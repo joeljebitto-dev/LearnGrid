@@ -37,8 +37,8 @@ pnpm dev:fast
 curl http://127.0.0.1:8001/health/
 ```
 
-The default runner starts PostgreSQL, Redis, all backend services, and the frontend. Press
-`Ctrl+C` to stop app processes. PostgreSQL and Redis stay running; stop them with:
+The default runner starts PostgreSQL, Redis, MinIO, all backend services, and the frontend. Press
+`Ctrl+C` to stop app processes. PostgreSQL, Redis, and MinIO stay running; stop them with:
 
 ```bash
 pnpm dev:infra:down

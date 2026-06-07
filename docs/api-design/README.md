@@ -19,6 +19,9 @@ API design documents use stable IDs:
 | [API-005](API-005-institution-batch-department-management.md) | Institution, Batch, And Department Management | [T-005](../tasks/T-005-institution-batch-department-management.md) | [SPEC-005](../specs/005-institution-batch-department-management.md) |
 | [API-006](API-006-course-catalog-metadata.md) | Course Catalog And Metadata | [T-006](../tasks/T-006-course-catalog-metadata.md) | [SPEC-006](../specs/006-course-catalog-metadata.md) |
 | [API-007](API-007-course-structure-versioning.md) | Course Structure And Versioning | [T-007](../tasks/T-007-course-structure-versioning.md) | [SPEC-007](../specs/007-course-structure-versioning.md) |
+| [API-008](API-008-content-upload-storage-access.md) | Content Upload, Storage, And Access | [T-008](../tasks/T-008-content-upload-storage-access.md) | [SPEC-008](../specs/008-content-upload-storage-access.md) |
+| [API-009](API-009-enrollment-access-management.md) | Enrollment And Access Management | [T-009](../tasks/T-009-enrollment-access-management.md) | [SPEC-009](../specs/009-enrollment-access-management.md) |
+| [API-010](API-010-learning-progress-tracking.md) | Learning Progress Tracking | [T-010](../tasks/T-010-learning-progress-tracking.md) | [SPEC-010](../specs/010-learning-progress-tracking.md) |
 
 ## Rules
 - Add one `API-###-<topic>.md` file after a task with API design is implemented.

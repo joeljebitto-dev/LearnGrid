@@ -20,3 +20,7 @@ Source: [SRD.pdf](SRD.pdf)
 - CHG-011 Added overall `DB_STRUCTURE.md` and `API_STRUCTURE.md` aggregate documentation for schema tables/fields and implemented API contracts.
 - CHG-012 Implemented `T-006 Course Catalog And Metadata` with course-service catalog models, metadata APIs, lifecycle workflows, Redis catalog cache, local structured course events, tests, and design documentation.
 - CHG-013 Implemented `T-007 Course Structure And Versioning` with course-service modules, lessons, topics, reorder APIs, lesson publishing events, revision snapshots, tests, and design documentation.
+- CHG-014 Implemented the `T-008` content metadata/access baseline with upload validation, signed access, content permissions, versions, local content events, tests, and provider selection later resolved in `CHG-017`.
+- CHG-015 Implemented `T-009 Enrollment And Access Management` with enrollment state, batch/cohort jobs, history, access grants, access checks, local enrollment events, tests, and design documentation.
+- CHG-016 Implemented `T-010 Learning Progress Tracking` with lesson/video/assessment/course progress, idempotent event ingestion, local progress events, tests, and design documentation.
+- CHG-017 Resolved `OD-002` by selecting MinIO, added local MinIO infrastructure, completed `T-008.03`, and implemented presigned/proxy upload plus MinIO-backed signed download behavior in content-service.

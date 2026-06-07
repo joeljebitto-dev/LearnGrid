@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "scripts/run-dev.sh",
     "dev:fast": "scripts/run-dev.sh --skip-install --skip-migrations",
-    "dev:infra": "docker compose up -d postgres redis",
+    "dev:infra": "docker compose up -d postgres redis minio minio-init",
     "dev:infra:down": "docker compose down",
     "frontend:dev": "pnpm -C frontend dev",
     "frontend:build": "pnpm -C frontend build",

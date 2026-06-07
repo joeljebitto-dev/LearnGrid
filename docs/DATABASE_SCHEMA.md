@@ -532,12 +532,12 @@ Purpose: File or link metadata owned by content-service.
 | DB-CONTENT-001-F004 | `asset_type` | `VARCHAR(32)` | No | None | Enum: `video`, `pdf`, `document`, `image`, `link`, `assignment_resource` |
 | DB-CONTENT-001-F005 | `title` | `VARCHAR(255)` | No | None | Asset title |
 | DB-CONTENT-001-F006 | `status` | `VARCHAR(24)` | No | `'draft'` | Enum: `draft`, `published`, `deleted`, `quarantined` |
-| DB-CONTENT-001-F007 | `metadata` | `JSONB` | No | `'{}'::jsonb` | Flexible asset metadata |
+| DB-CONTENT-001-F007 | `metadata` | `JSONB` | No | `'{}'::jsonb` | Flexible asset metadata; stores upload workflow state such as `upload_status` |
 | DB-CONTENT-001-F008 | `created_at` | `TIMESTAMPTZ` | No | `now()` | Audit field |
 | DB-CONTENT-001-F009 | `updated_at` | `TIMESTAMPTZ` | No | `now()` | Audit field |
 | DB-CONTENT-001-F010 | `deleted_at` | `TIMESTAMPTZ` | Yes | None | Soft delete |
 
-Indexes: `idx_content_assets_institution_status`, `idx_content_assets_owner_profile_id`, `idx_content_assets_asset_type`.
+Indexes: `idx_content_assets_inst_status`, `idx_content_assets_owner`, `idx_content_assets_asset_type`.
 
 ### DB-CONTENT-002 `file_metadata`
 Purpose: Object storage metadata for uploaded files.
@@ -546,9 +546,9 @@ Purpose: Object storage metadata for uploaded files.
 | --- | --- | --- | --- | --- | --- |
 | DB-CONTENT-002-F001 | `id` | `UUID` | No | `gen_random_uuid()` | PK |
 | DB-CONTENT-002-F002 | `content_asset_id` | `UUID` | No | None | FK to `content_assets.id`, unique |
-| DB-CONTENT-002-F003 | `storage_provider` | `VARCHAR(32)` | No | None | Open decision: MinIO, S3, or equivalent |
-| DB-CONTENT-002-F004 | `bucket_name` | `VARCHAR(255)` | No | None | Object storage bucket |
-| DB-CONTENT-002-F005 | `object_key` | `TEXT` | No | None | Object storage key |
+| DB-CONTENT-002-F003 | `storage_provider` | `VARCHAR(32)` | No | `'minio'` | Resolved provider from OD-002 |
+| DB-CONTENT-002-F004 | `bucket_name` | `VARCHAR(255)` | No | None | MinIO bucket |
+| DB-CONTENT-002-F005 | `object_key` | `TEXT` | No | None | MinIO object key |
 | DB-CONTENT-002-F006 | `file_name` | `VARCHAR(255)` | No | None | Original file name |
 | DB-CONTENT-002-F007 | `mime_type` | `VARCHAR(128)` | No | None | Validated MIME type |
 | DB-CONTENT-002-F008 | `file_size_bytes` | `BIGINT` | No | None | Must be greater than 0 |
@@ -570,7 +570,7 @@ Purpose: Asset-level access grants.
 | DB-CONTENT-003-F006 | `expires_at` | `TIMESTAMPTZ` | Yes | None | Optional access expiry |
 | DB-CONTENT-003-F007 | `created_at` | `TIMESTAMPTZ` | No | `now()` | Audit field |
 
-Indexes: unique `uq_content_permissions_grant`, `idx_content_permissions_asset_id`, `idx_content_permissions_grantee`.
+Indexes: unique `uq_content_permissions_grant`, `idx_content_permissions_asset`, `idx_content_perms_grantee`.
 
 ### DB-CONTENT-004 `signed_access_records`
 Purpose: Track signed URL or authenticated download grants.
@@ -600,7 +600,7 @@ Purpose: Content version metadata.
 | DB-CONTENT-005-F006 | `created_by_profile_id` | `UUID` | No | None | Cross-service UUID reference |
 | DB-CONTENT-005-F007 | `created_at` | `TIMESTAMPTZ` | No | `now()` | Version timestamp |
 
-Indexes: unique `uq_content_versions_asset_version`, `idx_content_versions_asset_id`.
+Indexes: unique `uq_content_versions_asset_version`, `idx_content_versions_asset`.
 
 ## enrollment_db
 
@@ -621,7 +621,7 @@ Purpose: Student course enrollment and lifecycle state.
 | DB-ENROLL-001-F010 | `created_at` | `TIMESTAMPTZ` | No | `now()` | Audit field |
 | DB-ENROLL-001-F011 | `updated_at` | `TIMESTAMPTZ` | No | `now()` | Audit field |
 
-Indexes: unique `uq_enrollments_student_course`, `idx_enrollments_course_status`, `idx_enrollments_student_status`, `idx_enrollments_institution_id`.
+Indexes: unique `uq_enrollments_student_course`, `idx_enroll_course_status`, `idx_enroll_student_status`, `idx_enroll_institution_id`.
 
 ### DB-ENROLL-002 `batch_enrollments`
 Purpose: Batch-based enrollment jobs.
@@ -637,7 +637,7 @@ Purpose: Batch-based enrollment jobs.
 | DB-ENROLL-002-F007 | `created_at` | `TIMESTAMPTZ` | No | `now()` | Audit field |
 | DB-ENROLL-002-F008 | `updated_at` | `TIMESTAMPTZ` | No | `now()` | Audit field |
 
-Indexes: `idx_batch_enrollments_batch_course`, `idx_batch_enrollments_status`.
+Indexes: `idx_batch_enroll_batch_course`, `idx_batch_enroll_status`.
 
 ### DB-ENROLL-003 `cohort_enrollments`
 Purpose: Cohort-based enrollment jobs.
@@ -653,7 +653,7 @@ Purpose: Cohort-based enrollment jobs.
 | DB-ENROLL-003-F007 | `created_at` | `TIMESTAMPTZ` | No | `now()` | Audit field |
 | DB-ENROLL-003-F008 | `updated_at` | `TIMESTAMPTZ` | No | `now()` | Audit field |
 
-Indexes: `idx_cohort_enrollments_cohort_course`, `idx_cohort_enrollments_status`.
+Indexes: `idx_cohort_enroll_course`, `idx_cohort_enroll_status`.
 
 ### DB-ENROLL-004 `enrollment_history`
 Purpose: Immutable enrollment status and access audit history.
@@ -668,7 +668,7 @@ Purpose: Immutable enrollment status and access audit history.
 | DB-ENROLL-004-F006 | `reason` | `TEXT` | Yes | None | Change reason |
 | DB-ENROLL-004-F007 | `created_at` | `TIMESTAMPTZ` | No | `now()` | Audit timestamp |
 
-Indexes: `idx_enrollment_history_enrollment_id`, `idx_enrollment_history_created_at`.
+Indexes: `idx_enroll_history_enroll`, `idx_enroll_history_created`.
 
 ### DB-ENROLL-005 `access_grants`
 Purpose: Derived course access grants for enforcement.
@@ -685,7 +685,7 @@ Purpose: Derived course access grants for enforcement.
 | DB-ENROLL-005-F008 | `created_at` | `TIMESTAMPTZ` | No | `now()` | Audit field |
 | DB-ENROLL-005-F009 | `updated_at` | `TIMESTAMPTZ` | No | `now()` | Audit field |
 
-Indexes: `idx_access_grants_student_course`, `idx_access_grants_course_status`, unique partial `uq_active_access_grant`.
+Indexes: `idx_access_student_course`, `idx_access_course_status`, unique partial `uq_active_access_grant`.
 
 ## progress_db
 
@@ -704,7 +704,7 @@ Purpose: Track learner lesson completion.
 | DB-PROGRESS-001-F008 | `completed_at` | `TIMESTAMPTZ` | Yes | None | Completion timestamp |
 | DB-PROGRESS-001-F009 | `updated_at` | `TIMESTAMPTZ` | No | `now()` | Update timestamp |
 
-Indexes: unique `uq_lesson_progress_student_lesson`, `idx_lesson_progress_course_status`, `idx_lesson_progress_student_course`.
+Indexes: unique `uq_lesson_progress_student_lesson`, `idx_lesson_progress_course`, `idx_lesson_progress_student`.
 
 ### DB-PROGRESS-002 `video_progress`
 Purpose: Track learner video playback progress.
@@ -721,7 +721,7 @@ Purpose: Track learner video playback progress.
 | DB-PROGRESS-002-F008 | `completed_at` | `TIMESTAMPTZ` | Yes | None | Completion timestamp |
 | DB-PROGRESS-002-F009 | `updated_at` | `TIMESTAMPTZ` | No | `now()` | Update timestamp |
 
-Indexes: unique `uq_video_progress_student_asset`, `idx_video_progress_course_id`.
+Indexes: unique `uq_video_progress_student_asset`, `idx_video_progress_course`.
 
 ### DB-PROGRESS-003 `assessment_progress`
 Purpose: Track quiz, exam, and assignment progress summary.
@@ -737,7 +737,7 @@ Purpose: Track quiz, exam, and assignment progress summary.
 | DB-PROGRESS-003-F007 | `last_submitted_at` | `TIMESTAMPTZ` | Yes | None | Last submission |
 | DB-PROGRESS-003-F008 | `updated_at` | `TIMESTAMPTZ` | No | `now()` | Update timestamp |
 
-Indexes: unique `uq_assessment_progress_student_assessment`, `idx_assessment_progress_course_status`.
+Indexes: unique `uq_assess_progress_student_assess`, `idx_assess_progress_course`.
 
 ### DB-PROGRESS-004 `course_progress`
 Purpose: Course completion percentage and dashboard summary.
@@ -754,7 +754,7 @@ Purpose: Course completion percentage and dashboard summary.
 | DB-PROGRESS-004-F008 | `completed_at` | `TIMESTAMPTZ` | Yes | None | Completion timestamp |
 | DB-PROGRESS-004-F009 | `updated_at` | `TIMESTAMPTZ` | No | `now()` | Update timestamp |
 
-Indexes: unique `uq_course_progress_student_course`, `idx_course_progress_course_status`, `idx_course_progress_student_status`.
+Indexes: unique `uq_course_progress_student_course`, `idx_course_progress_course`, `idx_course_progress_student`.
 
 ### DB-PROGRESS-005 `progress_events`
 Purpose: Idempotency and audit record for consumed progress events.

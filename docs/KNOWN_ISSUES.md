@@ -9,9 +9,10 @@ Related spec: [SPEC-019](specs/019-api-gateway.md).
 Related task: [T-019](tasks/T-019-api-gateway.md).
 
 ## OD-002 Object Storage Selection
-Status: Open.  
-Decision needed: Select MinIO for on-premise, S3-compatible cloud storage, or another object storage provider.  
-Related spec: [SPEC-008](specs/008-content-upload-storage-access.md).  
+Status: Resolved.
+Decision: Use MinIO as the canonical object storage provider for local, staging, and production deployments.
+Notes: S3 or other providers require a future explicit architecture decision. Production MinIO must be durable, clustered, or managed rather than the local Docker container.
+Related spec: [SPEC-008](specs/008-content-upload-storage-access.md).
 Related task: [T-008](tasks/T-008-content-upload-storage-access.md).
 
 ## OD-003 Deployment Model

@@ -14,6 +14,7 @@ dj-database-url = "^3.0.1"
 pyjwt = "^2.10.1"
 psycopg = { version = "^3.2.12", extras = ["binary"] }
 redis = "^7.0.1"
+minio = "^7.2.20"
 
 [tool.poetry.group.dev.dependencies]
 django-stubs = "^5.2.7"

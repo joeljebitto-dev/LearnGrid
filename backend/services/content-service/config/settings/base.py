@@ -43,6 +43,24 @@ DATABASES = {
 }
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+CONTENT_STORAGE_PROVIDER = os.getenv("CONTENT_STORAGE_PROVIDER", "minio")
+CONTENT_STORAGE_BUCKET = os.getenv("CONTENT_STORAGE_BUCKET", "learngrid-content")
+CONTENT_MINIO_ENDPOINT_URL = os.getenv("CONTENT_MINIO_ENDPOINT_URL", "http://127.0.0.1:9000")
+CONTENT_MINIO_ACCESS_KEY = os.getenv("CONTENT_MINIO_ACCESS_KEY", "learngrid")
+CONTENT_MINIO_SECRET_KEY = os.getenv("CONTENT_MINIO_SECRET_KEY", "learngrid-minio-secret")
+CONTENT_MINIO_SECURE = os.getenv("CONTENT_MINIO_SECURE", "false").lower() == "true"
+CONTENT_MAX_UPLOAD_SIZE_BYTES = int(os.getenv("CONTENT_MAX_UPLOAD_SIZE_BYTES", "104857600"))
+CONTENT_ALLOWED_MIME_TYPES = [
+    mime.strip()
+    for mime in os.getenv(
+        "CONTENT_ALLOWED_MIME_TYPES",
+        "video/mp4,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,text/plain",
+    ).split(",")
+    if mime.strip()
+]
+CONTENT_SIGNED_ACCESS_TTL_SECONDS = int(os.getenv("CONTENT_SIGNED_ACCESS_TTL_SECONDS", "300"))
+CONTENT_PRESIGNED_UPLOAD_TTL_SECONDS = int(os.getenv("CONTENT_PRESIGNED_UPLOAD_TTL_SECONDS", "900"))
+CONTENT_PRESIGNED_DOWNLOAD_TTL_SECONDS = int(os.getenv("CONTENT_PRESIGNED_DOWNLOAD_TTL_SECONDS", "300"))
 AUTH_SERVICE_BASE_URL = os.getenv("AUTH_SERVICE_BASE_URL", "http://127.0.0.1:8001")
 AUTH_JWT_SIGNING_KEY = os.getenv(
     "AUTH_JWT_SIGNING_KEY",

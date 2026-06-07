@@ -13,6 +13,10 @@ POSTGRES_PASSWORD_VALUE="${POSTGRES_PASSWORD:-learngrid}"
 POSTGRES_HOST_VALUE="${POSTGRES_HOST:-localhost}"
 POSTGRES_PORT_VALUE="${POSTGRES_PORT:-5432}"
 REDIS_URL_VALUE="${REDIS_URL:-redis://localhost:6379/0}"
+CONTENT_STORAGE_BUCKET_VALUE="${CONTENT_STORAGE_BUCKET:-learngrid-content}"
+CONTENT_MINIO_ENDPOINT_URL_VALUE="${CONTENT_MINIO_ENDPOINT_URL:-http://127.0.0.1:9000}"
+CONTENT_MINIO_ACCESS_KEY_VALUE="${CONTENT_MINIO_ACCESS_KEY:-learngrid}"
+CONTENT_MINIO_SECRET_KEY_VALUE="${CONTENT_MINIO_SECRET_KEY:-learngrid-minio-secret}"
 
 SERVICES=(
   "auth-service:auth_db:8001"
@@ -47,6 +51,10 @@ Environment:
   POSTGRES_HOST      Local PostgreSQL host. Defaults to "localhost".
   POSTGRES_PORT      Local PostgreSQL port. Defaults to "5432".
   REDIS_URL          Local Redis URL. Defaults to "redis://localhost:6379/0".
+  CONTENT_STORAGE_BUCKET      Local MinIO bucket. Defaults to "learngrid-content".
+  CONTENT_MINIO_ENDPOINT_URL  Local MinIO endpoint. Defaults to "http://127.0.0.1:9000".
+  CONTENT_MINIO_ACCESS_KEY    Local MinIO access key. Defaults to "learngrid".
+  CONTENT_MINIO_SECRET_KEY    Local MinIO secret key. Defaults to "learngrid-minio-secret".
 EOF
 }
 
@@ -147,8 +155,11 @@ PY
 }
 
 start_infrastructure() {
-  log "Starting PostgreSQL and Redis..."
-  compose up -d postgres redis
+  log "Starting PostgreSQL, Redis, and MinIO..."
+  MINIO_ROOT_USER="$CONTENT_MINIO_ACCESS_KEY_VALUE" \
+    MINIO_ROOT_PASSWORD="$CONTENT_MINIO_SECRET_KEY_VALUE" \
+    CONTENT_STORAGE_BUCKET="$CONTENT_STORAGE_BUCKET_VALUE" \
+    compose up -d postgres redis minio
 
   log "Waiting for PostgreSQL..."
   until compose exec -T postgres pg_isready -U "$POSTGRES_USER_VALUE" -d learngrid >/dev/null 2>&1; do
@@ -159,6 +170,24 @@ start_infrastructure() {
   until compose exec -T redis redis-cli ping >/dev/null 2>&1; do
     sleep 1
   done
+
+  log "Waiting for MinIO..."
+  until python3 - "$CONTENT_MINIO_ENDPOINT_URL_VALUE/minio/health/ready" <<'PY' >/dev/null 2>&1; do
+import sys
+from urllib.request import urlopen
+
+with urlopen(sys.argv[1], timeout=2) as response:
+    if response.status >= 500:
+        raise SystemExit(1)
+PY
+    sleep 1
+  done
+
+  log "Ensuring MinIO bucket exists..."
+  MINIO_ROOT_USER="$CONTENT_MINIO_ACCESS_KEY_VALUE" \
+    MINIO_ROOT_PASSWORD="$CONTENT_MINIO_SECRET_KEY_VALUE" \
+    CONTENT_STORAGE_BUCKET="$CONTENT_STORAGE_BUCKET_VALUE" \
+    compose up minio-init >/dev/null
 }
 
 ensure_database() {
@@ -228,6 +257,12 @@ export_backend_env() {
   export SERVICE_PORT="$port"
   export DATABASE_URL="postgresql://${POSTGRES_USER_VALUE}:${POSTGRES_PASSWORD_VALUE}@${POSTGRES_HOST_VALUE}:${POSTGRES_PORT_VALUE}/${database_name}"
   export REDIS_URL="$REDIS_URL_VALUE"
+  export CONTENT_STORAGE_PROVIDER=minio
+  export CONTENT_STORAGE_BUCKET="$CONTENT_STORAGE_BUCKET_VALUE"
+  export CONTENT_MINIO_ENDPOINT_URL="$CONTENT_MINIO_ENDPOINT_URL_VALUE"
+  export CONTENT_MINIO_ACCESS_KEY="$CONTENT_MINIO_ACCESS_KEY_VALUE"
+  export CONTENT_MINIO_SECRET_KEY="$CONTENT_MINIO_SECRET_KEY_VALUE"
+  export CONTENT_MINIO_SECURE="${CONTENT_MINIO_SECURE:-false}"
   export AUTH_SERVICE_BASE_URL="${AUTH_SERVICE_BASE_URL:-http://127.0.0.1:8001}"
   export AUTH_JWT_SIGNING_KEY="${AUTH_JWT_SIGNING_KEY:-${DJANGO_SECRET_KEY:-insecure-local-auth-service-change-me-32bytes}}"
   export AUTH_JWT_ISSUER="${AUTH_JWT_ISSUER:-learngrid-auth-service}"
@@ -347,6 +382,8 @@ print_running_summary() {
   cat <<'EOF'
 [dev] LearnGrid LMS is running.
 [dev] Frontend: http://127.0.0.1:5173
+[dev] MinIO API: http://127.0.0.1:9000
+[dev] MinIO Console: http://127.0.0.1:9001
 [dev] Backend health endpoints:
 [dev]   auth-service         http://127.0.0.1:8001/health/
 [dev]   user-service         http://127.0.0.1:8002/health/
@@ -358,7 +395,7 @@ print_running_summary() {
 [dev]   grading-service      http://127.0.0.1:8008/health/
 [dev]   notification-service http://127.0.0.1:8009/health/
 [dev]   analytics-service    http://127.0.0.1:8010/health/
-[dev] Press Ctrl+C to stop app processes. PostgreSQL and Redis stay running.
+[dev] Press Ctrl+C to stop app processes. PostgreSQL, Redis, and MinIO stay running.
 EOF
 }
 

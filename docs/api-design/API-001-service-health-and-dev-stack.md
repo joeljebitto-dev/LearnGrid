@@ -36,7 +36,7 @@ Implemented backend service ports:
 | --- | --- |
 | `pnpm dev` | Start full local stack with installs, migrations, health waits, and logs |
 | `pnpm dev:fast` | Start full local stack while skipping installs and migrations |
-| `pnpm dev:infra` | Start PostgreSQL and Redis only |
+| `pnpm dev:infra` | Start PostgreSQL, Redis, and MinIO only |
 | `pnpm dev:infra:down` | Stop Docker Compose infrastructure |
 
 ## Failure Behavior

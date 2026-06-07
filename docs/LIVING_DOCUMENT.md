@@ -6,8 +6,10 @@ Source: [SRD.pdf](SRD.pdf)
 The repository contains the SRD, documentation set, the completed `T-001` monorepo scaffold,
 completed `T-002` token/session security, completed `T-003` RBAC/object authorization, and
 completed `T-004` user/profile management, completed `T-005` institution, department, and
-batch management, completed `T-006` course catalog metadata, and completed `T-007` course
-structure/versioning.
+batch management, completed `T-006` course catalog metadata, completed `T-007` course
+structure/versioning, completed `T-008` content upload/storage/access with MinIO object storage,
+completed `T-009` enrollment/access management, and completed `T-010`
+learning progress tracking.
 The scaffold includes the React `frontend-service`, Django REST Framework baselines for `SVC-001`
 through `SVC-010`, local PostgreSQL and Redis Compose configuration, health endpoints, lockfiles,
 basic tests, and GitHub Actions CI. Auth-service now includes JWT access and refresh token APIs,
@@ -23,7 +25,9 @@ filtering, pagination, and soft-delete behavior. Course-service now owns course 
 categories, tags, prerequisites, learning outcomes, published catalog cache behavior, lifecycle
 workflows, and local structured course events. Course-service also owns ordered modules, lessons,
 topics, lesson publishing, structure reordering, and course revision snapshots. Content domain
-models, production Kubernetes manifests, and remaining non-auth feature APIs remain for later tasks.
+metadata, MinIO-backed upload and signed access, enrollment/access management, and learning
+progress tracking are now implemented in their owning services. Kubernetes manifests and remaining
+non-auth feature APIs remain for later tasks.
 
 ## LD-002 Source Of Truth
 - Product and architecture requirements come from [SRD.pdf](SRD.pdf).
@@ -48,7 +52,6 @@ models, production Kubernetes manifests, and remaining non-auth feature APIs rem
 ## LD-004 Open Decision Register
 The following decisions remain open:
 - [OD-001 API Gateway Selection](KNOWN_ISSUES.md#od-001-api-gateway-selection)
-- [OD-002 Object Storage Selection](KNOWN_ISSUES.md#od-002-object-storage-selection)
 - [OD-003 Deployment Model](KNOWN_ISSUES.md#od-003-deployment-model)
 - [OD-004 Authentication Model](KNOWN_ISSUES.md#od-004-authentication-model)
 - [OD-005 Analytics Storage](KNOWN_ISSUES.md#od-005-analytics-storage)

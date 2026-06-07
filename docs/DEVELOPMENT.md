@@ -16,9 +16,9 @@ Start the complete local LearnGrid LMS stack:
 pnpm dev
 ```
 
-The command starts PostgreSQL, Redis, all ten Django backend services, and the Vite frontend.
-It also installs dependencies, ensures service databases exist, runs backend migrations, waits
-for health endpoints, and streams prefixed logs.
+The command starts PostgreSQL, Redis, MinIO, all ten Django backend services, and the Vite
+frontend. It also installs dependencies, ensures service databases and the MinIO content bucket
+exist, runs backend migrations, waits for health endpoints, and streams prefixed logs.
 
 For repeat starts after dependencies and migrations are already prepared:
 
@@ -26,8 +26,8 @@ For repeat starts after dependencies and migrations are already prepared:
 pnpm dev:fast
 ```
 
-`Ctrl+C` stops the backend and frontend processes. PostgreSQL and Redis are left running so
-local data is preserved.
+`Ctrl+C` stops the backend and frontend processes. PostgreSQL, Redis, and MinIO are left running
+so local data is preserved.
 
 Stop local infrastructure:
 
@@ -42,7 +42,7 @@ POETRY_BIN=/path/to/poetry pnpm dev
 ```
 
 ## Local Infrastructure
-Start PostgreSQL and Redis:
+Start PostgreSQL, Redis, and MinIO:
 
 ```bash
 pnpm dev:infra
@@ -53,6 +53,16 @@ PostgreSQL initialization creates these service databases:
 `assessment_db`, `grading_db`, `notification_db`, and `analytics_db`.
 The run script also checks and creates these databases when an existing Docker volume skipped
 the initialization SQL.
+
+MinIO local defaults:
+
+| Item | Value |
+| --- | --- |
+| API URL | `http://127.0.0.1:9000` |
+| Console URL | `http://127.0.0.1:9001` |
+| Root user | `learngrid` |
+| Root password | `learngrid-minio-secret` |
+| Content bucket | `learngrid-content` |
 
 ## Frontend Service
 The frontend service is `SVC-011 frontend-service`.
@@ -293,6 +303,31 @@ Structure writes require `course.manage` at the course institution. Published st
 require `course.view` and hide draft lessons plus non-published modules. Management reads include
 draft, published, and archived active structure records. Course structure writes invalidate the
 published catalog cache.
+
+## Content Upload, Storage, And Access
+`content-service` implements [T-008](tasks/T-008-content-upload-storage-access.md) under
+`/api/content/`. [OD-002](KNOWN_ISSUES.md#od-002-object-storage-selection) selects MinIO as the
+object storage provider. Asset metadata registration validates that the MinIO object exists.
+Presigned uploads use `POST /api/content/assets/uploads/presigned/` and
+`POST /api/content/assets/<uuid>/uploads/complete/`; backend proxy uploads use
+`POST /api/content/assets/uploads/proxy/`. Signed access creates hashed one-time token records,
+then `/api/content/download/<uuid>/?token=...` returns a short-lived MinIO presigned GET URL.
+Publish and delete emit `ContentPublished` and `ContentDeleted`; upload completion emits
+`ContentUploaded`.
+
+## Enrollment And Access Management
+`enrollment-service` implements [T-009](tasks/T-009-enrollment-access-management.md) under
+`/api/enrollments/`. It supports individual enrollments, batch and cohort enrollment jobs,
+status transitions, history reads, and `GET /api/enrollments/access/check/`. Enrollment changes
+synchronize derived access grants and emit local `StudentEnrolled`, `StudentRemovedFromCourse`,
+and `CourseAccessExpired` events.
+
+## Learning Progress Tracking
+`progress-service` implements [T-010](tasks/T-010-learning-progress-tracking.md) under
+`/api/progress/`. It supports lesson, video, and assessment progress updates, course progress
+reads, and idempotent event ingestion for `LessonViewed`, `VideoCompleted`, `QuizSubmitted`, and
+`AssignmentSubmitted`. Optional `total_lessons` and `total_assessments` provide course completion
+denominators until cross-service course aggregate reads are added.
 
 ## CI
 GitHub Actions runs frontend lint, typecheck, tests, and build. It also runs Ruff, Django checks,
