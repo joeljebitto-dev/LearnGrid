@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: learngrid-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-learngrid}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-learngrid}
+      POSTGRES_DB: learngrid
+    ports:
+      - "5432:5432"
+    volumes:
+      - learngrid_postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-learngrid} -d learngrid"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: learngrid-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - learngrid_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  learngrid_postgres_data:
+  learngrid_redis_data:
+

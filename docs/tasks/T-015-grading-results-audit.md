@@ -1,0 +1,13 @@
+# T-015 Grading, Results, And Audit
+
+Related spec: [SPEC-015](../specs/015-grading-results-audit.md)  
+Related schema: [grading_db](../DATABASE_SCHEMA.md#grading_db)
+
+- [ ] T-015.01 Implement grading rules model and APIs.
+- [ ] T-015.02 Implement automated grading for objective quiz answers.
+- [ ] T-015.03 Implement manual review workflow for subjective submissions.
+- [ ] T-015.04 Implement grade override workflow with required reason.
+- [ ] T-015.05 Implement grade publishing workflow.
+- [ ] T-015.06 Preserve grade history for all grade changes.
+- [ ] T-015.07 Emit GradeCalculated and GradePublished events.
+- [ ] T-015.08 Add tests for calculated, manual, overridden, published, and unauthorized grade flows.

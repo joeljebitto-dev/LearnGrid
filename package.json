@@ -1,0 +1,16 @@
+{
+  "name": "learngrid-lms",
+  "private": true,
+  "packageManager": "pnpm@11.2.2",
+  "scripts": {
+    "dev": "scripts/run-dev.sh",
+    "dev:fast": "scripts/run-dev.sh --skip-install --skip-migrations",
+    "dev:infra": "docker compose up -d postgres redis",
+    "dev:infra:down": "docker compose down",
+    "frontend:dev": "pnpm -C frontend dev",
+    "frontend:build": "pnpm -C frontend build",
+    "frontend:lint": "pnpm -C frontend lint",
+    "frontend:test": "pnpm -C frontend test",
+    "frontend:typecheck": "pnpm -C frontend typecheck"
+  }
+}
