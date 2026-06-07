@@ -6,9 +6,14 @@ from .models import (
     Course,
     CourseCategory,
     CourseDifficulty,
+    CourseModule,
+    CourseRevision,
     CourseStatus,
     CourseTag,
     LearningOutcome,
+    Lesson,
+    StructureStatus,
+    Topic,
 )
 from .services import normalize_slug
 
@@ -56,6 +61,99 @@ class LearningOutcomeSerializer(serializers.ModelSerializer):
     class Meta:
         model = LearningOutcome
         fields = ["id", "description", "position", "created_at", "updated_at"]
+
+
+class TopicSerializer(serializers.ModelSerializer):
+    lesson_id = serializers.UUIDField(read_only=True)
+
+    class Meta:
+        model = Topic
+        fields = [
+            "id",
+            "lesson_id",
+            "title",
+            "position",
+            "content_asset_id",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class LessonSerializer(serializers.ModelSerializer):
+    course_id = serializers.UUIDField(read_only=True)
+    module_id = serializers.UUIDField(read_only=True)
+    topics = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Lesson
+        fields = [
+            "id",
+            "course_id",
+            "module_id",
+            "title",
+            "summary",
+            "position",
+            "status",
+            "content_asset_id",
+            "published_at",
+            "topics",
+            "created_at",
+            "updated_at",
+            "deleted_at",
+        ]
+
+    def get_topics(self, obj: Lesson) -> list[dict]:
+        topics = getattr(obj, "prefetched_topics", None)
+        if topics is None:
+            topics = obj.topics.order_by("position", "id")
+        return [TopicSerializer(topic).data for topic in topics]
+
+
+class CourseModuleSerializer(serializers.ModelSerializer):
+    course_id = serializers.UUIDField(read_only=True)
+    lessons = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CourseModule
+        fields = [
+            "id",
+            "course_id",
+            "title",
+            "description",
+            "position",
+            "status",
+            "lessons",
+            "created_at",
+            "updated_at",
+            "deleted_at",
+        ]
+
+    def get_lessons(self, obj: CourseModule) -> list[dict]:
+        lessons = getattr(obj, "prefetched_lessons", None)
+        if lessons is None:
+            lessons = obj.lessons.order_by("position", "id")
+        return [LessonSerializer(lesson).data for lesson in lessons]
+
+
+class CourseStructureSerializer(serializers.ModelSerializer):
+    modules = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Course
+        fields = [
+            "id",
+            "institution_id",
+            "title",
+            "slug",
+            "status",
+            "modules",
+        ]
+
+    def get_modules(self, obj: Course) -> list[dict]:
+        modules = getattr(obj, "prefetched_modules", None)
+        if modules is None:
+            modules = obj.modules.order_by("position", "id")
+        return [CourseModuleSerializer(module).data for module in modules]
 
 
 class CourseSerializer(serializers.ModelSerializer):
@@ -206,6 +304,97 @@ class CourseSearchSerializer(serializers.Serializer):
     tag_id = serializers.UUIDField(required=False)
     q = serializers.CharField(required=False, allow_blank=True, max_length=255)
     sort = serializers.ChoiceField(choices=COURSE_SORT_CHOICES, default="-created_at", required=False)
+
+
+class ModuleCreateSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=255)
+    description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    position = serializers.IntegerField(required=False, min_value=1)
+    status = serializers.ChoiceField(
+        choices=StructureStatus.choices,
+        default=StructureStatus.DRAFT,
+        required=False,
+    )
+
+
+class ModuleUpdateSerializer(serializers.Serializer):
+    title = serializers.CharField(required=False, max_length=255)
+    description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    position = serializers.IntegerField(required=False, min_value=1)
+    status = serializers.ChoiceField(choices=StructureStatus.choices, required=False)
+
+
+class LessonCreateSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=255)
+    summary = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    position = serializers.IntegerField(required=False, min_value=1)
+    status = serializers.ChoiceField(
+        choices=StructureStatus.choices,
+        default=StructureStatus.DRAFT,
+        required=False,
+    )
+    content_asset_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class LessonUpdateSerializer(serializers.Serializer):
+    module_id = serializers.UUIDField(required=False)
+    title = serializers.CharField(required=False, max_length=255)
+    summary = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    position = serializers.IntegerField(required=False, min_value=1)
+    status = serializers.ChoiceField(choices=StructureStatus.choices, required=False)
+    content_asset_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class TopicCreateSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=255)
+    position = serializers.IntegerField(required=False, min_value=1)
+    content_asset_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class TopicUpdateSerializer(serializers.Serializer):
+    title = serializers.CharField(required=False, max_length=255)
+    position = serializers.IntegerField(required=False, min_value=1)
+    content_asset_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class ModuleReorderSerializer(serializers.Serializer):
+    module_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        allow_empty=False,
+    )
+
+
+class LessonReorderSerializer(serializers.Serializer):
+    lesson_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        allow_empty=False,
+    )
+
+
+class TopicReorderSerializer(serializers.Serializer):
+    topic_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        allow_empty=False,
+    )
+
+
+class CourseRevisionSerializer(serializers.ModelSerializer):
+    course_id = serializers.UUIDField(read_only=True)
+
+    class Meta:
+        model = CourseRevision
+        fields = [
+            "id",
+            "course_id",
+            "version_number",
+            "snapshot",
+            "created_by_profile_id",
+            "created_at",
+        ]
+
+
+class CourseRevisionCreateSerializer(serializers.Serializer):
+    created_by_profile_id = serializers.UUIDField(required=False)
 
 
 class CategoryCreateSerializer(serializers.Serializer):

@@ -4,10 +4,15 @@ from .models import (
     Course,
     CourseCategory,
     CourseCategoryLink,
+    CourseModule,
     CoursePrerequisite,
+    CourseRevision,
     CourseStatus,
     CourseTag,
     CourseTagLink,
+    Lesson,
+    StructureStatus,
+    Topic,
 )
 
 
@@ -43,6 +48,43 @@ def category_queryset() -> QuerySet[CourseCategory]:
 
 def tag_queryset() -> QuerySet[CourseTag]:
     return CourseTag.objects.all()
+
+
+def module_queryset() -> QuerySet[CourseModule]:
+    return CourseModule.objects.select_related("course").filter(deleted_at__isnull=True)
+
+
+def lesson_queryset() -> QuerySet[Lesson]:
+    return Lesson.objects.select_related("course", "module").filter(deleted_at__isnull=True)
+
+
+def topic_queryset() -> QuerySet[Topic]:
+    return Topic.objects.select_related("lesson", "lesson__module", "lesson__course")
+
+
+def revision_queryset() -> QuerySet[CourseRevision]:
+    return CourseRevision.objects.select_related("course")
+
+
+def course_structure_queryset(*, management: bool = False) -> QuerySet[Course]:
+    modules = CourseModule.objects.filter(deleted_at__isnull=True).order_by("position", "id")
+    lessons = Lesson.objects.filter(deleted_at__isnull=True).order_by("position", "id")
+    if not management:
+        modules = modules.filter(status=StructureStatus.PUBLISHED)
+        lessons = lessons.filter(status=StructureStatus.PUBLISHED)
+    lessons = lessons.prefetch_related(
+        Prefetch(
+            "topics",
+            queryset=Topic.objects.order_by("position", "id"),
+            to_attr="prefetched_topics",
+        )
+    )
+    modules = modules.prefetch_related(
+        Prefetch("lessons", queryset=lessons, to_attr="prefetched_lessons")
+    )
+    return Course.objects.prefetch_related(
+        Prefetch("modules", queryset=modules, to_attr="prefetched_modules")
+    )
 
 
 def search_courses(filters: dict, *, management: bool = False) -> QuerySet[Course]:

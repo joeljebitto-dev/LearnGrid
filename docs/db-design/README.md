@@ -18,6 +18,7 @@ Database design documents use stable IDs:
 | [DBD-004](DBD-004-user-profile-management.md) | User Profile Management | [T-004](../tasks/T-004-user-profile-management.md) | [SPEC-004](../specs/004-user-profile-management.md) |
 | [DBD-005](DBD-005-institution-batch-department-management.md) | Institution, Batch, And Department Management | [T-005](../tasks/T-005-institution-batch-department-management.md) | [SPEC-005](../specs/005-institution-batch-department-management.md) |
 | [DBD-006](DBD-006-course-catalog-metadata.md) | Course Catalog And Metadata | [T-006](../tasks/T-006-course-catalog-metadata.md) | [SPEC-006](../specs/006-course-catalog-metadata.md) |
+| [DBD-007](DBD-007-course-structure-versioning.md) | Course Structure And Versioning | [T-007](../tasks/T-007-course-structure-versioning.md) | [SPEC-007](../specs/007-course-structure-versioning.md) |
 
 ## Rules
 - Keep [DATABASE_SCHEMA.md](../DATABASE_SCHEMA.md) as the field-level source of truth.

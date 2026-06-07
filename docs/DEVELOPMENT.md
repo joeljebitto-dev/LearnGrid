@@ -249,6 +249,51 @@ Course lifecycle emits structured local `CourseCreated`, `CoursePublished`, and
 `timestamp`, `version`, `correlation_id`, and `payload`. Kafka transport remains future
 [T-020](tasks/T-020-kafka-eventing.md) scope.
 
+## Course Structure And Versioning
+`course-service` implements ordered course structure for
+[T-007](tasks/T-007-course-structure-versioning.md). It owns `course_modules`, `lessons`,
+`topics`, and `course_revisions` in `course_db`.
+
+Structure APIs:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/courses/<uuid>/structure/` | Read nested modules, lessons, and topics |
+| `GET` | `/api/courses/<uuid>/modules/` | List modules in a course |
+| `POST` | `/api/courses/<uuid>/modules/` | Create a module |
+| `GET` | `/api/courses/modules/<uuid>/` | Read a module |
+| `PATCH` | `/api/courses/modules/<uuid>/` | Update a module |
+| `DELETE` | `/api/courses/modules/<uuid>/` | Soft-archive a module |
+| `POST` | `/api/courses/<uuid>/modules/reorder/` | Reorder all active modules |
+| `GET` | `/api/courses/modules/<uuid>/lessons/` | List lessons in a module |
+| `POST` | `/api/courses/modules/<uuid>/lessons/` | Create a lesson |
+| `GET` | `/api/courses/lessons/<uuid>/` | Read a lesson |
+| `PATCH` | `/api/courses/lessons/<uuid>/` | Update a lesson or move it within the same course |
+| `DELETE` | `/api/courses/lessons/<uuid>/` | Soft-archive a lesson |
+| `POST` | `/api/courses/lessons/<uuid>/publish/` | Publish a lesson and emit `LessonPublished` |
+| `POST` | `/api/courses/modules/<uuid>/lessons/reorder/` | Reorder all active lessons in a module |
+| `GET` | `/api/courses/lessons/<uuid>/topics/` | List topics in a lesson |
+| `POST` | `/api/courses/lessons/<uuid>/topics/` | Create a topic |
+| `GET` | `/api/courses/topics/<uuid>/` | Read a topic |
+| `PATCH` | `/api/courses/topics/<uuid>/` | Update a topic |
+| `DELETE` | `/api/courses/topics/<uuid>/` | Delete a topic |
+| `POST` | `/api/courses/lessons/<uuid>/topics/reorder/` | Reorder all topics in a lesson |
+| `GET` | `/api/courses/<uuid>/revisions/` | List course revision snapshots |
+| `POST` | `/api/courses/<uuid>/revisions/` | Create a course structure snapshot |
+| `GET` | `/api/courses/revisions/<uuid>/` | Read one revision snapshot |
+
+Module payload fields are `title`, `description`, optional `position`, and optional `status`.
+Lesson payload fields are `title`, `summary`, optional `position`, optional `status`, and
+optional `content_asset_id`; update also accepts `module_id` for moving within the same course.
+Topic payload fields are `title`, optional `position`, and optional `content_asset_id`.
+Reorder requests use `module_ids`, `lesson_ids`, or `topic_ids` and must include the complete
+active set for that scope.
+
+Structure writes require `course.manage` at the course institution. Published structure reads
+require `course.view` and hide draft lessons plus non-published modules. Management reads include
+draft, published, and archived active structure records. Course structure writes invalidate the
+published catalog cache.
+
 ## CI
 GitHub Actions runs frontend lint, typecheck, tests, and build. It also runs Ruff, Django checks,
 and pytest for each backend service.

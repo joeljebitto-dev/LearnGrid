@@ -454,7 +454,7 @@ Purpose: Ordered modules inside a course.
 | DB-COURSE-007-F008 | `updated_at` | `TIMESTAMPTZ` | No | `now()` | Audit field |
 | DB-COURSE-007-F009 | `deleted_at` | `TIMESTAMPTZ` | Yes | None | Soft delete |
 
-Indexes: unique `uq_course_modules_course_position`, `idx_course_modules_course_status`.
+Indexes: unique `uq_course_modules_course_position`, `idx_modules_course_status`.
 
 ### DB-COURSE-008 `lessons`
 Purpose: Ordered lessons inside modules.
@@ -506,7 +506,7 @@ Purpose: Course learning outcomes.
 Indexes: unique `uq_learning_outcomes_course_position`, `idx_learning_outcomes_course_id`.
 
 ### DB-COURSE-011 `course_revisions`
-Purpose: Future course versioning and content revision history.
+Purpose: Course versioning and content revision history.
 
 | Field ID | Field name | PostgreSQL datatype | Nullable | Default | Key and details |
 | --- | --- | --- | --- | --- | --- |
@@ -517,7 +517,7 @@ Purpose: Future course versioning and content revision history.
 | DB-COURSE-011-F005 | `created_by_profile_id` | `UUID` | No | None | Cross-service UUID reference |
 | DB-COURSE-011-F006 | `created_at` | `TIMESTAMPTZ` | No | `now()` | Revision timestamp |
 
-Indexes: unique `uq_course_revisions_course_version`, `idx_course_revisions_course_id`.
+Indexes: unique `uq_course_revisions_course_version`, `idx_course_revisions_course`.
 
 ## content_db
 

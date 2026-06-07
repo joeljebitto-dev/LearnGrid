@@ -9,7 +9,7 @@ Aggregate structure: [DB_STRUCTURE.md](../DB_STRUCTURE.md#course_db)
 `course-service` owns the T-006 course catalog metadata subset in `course_db`.
 This implemented design covers catalog records, categories, tags, category/tag links,
 prerequisites, and ordered learning outcomes. Course modules, lessons, topics, and
-course revisions remain future `T-007` scope.
+course revisions are covered by [DBD-007](DBD-007-course-structure-versioning.md).
 
 ## DBD-006-002 Implemented Tables
 | Table ID | Table | Purpose | Implemented in T-006 |

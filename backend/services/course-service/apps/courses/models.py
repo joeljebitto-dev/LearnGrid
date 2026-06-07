@@ -19,6 +19,12 @@ class CourseDifficulty(models.TextChoices):
     ADVANCED = "advanced", "Advanced"
 
 
+class StructureStatus(models.TextChoices):
+    DRAFT = "draft", "Draft"
+    PUBLISHED = "published", "Published"
+    ARCHIVED = "archived", "Archived"
+
+
 class Course(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     institution_id = models.UUIDField()
@@ -235,3 +241,119 @@ class LearningOutcome(models.Model):
 
     def __str__(self) -> str:
         return self.description
+
+
+class CourseModule(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="modules")
+    title = models.CharField(max_length=255)
+    description = models.TextField(null=True, blank=True)
+    position = models.PositiveIntegerField()
+    status = models.CharField(
+        max_length=24,
+        choices=StructureStatus.choices,
+        default=StructureStatus.DRAFT,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "course_modules"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["course", "position"],
+                name="uq_course_modules_course_position",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["course", "status"], name="idx_modules_course_status"),
+        ]
+        ordering = ["position", "id"]
+
+    def __str__(self) -> str:
+        return self.title
+
+
+class Lesson(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="lessons")
+    module = models.ForeignKey(CourseModule, on_delete=models.CASCADE, related_name="lessons")
+    title = models.CharField(max_length=255)
+    summary = models.TextField(null=True, blank=True)
+    position = models.PositiveIntegerField()
+    status = models.CharField(
+        max_length=24,
+        choices=StructureStatus.choices,
+        default=StructureStatus.DRAFT,
+    )
+    content_asset_id = models.UUIDField(null=True, blank=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "lessons"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["module", "position"],
+                name="uq_lessons_module_position",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["course", "status"], name="idx_lessons_course_status"),
+            models.Index(fields=["module"], name="idx_lessons_module_id"),
+        ]
+        ordering = ["position", "id"]
+
+    def __str__(self) -> str:
+        return self.title
+
+
+class Topic(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name="topics")
+    title = models.CharField(max_length=255)
+    position = models.PositiveIntegerField()
+    content_asset_id = models.UUIDField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "topics"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["lesson", "position"],
+                name="uq_topics_lesson_position",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["lesson"], name="idx_topics_lesson_id"),
+        ]
+        ordering = ["position", "id"]
+
+    def __str__(self) -> str:
+        return self.title
+
+
+class CourseRevision(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="revisions")
+    version_number = models.PositiveIntegerField()
+    snapshot = models.JSONField()
+    created_by_profile_id = models.UUIDField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "course_revisions"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["course", "version_number"],
+                name="uq_course_revisions_course_version",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["course"], name="idx_course_revisions_course"),
+        ]
+        ordering = ["-version_number", "id"]

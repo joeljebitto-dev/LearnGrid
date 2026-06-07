@@ -6,7 +6,7 @@ Related tasks: [TASKS.md](TASKS.md)
 
 This file is the overall database structure reference for the application. It consolidates every documented database, table, field, datatype, key/constraint note, index note, relationship note, enum/status value, audit field, and soft-delete marker from the canonical schema.
 
-Implemented design notes currently exist for service database ownership, auth token/session storage, RBAC authorization, user profile management, institution/department/batch management, and course catalog metadata. Future-domain tables remain included here because they are part of the documented schema baseline.
+Implemented design notes currently exist for service database ownership, auth token/session storage, RBAC authorization, user profile management, institution/department/batch management, course catalog metadata, and course structure/versioning. Future-domain tables remain included here because they are part of the documented schema baseline.
 
 ## DB-000 Schema Rules
 - Production uses PostgreSQL with database-per-service ownership.
@@ -422,7 +422,7 @@ Indexes: `idx_user_import_jobs_institution_status`, `idx_user_import_jobs_reques
 ## course_db
 
 Owning service: `course-service`
-Related implemented design: [DBD-006 Course Catalog And Metadata](db-design/DBD-006-course-catalog-metadata.md) for `DB-COURSE-001` through `DB-COURSE-006` and `DB-COURSE-010`. `DB-COURSE-007`, `DB-COURSE-008`, `DB-COURSE-009`, and `DB-COURSE-011` remain future [T-007](tasks/T-007-course-structure-versioning.md) scope.
+Related implemented design: [DBD-006 Course Catalog And Metadata](db-design/DBD-006-course-catalog-metadata.md) for `DB-COURSE-001` through `DB-COURSE-006` and `DB-COURSE-010`; [DBD-007 Course Structure And Versioning](db-design/DBD-007-course-structure-versioning.md) for `DB-COURSE-007`, `DB-COURSE-008`, `DB-COURSE-009`, and `DB-COURSE-011`.
 
 ### DB-COURSE-001 `courses`
 Owning service: `course-service`  
@@ -545,7 +545,7 @@ Purpose: Ordered modules inside a course.
 | DB-COURSE-007-F008 | `updated_at` | `TIMESTAMPTZ` | No | `now()` | Audit field |
 | DB-COURSE-007-F009 | `deleted_at` | `TIMESTAMPTZ` | Yes | None | Soft delete |
 
-Indexes: unique `uq_course_modules_course_position`, `idx_course_modules_course_status`.
+Indexes: unique `uq_course_modules_course_position`, `idx_modules_course_status`.
 
 ### DB-COURSE-008 `lessons`
 Owning service: `course-service`  
@@ -609,7 +609,7 @@ Indexes: unique `uq_learning_outcomes_course_position`, `idx_learning_outcomes_c
 Owning service: `course-service`  
 Table ID: `DB-COURSE-011`  
 Table name: `course_revisions`
-Purpose: Future course versioning and content revision history.
+Purpose: Course versioning and content revision history.
 
 | Field ID | Field name | PostgreSQL datatype | Nullable | Default | Key and details |
 | --- | --- | --- | --- | --- | --- |
@@ -620,7 +620,7 @@ Purpose: Future course versioning and content revision history.
 | DB-COURSE-011-F005 | `created_by_profile_id` | `UUID` | No | None | Cross-service UUID reference |
 | DB-COURSE-011-F006 | `created_at` | `TIMESTAMPTZ` | No | `now()` | Revision timestamp |
 
-Indexes: unique `uq_course_revisions_course_version`, `idx_course_revisions_course_id`.
+Indexes: unique `uq_course_revisions_course_version`, `idx_course_revisions_course`.
 
 ## content_db
 

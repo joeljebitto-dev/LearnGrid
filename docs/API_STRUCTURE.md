@@ -2,7 +2,7 @@
 
 Source of truth: [api-design/](api-design/README.md)
 Related implementation docs: [DEVELOPMENT.md](DEVELOPMENT.md), [TASKS.md](TASKS.md)
-Related implemented designs: [API-001](api-design/API-001-service-health-and-dev-stack.md), [API-002](api-design/API-002-token-session-security.md), [API-003](api-design/API-003-rbac-authorization.md), [API-004](api-design/API-004-user-profile-management.md), [API-005](api-design/API-005-institution-batch-department-management.md), [API-006](api-design/API-006-course-catalog-metadata.md)
+Related implemented designs: [API-001](api-design/API-001-service-health-and-dev-stack.md), [API-002](api-design/API-002-token-session-security.md), [API-003](api-design/API-003-rbac-authorization.md), [API-004](api-design/API-004-user-profile-management.md), [API-005](api-design/API-005-institution-batch-department-management.md), [API-006](api-design/API-006-course-catalog-metadata.md), [API-007](api-design/API-007-course-structure-versioning.md)
 
 This file is the overall API structure reference for implemented LearnGrid LMS APIs. Future task APIs are intentionally not expanded here until implementation provides stable request and response contracts.
 
@@ -959,6 +959,83 @@ Purpose: Manage course tags.
 
 Request body parameters: `institution_id`, `name`, and optional `slug`.
 Response fields: tag object with `id`, `institution_id`, `name`, `slug`, and `created_at`.
+
+## API-008 Course Structure And Versioning APIs
+
+Related design: [API-007 Course Structure And Versioning](api-design/API-007-course-structure-versioning.md)
+Related task: [T-007](tasks/T-007-course-structure-versioning.md)
+
+### API-008-001 Read Course Structure
+Purpose: Read nested modules, lessons, and topics for a course.
+
+| Item | Value |
+| --- | --- |
+| Service | `course-service` |
+| Method | `GET` |
+| Path | `/api/courses/<uuid>/structure/` |
+| Auth | `course.view` for published structure; `course.manage` for draft/archived/deleted structure |
+
+Path parameters: `uuid` course ID.
+Response fields: course identity plus ordered `modules`, nested `lessons`, and nested `topics`.
+Status behavior: published reads hide draft lessons and non-published modules; management reads include active draft, published, and archived structure records.
+
+### API-008-002 Module APIs
+Purpose: Manage ordered course modules.
+
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET` | `/api/courses/<uuid>/modules/` | List modules in a course | `course.view` or `course.manage` |
+| `POST` | `/api/courses/<uuid>/modules/` | Create a module | `course.manage` |
+| `GET` | `/api/courses/modules/<uuid>/` | Read one module | `course.view` or `course.manage` |
+| `PATCH` | `/api/courses/modules/<uuid>/` | Update a module | `course.manage` |
+| `DELETE` | `/api/courses/modules/<uuid>/` | Soft-archive a module | `course.manage` |
+| `POST` | `/api/courses/<uuid>/modules/reorder/` | Transactionally reorder modules | `course.manage` |
+
+Request body parameters: `title`, `description`, optional `position`, and optional `status`.
+Reorder body parameter: `module_ids`, the complete active ordered module ID list.
+
+### API-008-003 Lesson APIs
+Purpose: Manage ordered lessons and lesson publishing.
+
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET` | `/api/courses/modules/<uuid>/lessons/` | List lessons in a module | `course.view` or `course.manage` |
+| `POST` | `/api/courses/modules/<uuid>/lessons/` | Create a lesson | `course.manage` |
+| `GET` | `/api/courses/lessons/<uuid>/` | Read one lesson | `course.view` or `course.manage` |
+| `PATCH` | `/api/courses/lessons/<uuid>/` | Update a lesson or move it within the same course | `course.manage` |
+| `DELETE` | `/api/courses/lessons/<uuid>/` | Soft-archive a lesson | `course.manage` |
+| `POST` | `/api/courses/lessons/<uuid>/publish/` | Publish a lesson and emit `LessonPublished` | `course.manage` |
+| `POST` | `/api/courses/modules/<uuid>/lessons/reorder/` | Transactionally reorder lessons | `course.manage` |
+
+Request body parameters: `module_id` on update, `title`, `summary`, optional `position`, optional `status`, and optional `content_asset_id`.
+Reorder body parameter: `lesson_ids`, the complete active ordered lesson ID list.
+
+### API-008-004 Topic APIs
+Purpose: Manage ordered lesson topics.
+
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET` | `/api/courses/lessons/<uuid>/topics/` | List topics in a lesson | `course.view` or `course.manage` |
+| `POST` | `/api/courses/lessons/<uuid>/topics/` | Create a topic | `course.manage` |
+| `GET` | `/api/courses/topics/<uuid>/` | Read one topic | `course.view` or `course.manage` |
+| `PATCH` | `/api/courses/topics/<uuid>/` | Update a topic | `course.manage` |
+| `DELETE` | `/api/courses/topics/<uuid>/` | Delete a topic | `course.manage` |
+| `POST` | `/api/courses/lessons/<uuid>/topics/reorder/` | Transactionally reorder topics | `course.manage` |
+
+Request body parameters: `title`, optional `position`, and optional `content_asset_id`.
+Reorder body parameter: `topic_ids`, the complete ordered topic ID list.
+
+### API-008-005 Revision APIs
+Purpose: Preserve course structure snapshots.
+
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET` | `/api/courses/<uuid>/revisions/` | List revision snapshots | `course.manage` |
+| `POST` | `/api/courses/<uuid>/revisions/` | Create a revision snapshot | `course.manage` |
+| `GET` | `/api/courses/revisions/<uuid>/` | Read one revision snapshot | `course.manage` |
+
+Request body parameters: optional `created_by_profile_id`.
+Response fields: `id`, `course_id`, `version_number`, `snapshot`, `created_by_profile_id`, and `created_at`.
 
 ## Future APIs Not Implemented
 Content upload, enrollment workflows, progress tracking, dashboards, assessment authoring, quiz attempts, assignment submissions, grading, certificates, notifications, analytics reporting, API gateway, Kafka transport, Redis architecture operations, deployment, and broader security APIs remain future task scope unless explicitly listed above.

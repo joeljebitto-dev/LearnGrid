@@ -8,6 +8,7 @@ from typing import Any
 import redis
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Max
 from django.utils import timezone
 from django.utils.text import slugify
 from rest_framework.exceptions import ValidationError
@@ -16,11 +17,16 @@ from .models import (
     Course,
     CourseCategory,
     CourseCategoryLink,
+    CourseModule,
     CoursePrerequisite,
+    CourseRevision,
     CourseStatus,
     CourseTag,
     CourseTagLink,
     LearningOutcome,
+    Lesson,
+    StructureStatus,
+    Topic,
 )
 
 
@@ -171,6 +177,276 @@ def update_tag(*, tag: CourseTag, validated_data: dict[str, Any]) -> CourseTag:
 def delete_tag(*, tag: CourseTag) -> None:
     tag.delete()
     invalidate_catalog_cache()
+
+
+def create_module(*, course: Course, validated_data: dict[str, Any]) -> CourseModule:
+    position = validated_data.get("position") or _next_position(CourseModule, course=course)
+    _ensure_position_available(
+        CourseModule.objects.filter(course=course),
+        position,
+        "position",
+    )
+    module = CourseModule.objects.create(
+        course=course,
+        title=validated_data["title"],
+        description=validated_data.get("description"),
+        position=position,
+        status=validated_data.get("status", StructureStatus.DRAFT),
+    )
+    invalidate_catalog_cache()
+    return module
+
+
+def update_module(*, module: CourseModule, validated_data: dict[str, Any]) -> CourseModule:
+    if "position" in validated_data:
+        _ensure_position_available(
+            CourseModule.objects.filter(course=module.course),
+            validated_data["position"],
+            "position",
+            exclude_id=module.id,
+        )
+    for field in ["title", "description", "position", "status"]:
+        if field in validated_data:
+            setattr(module, field, validated_data[field])
+    module.save()
+    invalidate_catalog_cache()
+    return module
+
+
+def archive_module(*, module: CourseModule) -> CourseModule:
+    module.status = StructureStatus.ARCHIVED
+    module.deleted_at = timezone.now()
+    module.position = _next_position_excluding(CourseModule, exclude_id=module.id, course=module.course)
+    module.save(update_fields=["status", "position", "deleted_at", "updated_at"])
+    invalidate_catalog_cache()
+    return module
+
+
+def reorder_modules(*, course: Course, module_ids: list) -> list[CourseModule]:
+    modules = list(CourseModule.objects.filter(course=course, deleted_at__isnull=True))
+    ordered = _ordered_by_ids(items=modules, ordered_ids=module_ids, field_name="module_ids")
+    with transaction.atomic():
+        temp_base = _max_position(CourseModule, course=course)
+        _assign_ordered_positions(ordered, temp_base=temp_base)
+    invalidate_catalog_cache()
+    return ordered
+
+
+def create_lesson(*, module: CourseModule, validated_data: dict[str, Any]) -> Lesson:
+    position = validated_data.get("position") or _next_position(Lesson, module=module)
+    _ensure_position_available(
+        Lesson.objects.filter(module=module),
+        position,
+        "position",
+    )
+    published_at = timezone.now() if validated_data.get("status") == StructureStatus.PUBLISHED else None
+    lesson = Lesson.objects.create(
+        course=module.course,
+        module=module,
+        title=validated_data["title"],
+        summary=validated_data.get("summary"),
+        position=position,
+        status=validated_data.get("status", StructureStatus.DRAFT),
+        content_asset_id=validated_data.get("content_asset_id"),
+        published_at=published_at,
+    )
+    invalidate_catalog_cache()
+    return lesson
+
+
+def update_lesson(*, lesson: Lesson, validated_data: dict[str, Any]) -> Lesson:
+    target_module = lesson.module
+    if module_id := validated_data.pop("module_id", None):
+        try:
+            target_module = CourseModule.objects.get(id=module_id, deleted_at__isnull=True)
+        except CourseModule.DoesNotExist as exc:
+            raise ValidationError({"module_id": "Module was not found."}) from exc
+        if target_module.course_id != lesson.course_id:
+            raise ValidationError({"module_id": "Lesson cannot move to a module in another course."})
+        if "position" not in validated_data:
+            validated_data["position"] = _next_position(Lesson, module=target_module)
+
+    if "position" in validated_data or target_module.id != lesson.module_id:
+        _ensure_position_available(
+            Lesson.objects.filter(module=target_module),
+            validated_data.get("position", lesson.position),
+            "position",
+            exclude_id=lesson.id,
+        )
+
+    if validated_data.get("status") == StructureStatus.PUBLISHED and lesson.published_at is None:
+        lesson.published_at = timezone.now()
+    lesson.module = target_module
+    lesson.course = target_module.course
+    for field in ["title", "summary", "position", "status", "content_asset_id"]:
+        if field in validated_data:
+            setattr(lesson, field, validated_data[field])
+    lesson.save()
+    invalidate_catalog_cache()
+    return lesson
+
+
+def publish_lesson(*, lesson: Lesson, correlation_id: str | None = None) -> Lesson:
+    lesson.status = StructureStatus.PUBLISHED
+    lesson.deleted_at = None
+    if lesson.published_at is None:
+        lesson.published_at = timezone.now()
+    lesson.save(update_fields=["status", "deleted_at", "published_at", "updated_at"])
+    invalidate_catalog_cache()
+    publish_course_event(
+        event_type="LessonPublished",
+        aggregate_id=lesson.id,
+        correlation_id=correlation_id,
+        payload={
+            "course_id": str(lesson.course_id),
+            "module_id": str(lesson.module_id),
+            "institution_id": str(lesson.course.institution_id),
+            "status": lesson.status,
+        },
+    )
+    return lesson
+
+
+def archive_lesson(*, lesson: Lesson) -> Lesson:
+    lesson.status = StructureStatus.ARCHIVED
+    lesson.deleted_at = timezone.now()
+    lesson.position = _next_position_excluding(Lesson, exclude_id=lesson.id, module=lesson.module)
+    lesson.save(update_fields=["status", "position", "deleted_at", "updated_at"])
+    invalidate_catalog_cache()
+    return lesson
+
+
+def reorder_lessons(*, module: CourseModule, lesson_ids: list) -> list[Lesson]:
+    lessons = list(Lesson.objects.filter(module=module, deleted_at__isnull=True))
+    ordered = _ordered_by_ids(items=lessons, ordered_ids=lesson_ids, field_name="lesson_ids")
+    with transaction.atomic():
+        temp_base = _max_position(Lesson, module=module)
+        _assign_ordered_positions(ordered, temp_base=temp_base)
+    invalidate_catalog_cache()
+    return ordered
+
+
+def create_topic(*, lesson: Lesson, validated_data: dict[str, Any]) -> Topic:
+    position = validated_data.get("position") or _next_position(Topic, lesson=lesson)
+    _ensure_position_available(
+        Topic.objects.filter(lesson=lesson),
+        position,
+        "position",
+    )
+    topic = Topic.objects.create(
+        lesson=lesson,
+        title=validated_data["title"],
+        position=position,
+        content_asset_id=validated_data.get("content_asset_id"),
+    )
+    invalidate_catalog_cache()
+    return topic
+
+
+def update_topic(*, topic: Topic, validated_data: dict[str, Any]) -> Topic:
+    if "position" in validated_data:
+        _ensure_position_available(
+            Topic.objects.filter(lesson=topic.lesson),
+            validated_data["position"],
+            "position",
+            exclude_id=topic.id,
+        )
+    for field in ["title", "position", "content_asset_id"]:
+        if field in validated_data:
+            setattr(topic, field, validated_data[field])
+    topic.save()
+    invalidate_catalog_cache()
+    return topic
+
+
+def delete_topic(*, topic: Topic) -> None:
+    topic.delete()
+    invalidate_catalog_cache()
+
+
+def reorder_topics(*, lesson: Lesson, topic_ids: list) -> list[Topic]:
+    topics = list(Topic.objects.filter(lesson=lesson))
+    ordered = _ordered_by_ids(items=topics, ordered_ids=topic_ids, field_name="topic_ids")
+    with transaction.atomic():
+        temp_base = _max_position(Topic, lesson=lesson)
+        _assign_ordered_positions(ordered, temp_base=temp_base)
+    invalidate_catalog_cache()
+    return ordered
+
+
+def create_course_revision(*, course: Course, created_by_profile_id) -> CourseRevision:
+    version_number = (
+        CourseRevision.objects.filter(course=course).aggregate(max_version=Max("version_number"))[
+            "max_version"
+        ]
+        or 0
+    ) + 1
+    revision = CourseRevision.objects.create(
+        course=course,
+        version_number=version_number,
+        created_by_profile_id=created_by_profile_id,
+        snapshot=course_structure_snapshot(course),
+    )
+    return revision
+
+
+def course_structure_snapshot(course: Course) -> dict[str, Any]:
+    modules = (
+        CourseModule.objects.filter(course=course, deleted_at__isnull=True)
+        .prefetch_related("lessons__topics")
+        .order_by("position", "id")
+    )
+    return {
+        "course": {
+            "id": str(course.id),
+            "institution_id": str(course.institution_id),
+            "owner_profile_id": str(course.owner_profile_id),
+            "title": course.title,
+            "slug": course.slug,
+            "status": course.status,
+            "published_at": course.published_at.isoformat() if course.published_at else None,
+        },
+        "modules": [
+            {
+                "id": str(module.id),
+                "title": module.title,
+                "description": module.description,
+                "position": module.position,
+                "status": module.status,
+                "lessons": [
+                    {
+                        "id": str(lesson.id),
+                        "title": lesson.title,
+                        "summary": lesson.summary,
+                        "position": lesson.position,
+                        "status": lesson.status,
+                        "content_asset_id": (
+                            str(lesson.content_asset_id) if lesson.content_asset_id else None
+                        ),
+                        "published_at": (
+                            lesson.published_at.isoformat() if lesson.published_at else None
+                        ),
+                        "topics": [
+                            {
+                                "id": str(topic.id),
+                                "title": topic.title,
+                                "position": topic.position,
+                                "content_asset_id": (
+                                    str(topic.content_asset_id) if topic.content_asset_id else None
+                                ),
+                            }
+                            for topic in lesson.topics.all().order_by("position", "id")
+                        ],
+                    }
+                    for lesson in module.lessons.filter(deleted_at__isnull=True).order_by(
+                        "position",
+                        "id",
+                    )
+                ],
+            }
+            for module in modules
+        ],
+    }
 
 
 def replace_course_metadata(*, course: Course, metadata: dict[str, Any]) -> None:
@@ -357,3 +633,50 @@ def _unique_ids(values: list) -> list:
         seen.add(value)
         normalized.append(value)
     return normalized
+
+
+def _next_position(model, **filters) -> int:
+    return _max_position(model, **filters) + 1
+
+
+def _next_position_excluding(model, *, exclude_id, **filters) -> int:
+    return (
+        model.objects.filter(**filters)
+        .exclude(id=exclude_id)
+        .aggregate(max_position=Max("position"))["max_position"]
+        or 0
+    ) + 1
+
+
+def _max_position(model, **filters) -> int:
+    return model.objects.filter(**filters).aggregate(max_position=Max("position"))["max_position"] or 0
+
+
+def _ensure_position_available(queryset, position: int, field_name: str, exclude_id=None) -> None:
+    if position is None:
+        return
+    if exclude_id:
+        queryset = queryset.exclude(id=exclude_id)
+    if queryset.filter(position=position).exists():
+        raise ValidationError({field_name: "Position is already used in this scope."})
+
+
+def _ordered_by_ids(*, items: list, ordered_ids: list, field_name: str) -> list:
+    normalized_ids = _unique_ids(ordered_ids)
+    if len(normalized_ids) != len(ordered_ids):
+        raise ValidationError({field_name: "Duplicate IDs are not allowed."})
+    item_map = {item.id: item for item in items}
+    expected_ids = set(item_map)
+    received_ids = set(normalized_ids)
+    if received_ids != expected_ids:
+        raise ValidationError({field_name: "IDs must match the current active structure records."})
+    return [item_map[item_id] for item_id in normalized_ids]
+
+
+def _assign_ordered_positions(items: list, *, temp_base: int) -> None:
+    for offset, item in enumerate(items, start=1):
+        item.position = temp_base + offset
+        item.save(update_fields=["position", "updated_at"])
+    for position, item in enumerate(items, start=1):
+        item.position = position
+        item.save(update_fields=["position", "updated_at"])
