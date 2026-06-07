@@ -6,7 +6,7 @@ Related tasks: [TASKS.md](TASKS.md)
 
 This file is the overall database structure reference for the application. It consolidates every documented database, table, field, datatype, key/constraint note, index note, relationship note, enum/status value, audit field, and soft-delete marker from the canonical schema.
 
-Implemented design notes currently exist for service database ownership, auth token/session storage, RBAC authorization, user profile management, and institution/department/batch management. Future-domain tables remain included here because they are part of the documented schema baseline.
+Implemented design notes currently exist for service database ownership, auth token/session storage, RBAC authorization, user profile management, institution/department/batch management, and course catalog metadata. Future-domain tables remain included here because they are part of the documented schema baseline.
 
 ## DB-000 Schema Rules
 - Production uses PostgreSQL with database-per-service ownership.
@@ -422,7 +422,7 @@ Indexes: `idx_user_import_jobs_institution_status`, `idx_user_import_jobs_reques
 ## course_db
 
 Owning service: `course-service`
-Related implemented design: not yet implemented beyond baseline schema documentation.
+Related implemented design: [DBD-006 Course Catalog And Metadata](db-design/DBD-006-course-catalog-metadata.md) for `DB-COURSE-001` through `DB-COURSE-006` and `DB-COURSE-010`. `DB-COURSE-007`, `DB-COURSE-008`, `DB-COURSE-009`, and `DB-COURSE-011` remain future [T-007](tasks/T-007-course-structure-versioning.md) scope.
 
 ### DB-COURSE-001 `courses`
 Owning service: `course-service`  

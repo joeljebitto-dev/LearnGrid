@@ -1,8 +1,8 @@
 # LearnGrid LMS API Structure
 
-Source of truth: [api-design/](api-design/README.md)  
-Related implementation docs: [DEVELOPMENT.md](DEVELOPMENT.md), [TASKS.md](TASKS.md)  
-Related implemented designs: [API-001](api-design/API-001-service-health-and-dev-stack.md), [API-002](api-design/API-002-token-session-security.md), [API-003](api-design/API-003-rbac-authorization.md), [API-004](api-design/API-004-user-profile-management.md), [API-005](api-design/API-005-institution-batch-department-management.md)
+Source of truth: [api-design/](api-design/README.md)
+Related implementation docs: [DEVELOPMENT.md](DEVELOPMENT.md), [TASKS.md](TASKS.md)
+Related implemented designs: [API-001](api-design/API-001-service-health-and-dev-stack.md), [API-002](api-design/API-002-token-session-security.md), [API-003](api-design/API-003-rbac-authorization.md), [API-004](api-design/API-004-user-profile-management.md), [API-005](api-design/API-005-institution-batch-department-management.md), [API-006](api-design/API-006-course-catalog-metadata.md)
 
 This file is the overall API structure reference for implemented LearnGrid LMS APIs. Future task APIs are intentionally not expanded here until implementation provides stable request and response contracts.
 
@@ -17,7 +17,7 @@ This file is the overall API structure reference for implemented LearnGrid LMS A
 ## API-001 Development Stack And Health
 
 ### API-001-001 Backend Health
-Purpose: Verify service process identity and readiness for local checks.  
+Purpose: Verify service process identity and readiness for local checks.
 Implemented by: all ten backend services.
 
 | Item | Value |
@@ -107,7 +107,7 @@ Request body parameters:
 | --- | --- | --- | --- |
 | `refresh` | Yes | string/JWT | Active refresh token to rotate |
 
-Response fields: same as [API-002-001](#api-002-001-issue-token-pair).  
+Response fields: same as [API-002-001](#api-002-001-issue-token-pair).
 Status behavior: `200` on success; malformed, expired, revoked, reused, or password-stale refresh tokens are rejected.
 
 ### API-002-003 Logout
@@ -346,7 +346,7 @@ Request body parameters:
 | `scope_type` | No | string enum | Authorization scope; defaults to `platform` |
 | `scope_id` | Required for non-platform | UUID/null | Scoped resource identifier |
 
-Response fields: same as [API-004-001](#api-004-001-create-account).  
+Response fields: same as [API-004-001](#api-004-001-create-account).
 Status behavior: `200` on success; not found, duplicate values, invalid scope, or insufficient authorization is rejected.
 
 ### API-004-003 Deactivate Account
@@ -372,7 +372,7 @@ Request body parameters:
 | `scope_type` | No | string enum | Authorization scope; defaults to `platform` |
 | `scope_id` | Required for non-platform | UUID/null | Scoped resource identifier |
 
-Response fields: same as [API-004-001](#api-004-001-create-account).  
+Response fields: same as [API-004-001](#api-004-001-create-account).
 Status behavior: `200` on success; active refresh tokens are revoked and access tokens are invalidated by password-change timestamp.
 
 ## API-005 User Profile APIs
@@ -408,7 +408,7 @@ Request body parameters:
 | `instructor` | No | object | Instructor fields: optional `employee_number`, `department_id`, `title`, `bio` |
 | `admin` | No | object | Admin fields: optional `admin_type`, `department_id` |
 
-Response fields: profile object with `id`, `auth_account_id`, `institution_id`, names, `display_name`, `avatar_url`, `status`, `metadata`, `profile_type`, `role_profile`, timestamps, and `deleted_at`.  
+Response fields: profile object with `id`, `auth_account_id`, `institution_id`, names, `display_name`, `avatar_url`, `status`, `metadata`, `profile_type`, `role_profile`, timestamps, and `deleted_at`.
 Status behavior: `201` on success; local creation failure after account creation triggers auth account deactivation compensation.
 
 ### API-005-002 Search Profiles
@@ -436,7 +436,7 @@ Query parameters:
 | `page` | integer | Page number |
 | `page_size` | integer | Page size, capped by service paginator |
 
-Response fields: paginated profile objects.  
+Response fields: paginated profile objects.
 Status behavior: `200` on success; unauthorized scopes are denied.
 
 ### API-005-003 Read Profile
@@ -455,7 +455,7 @@ Path parameters:
 | --- | --- | --- |
 | `uuid` | UUID | User profile ID |
 
-Response fields: profile object as described in [API-005-001](#api-005-001-create-profile).  
+Response fields: profile object as described in [API-005-001](#api-005-001-create-profile).
 Status behavior: `200` on success; missing, soft-deleted, or unauthorized profiles are rejected.
 
 ### API-005-004 Update Profile
@@ -474,8 +474,8 @@ Path parameters:
 | --- | --- | --- |
 | `uuid` | UUID | User profile ID |
 
-Request body parameters: optional `email`, `phone`, base profile fields, `status`, `metadata`, and role-specific `student`, `instructor`, or `admin` payloads.  
-Response fields: updated profile object.  
+Request body parameters: optional `email`, `phone`, base profile fields, `status`, `metadata`, and role-specific `student`, `instructor`, or `admin` payloads.
+Response fields: updated profile object.
 Status behavior: `200` on success; auth-service update failure returns a controlled API error.
 
 ### API-005-005 Deactivate Profile
@@ -494,8 +494,8 @@ Path parameters:
 | --- | --- | --- |
 | `uuid` | UUID | User profile ID |
 
-Request body: none.  
-Response fields: deactivated profile object.  
+Request body: none.
+Response fields: deactivated profile object.
 Status behavior: `200` on success; auth-service deactivation failure returns a controlled API error.
 
 ### API-005-006 Import Job Placeholder
@@ -545,7 +545,7 @@ Query parameters:
 | `page` | integer | Page number |
 | `page_size` | integer | Page size |
 
-Response fields: paginated institution objects with `id`, `name`, `code`, `status`, `settings`, timestamps, and `deleted_at`.  
+Response fields: paginated institution objects with `id`, `name`, `code`, `status`, `settings`, timestamps, and `deleted_at`.
 Status behavior: `200` on success; platform authorization required.
 
 ### API-006-002 Create Institution
@@ -567,7 +567,7 @@ Request body parameters:
 | `status` | No | string enum | Defaults to `active` |
 | `settings` | No | object | Institution settings |
 
-Response fields: institution object.  
+Response fields: institution object.
 Status behavior: `201` on success; duplicate code or authorization failure is rejected.
 
 ### API-006-003 Read Institution
@@ -586,7 +586,7 @@ Path parameters:
 | --- | --- | --- |
 | `uuid` | UUID | Institution ID |
 
-Response fields: institution object.  
+Response fields: institution object.
 Status behavior: `200` on success; missing, soft-deleted, or unauthorized records are rejected.
 
 ### API-006-004 Update Institution
@@ -599,9 +599,9 @@ Purpose: Update institution fields.
 | Path | `/api/users/institutions/<uuid>/` |
 | Auth | Bearer access token with platform-scope `institution.manage` |
 
-Path parameters: `uuid` institution ID.  
-Request body parameters: optional `name`, `code`, `status`, and `settings`.  
-Response fields: updated institution object.  
+Path parameters: `uuid` institution ID.
+Request body parameters: optional `name`, `code`, `status`, and `settings`.
+Response fields: updated institution object.
 Status behavior: `200` on success; duplicate code or authorization failure is rejected.
 
 ### API-006-005 Archive Institution
@@ -614,8 +614,8 @@ Purpose: Soft-delete an institution while preserving historical relationships.
 | Path | `/api/users/institutions/<uuid>/` |
 | Auth | Bearer access token with platform-scope `institution.manage` |
 
-Path parameters: `uuid` institution ID.  
-Response fields: archived institution object with `status = archived` and `deleted_at`.  
+Path parameters: `uuid` institution ID.
+Response fields: archived institution object with `status = archived` and `deleted_at`.
 Status behavior: `200` on success.
 
 ### API-006-006 Search Departments
@@ -639,7 +639,7 @@ Query parameters:
 | `page` | integer | Page number |
 | `page_size` | integer | Page size |
 
-Response fields: paginated department objects with `id`, `institution_id`, `name`, `code`, `status`, timestamps, and `deleted_at`.  
+Response fields: paginated department objects with `id`, `institution_id`, `name`, `code`, `status`, timestamps, and `deleted_at`.
 Status behavior: `200` on success; cross-institution or missing-scope access is denied.
 
 ### API-006-007 Create Department
@@ -661,7 +661,7 @@ Request body parameters:
 | `code` | Yes | string | Department code, normalized to uppercase |
 | `status` | No | string enum | Defaults to `active` |
 
-Response fields: department object.  
+Response fields: department object.
 Status behavior: `201` on success; missing institution, duplicate code within institution, or authorization failure is rejected.
 
 ### API-006-008 Read Department
@@ -674,8 +674,8 @@ Purpose: Read one department.
 | Path | `/api/users/departments/<uuid>/` |
 | Auth | Bearer access token with `institution.manage` at department institution |
 
-Path parameters: `uuid` department ID.  
-Response fields: department object.  
+Path parameters: `uuid` department ID.
+Response fields: department object.
 Status behavior: `200` on success; missing, soft-deleted, or unauthorized records are rejected.
 
 ### API-006-009 Update Department
@@ -688,9 +688,9 @@ Purpose: Update department fields without moving it across institutions.
 | Path | `/api/users/departments/<uuid>/` |
 | Auth | Bearer access token with `institution.manage` at department institution |
 
-Path parameters: `uuid` department ID.  
-Request body parameters: optional `name`, `code`, and `status`.  
-Response fields: updated department object.  
+Path parameters: `uuid` department ID.
+Request body parameters: optional `name`, `code`, and `status`.
+Response fields: updated department object.
 Status behavior: `200` on success; duplicate code within institution or authorization failure is rejected.
 
 ### API-006-010 Archive Department
@@ -703,8 +703,8 @@ Purpose: Soft-delete a department while preserving historical relationships.
 | Path | `/api/users/departments/<uuid>/` |
 | Auth | Bearer access token with `institution.manage` at department institution |
 
-Path parameters: `uuid` department ID.  
-Response fields: archived department object with `status = archived` and `deleted_at`.  
+Path parameters: `uuid` department ID.
+Response fields: archived department object with `status = archived` and `deleted_at`.
 Status behavior: `200` on success.
 
 ### API-006-011 Search Batches
@@ -729,7 +729,7 @@ Query parameters:
 | `page` | integer | Page number |
 | `page_size` | integer | Page size |
 
-Response fields: paginated batch objects with `id`, `institution_id`, `department_id`, `name`, `start_date`, `end_date`, `status`, timestamps, and `deleted_at`.  
+Response fields: paginated batch objects with `id`, `institution_id`, `department_id`, `name`, `start_date`, `end_date`, `status`, timestamps, and `deleted_at`.
 Status behavior: `200` on success; unauthorized scopes are denied.
 
 ### API-006-012 Create Batch
@@ -753,7 +753,7 @@ Request body parameters:
 | `end_date` | No | date/null | Batch end date; cannot be before start date |
 | `status` | No | string enum | Defaults to `active` |
 
-Response fields: batch object.  
+Response fields: batch object.
 Status behavior: `201` on success; invalid institution, cross-institution department, invalid date range, or authorization failure is rejected.
 
 ### API-006-013 Read Batch
@@ -766,8 +766,8 @@ Purpose: Read one batch.
 | Path | `/api/users/batches/<uuid>/` |
 | Auth | Bearer access token with `institution.manage` at batch institution |
 
-Path parameters: `uuid` batch ID.  
-Response fields: batch object.  
+Path parameters: `uuid` batch ID.
+Response fields: batch object.
 Status behavior: `200` on success; missing, soft-deleted, or unauthorized records are rejected.
 
 ### API-006-014 Update Batch
@@ -780,9 +780,9 @@ Purpose: Update batch fields while keeping department references inside the batc
 | Path | `/api/users/batches/<uuid>/` |
 | Auth | Bearer access token with `institution.manage` at batch institution |
 
-Path parameters: `uuid` batch ID.  
-Request body parameters: optional `department_id`, `name`, `start_date`, `end_date`, and `status`.  
-Response fields: updated batch object.  
+Path parameters: `uuid` batch ID.
+Request body parameters: optional `department_id`, `name`, `start_date`, `end_date`, and `status`.
+Response fields: updated batch object.
 Status behavior: `200` on success; cross-institution department, invalid date range, or authorization failure is rejected.
 
 ### API-006-015 Archive Batch
@@ -795,9 +795,170 @@ Purpose: Soft-delete a batch while preserving historical relationships.
 | Path | `/api/users/batches/<uuid>/` |
 | Auth | Bearer access token with `institution.manage` at batch institution |
 
-Path parameters: `uuid` batch ID.  
-Response fields: archived batch object with `status = archived` and `deleted_at`.  
+Path parameters: `uuid` batch ID.
+Response fields: archived batch object with `status = archived` and `deleted_at`.
 Status behavior: `200` on success.
 
+## API-007 Course Catalog And Metadata APIs
+
+Related design: [API-006 Course Catalog And Metadata](api-design/API-006-course-catalog-metadata.md)
+Related task: [T-006](tasks/T-006-course-catalog-metadata.md)
+
+### API-007-001 Search Courses
+Purpose: Search catalog courses.
+
+| Item | Value |
+| --- | --- |
+| Service | `course-service` |
+| Method | `GET` |
+| Path | `/api/courses/` |
+| Auth | Bearer access token with `course.view` or `course.manage` |
+
+Query parameters:
+
+| Parameter | Type | Purpose |
+| --- | --- | --- |
+| `institution_id` | UUID | Restrict to one institution and authorize that scope |
+| `owner_profile_id` | UUID | Restrict to one course owner profile |
+| `status` | string enum | Management filter for `draft`, `published`, `archived`, or `deleted` |
+| `difficulty_level` | string enum | Filter by `beginner`, `intermediate`, or `advanced` |
+| `category_id` | UUID | Filter by linked category |
+| `tag_id` | UUID | Filter by linked tag |
+| `q` | string | Search course title and description |
+| `sort` | string enum | Sort by title, status, difficulty, published time, created time, or updated time |
+| `page` | integer | Page number |
+| `page_size` | integer | Page size |
+
+Response fields: paginated course objects with core course fields, categories, tags, prerequisite course IDs, learning outcomes, timestamps, and `deleted_at`.
+Status behavior: viewers see published courses only; management users may list non-published states.
+
+### API-007-002 Create Course
+Purpose: Create a draft course with catalog metadata.
+
+| Item | Value |
+| --- | --- |
+| Service | `course-service` |
+| Method | `POST` |
+| Path | `/api/courses/` |
+| Auth | Bearer access token with `course.manage` at request `institution_id` |
+
+Request body parameters:
+
+| Parameter | Required | Type | Purpose |
+| --- | --- | --- | --- |
+| `institution_id` | Yes | UUID | Owning institution |
+| `owner_profile_id` | Yes | UUID | Instructor/admin owner profile reference |
+| `title` | Yes | string | Course title |
+| `slug` | No | string | URL slug; generated from title when omitted |
+| `description` | No | string/null | Course description |
+| `difficulty_level` | No | enum/null | `beginner`, `intermediate`, or `advanced` |
+| `thumbnail_asset_id` | No | UUID/null | Cross-service content asset reference |
+| `category_ids` | No | UUID array | Categories to attach |
+| `tag_ids` | No | UUID array | Tags to attach |
+| `prerequisite_course_ids` | No | UUID array | Same-institution prerequisite courses |
+| `learning_outcomes` | No | object array | Ordered outcome objects with `description` and optional `position` |
+
+Response fields: created draft course object.
+Status behavior: `201` on success; invalid metadata, duplicate slug, or authorization failure is rejected. Emits `CourseCreated`.
+
+### API-007-003 Read Course
+Purpose: Read one course.
+
+| Item | Value |
+| --- | --- |
+| Service | `course-service` |
+| Method | `GET` |
+| Path | `/api/courses/<uuid>/` |
+| Auth | `course.view` for published courses; `course.manage` for draft, archived, or deleted courses |
+
+Path parameters: `uuid` course ID.
+Response fields: course object with metadata arrays.
+Status behavior: published detail reads may use Redis cache; non-published reads bypass cache.
+
+### API-007-004 Update Course
+Purpose: Update course fields and replace any supplied metadata arrays.
+
+| Item | Value |
+| --- | --- |
+| Service | `course-service` |
+| Method | `PATCH` |
+| Path | `/api/courses/<uuid>/` |
+| Auth | Bearer access token with `course.manage` at current course institution and new institution when changed |
+
+Path parameters: `uuid` course ID.
+Request body parameters: optional `institution_id`, `owner_profile_id`, `title`, `slug`, `description`, `difficulty_level`, `thumbnail_asset_id`, `category_ids`, `tag_ids`, `prerequisite_course_ids`, and `learning_outcomes`.
+Response fields: updated course object.
+Status behavior: metadata arrays replace existing links only when supplied; cache is invalidated.
+
+### API-007-005 Publish Course
+Purpose: Publish a course into catalog discovery.
+
+| Item | Value |
+| --- | --- |
+| Service | `course-service` |
+| Method | `POST` |
+| Path | `/api/courses/<uuid>/publish/` |
+| Auth | Bearer access token with `course.manage` at course institution |
+
+Path parameters: `uuid` course ID.
+Response fields: published course object with `status = published` and `published_at`.
+Status behavior: `200` on success; cache is invalidated and `CoursePublished` is emitted.
+
+### API-007-006 Archive Course
+Purpose: Archive a course and hide it from normal discovery.
+
+| Item | Value |
+| --- | --- |
+| Service | `course-service` |
+| Method | `POST` |
+| Path | `/api/courses/<uuid>/archive/` |
+| Auth | Bearer access token with `course.manage` at course institution |
+
+Path parameters: `uuid` course ID.
+Response fields: archived course object.
+Status behavior: `200` on success; cache is invalidated and `CourseArchived` is emitted.
+
+### API-007-007 Delete Course
+Purpose: Soft-delete a course.
+
+| Item | Value |
+| --- | --- |
+| Service | `course-service` |
+| Method | `DELETE` |
+| Path | `/api/courses/<uuid>/` |
+| Auth | Bearer access token with `course.manage` at course institution |
+
+Path parameters: `uuid` course ID.
+Response fields: deleted course object with `status = deleted` and `deleted_at`.
+Status behavior: `200` on success; cache is invalidated.
+
+### API-007-008 Category APIs
+Purpose: Manage course categories.
+
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET` | `/api/courses/categories/` | Search categories with `institution_id`, `q`, `sort`, `page`, and `page_size` | `course.view` or `course.manage` |
+| `POST` | `/api/courses/categories/` | Create global or institution-scoped category | `course.manage` |
+| `GET` | `/api/courses/categories/<uuid>/` | Read category | `course.view` or `course.manage` |
+| `PATCH` | `/api/courses/categories/<uuid>/` | Update category name, slug, or parent | `course.manage` |
+| `DELETE` | `/api/courses/categories/<uuid>/` | Delete category and category links | `course.manage` |
+
+Request body parameters: `institution_id`, `name`, optional `slug`, and optional `parent_category_id`.
+Response fields: category object with `id`, `institution_id`, `name`, `slug`, `parent_category_id`, and timestamps.
+
+### API-007-009 Tag APIs
+Purpose: Manage course tags.
+
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET` | `/api/courses/tags/` | Search tags with `institution_id`, `q`, `sort`, `page`, and `page_size` | `course.view` or `course.manage` |
+| `POST` | `/api/courses/tags/` | Create global or institution-scoped tag | `course.manage` |
+| `GET` | `/api/courses/tags/<uuid>/` | Read tag | `course.view` or `course.manage` |
+| `PATCH` | `/api/courses/tags/<uuid>/` | Update tag name or slug | `course.manage` |
+| `DELETE` | `/api/courses/tags/<uuid>/` | Delete tag and tag links | `course.manage` |
+
+Request body parameters: `institution_id`, `name`, and optional `slug`.
+Response fields: tag object with `id`, `institution_id`, `name`, `slug`, and `created_at`.
+
 ## Future APIs Not Implemented
-Course catalog, content upload, enrollment workflows, progress tracking, dashboards, assessment authoring, quiz attempts, assignment submissions, grading, certificates, notifications, analytics reporting, API gateway, Kafka, Redis architecture operations, deployment, and broader security APIs remain future task scope unless explicitly listed above.
+Content upload, enrollment workflows, progress tracking, dashboards, assessment authoring, quiz attempts, assignment submissions, grading, certificates, notifications, analytics reporting, API gateway, Kafka transport, Redis architecture operations, deployment, and broader security APIs remain future task scope unless explicitly listed above.

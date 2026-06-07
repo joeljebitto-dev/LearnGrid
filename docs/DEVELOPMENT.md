@@ -196,6 +196,59 @@ endpoints require `institution.manage` at the target institution scope. `DELETE`
 by setting `status = archived` and `deleted_at`; historical foreign key relationships are preserved.
 Organization codes are normalized to uppercase and remain reserved after soft delete.
 
+## Course Catalog And Metadata
+`course-service` implements catalog metadata for
+[T-006](tasks/T-006-course-catalog-metadata.md). It owns the implemented `course_db`
+tables for courses, categories, tags, prerequisites, and learning outcomes.
+
+Course APIs:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/courses/` | Search courses with `institution_id`, `owner_profile_id`, `status`, `difficulty_level`, `category_id`, `tag_id`, `q`, `sort`, `page`, and `page_size` |
+| `POST` | `/api/courses/` | Create a draft course with optional categories, tags, prerequisites, and learning outcomes |
+| `GET` | `/api/courses/<uuid>/` | Read one course |
+| `PATCH` | `/api/courses/<uuid>/` | Update course fields and replace supplied metadata arrays |
+| `POST` | `/api/courses/<uuid>/publish/` | Publish a course |
+| `POST` | `/api/courses/<uuid>/archive/` | Archive a course |
+| `DELETE` | `/api/courses/<uuid>/` | Soft-delete a course by setting `status = deleted` and `deleted_at` |
+
+Course create/update payload fields include `institution_id`, `owner_profile_id`, `title`,
+optional `slug`, `description`, `difficulty_level`, `thumbnail_asset_id`, `category_ids`,
+`tag_ids`, `prerequisite_course_ids`, and ordered `learning_outcomes`. Slugs are normalized
+to lowercase URL-safe values and generated from the title when omitted.
+
+Category and tag APIs:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/courses/categories/` | Search categories with `institution_id`, `q`, `sort`, `page`, and `page_size` |
+| `POST` | `/api/courses/categories/` | Create a global or institution-scoped category |
+| `GET` | `/api/courses/categories/<uuid>/` | Read one category |
+| `PATCH` | `/api/courses/categories/<uuid>/` | Update category name, slug, or parent |
+| `DELETE` | `/api/courses/categories/<uuid>/` | Delete a category and its links |
+| `GET` | `/api/courses/tags/` | Search tags with `institution_id`, `q`, `sort`, `page`, and `page_size` |
+| `POST` | `/api/courses/tags/` | Create a global or institution-scoped tag |
+| `GET` | `/api/courses/tags/<uuid>/` | Read one tag |
+| `PATCH` | `/api/courses/tags/<uuid>/` | Update tag name or slug |
+| `DELETE` | `/api/courses/tags/<uuid>/` | Delete a tag and its links |
+
+Course writes and lifecycle actions require `course.manage` at the course institution.
+Published catalog reads require `course.view`; draft, archived, and deleted reads require
+`course.manage`. Category and tag writes require `course.manage`; global records use
+platform scope and institution records use institution scope. Auth-service denial or network
+failure denies access.
+
+Published catalog list/detail responses are cached in Redis for
+`COURSE_CATALOG_CACHE_TTL_SECONDS`, default `300`. Management and non-published reads bypass
+cache. Course, category, tag, prerequisite, and learning outcome writes invalidate catalog
+cache keys. Redis failures fall back to database reads.
+
+Course lifecycle emits structured local `CourseCreated`, `CoursePublished`, and
+`CourseArchived` events with `event_id`, `event_type`, `aggregate_id`, `producer_service`,
+`timestamp`, `version`, `correlation_id`, and `payload`. Kafka transport remains future
+[T-020](tasks/T-020-kafka-eventing.md) scope.
+
 ## CI
 GitHub Actions runs frontend lint, typecheck, tests, and build. It also runs Ruff, Django checks,
 and pytest for each backend service.

@@ -18,3 +18,4 @@ Source: [SRD.pdf](SRD.pdf)
 - CHG-009 Added implemented database design and API design documentation folders with T-001 through T-004 design records.
 - CHG-010 Implemented `T-005 Institution, Batch, And Department Management` with user-service organization APIs, scoped authorization, soft-delete behavior, tests, and design documentation.
 - CHG-011 Added overall `DB_STRUCTURE.md` and `API_STRUCTURE.md` aggregate documentation for schema tables/fields and implemented API contracts.
+- CHG-012 Implemented `T-006 Course Catalog And Metadata` with course-service catalog models, metadata APIs, lifecycle workflows, Redis catalog cache, local structured course events, tests, and design documentation.
