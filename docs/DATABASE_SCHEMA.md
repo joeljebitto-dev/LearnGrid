@@ -772,6 +772,8 @@ Indexes: unique `uq_progress_events_event_id`, `idx_progress_events_event_type`.
 
 ## assessment_db
 
+Implementation note: `T-012` implements `DB-ASSESS-001` through `DB-ASSESS-005` and `DB-ASSESS-008`; `T-013` implements `DB-ASSESS-006`, `DB-ASSESS-007`, and `DB-ASSESS-010`. `DB-ASSESS-009 assignment_submissions` remains future `T-014` scope.
+
 ### DB-ASSESS-001 `question_banks`
 Purpose: Question bank owned by instructor or institution.
 
@@ -1139,7 +1141,7 @@ Purpose: Analytics event fact table populated from Kafka.
 | DB-ANALYTICS-001-F008 | `payload` | `JSONB` | No | None | Event payload |
 | DB-ANALYTICS-001-F009 | `ingested_at` | `TIMESTAMPTZ` | No | `now()` | Ingestion timestamp |
 
-Indexes: unique `uq_event_facts_event_id`, `idx_event_facts_type_time`, `idx_event_facts_institution_time`, `idx_event_facts_aggregate_id`.
+Indexes: unique `event_id`, `idx_event_facts_type_time`, `idx_event_facts_inst_time`, `idx_event_facts_aggregate_id`.
 
 ### DB-ANALYTICS-002 `dashboard_aggregates`
 Purpose: Cached dashboard metrics for students, instructors, and admins.
@@ -1147,13 +1149,13 @@ Purpose: Cached dashboard metrics for students, instructors, and admins.
 | Field ID | Field name | PostgreSQL datatype | Nullable | Default | Key and details |
 | --- | --- | --- | --- | --- | --- |
 | DB-ANALYTICS-002-F001 | `id` | `UUID` | No | `gen_random_uuid()` | PK |
-| DB-ANALYTICS-002-F002 | `scope_type` | `VARCHAR(32)` | No | None | Enum: `student`, `instructor`, `institution`, `course` |
+| DB-ANALYTICS-002-F002 | `scope_type` | `VARCHAR(32)` | No | None | Enum: `student`, `instructor`, `institution`, `course`, `platform` |
 | DB-ANALYTICS-002-F003 | `scope_id` | `UUID` | No | None | Cross-service UUID reference |
 | DB-ANALYTICS-002-F004 | `metric_date` | `DATE` | No | None | Aggregate date |
 | DB-ANALYTICS-002-F005 | `metrics` | `JSONB` | No | None | Dashboard metric values |
 | DB-ANALYTICS-002-F006 | `computed_at` | `TIMESTAMPTZ` | No | `now()` | Computation timestamp |
 
-Indexes: unique `uq_dashboard_aggregates_scope_date`, `idx_dashboard_aggregates_scope_type`.
+Indexes: unique `uq_dash_aggr_scope_date`, `idx_dash_aggr_scope_type`.
 
 ### DB-ANALYTICS-003 `report_snapshots`
 Purpose: Saved admin reports and large-scale reporting output.
@@ -1162,13 +1164,13 @@ Purpose: Saved admin reports and large-scale reporting output.
 | --- | --- | --- | --- | --- | --- |
 | DB-ANALYTICS-003-F001 | `id` | `UUID` | No | `gen_random_uuid()` | PK |
 | DB-ANALYTICS-003-F002 | `institution_id` | `UUID` | Yes | None | Cross-service UUID reference |
-| DB-ANALYTICS-003-F003 | `report_type` | `VARCHAR(80)` | No | None | Enum: `active_users`, `enrollments`, `completion_rates`, `assessment_results`, `system_usage` |
+| DB-ANALYTICS-003-F003 | `report_type` | `VARCHAR(80)` | No | None | Enum: `active_users`, `enrollments`, `completion_rates`, `assessment_results`, `system_usage`, `dashboard` |
 | DB-ANALYTICS-003-F004 | `parameters` | `JSONB` | No | `'{}'::jsonb` | Report filters |
 | DB-ANALYTICS-003-F005 | `result_payload` | `JSONB` | No | None | Report result snapshot |
 | DB-ANALYTICS-003-F006 | `generated_by_profile_id` | `UUID` | Yes | None | Cross-service UUID reference |
 | DB-ANALYTICS-003-F007 | `generated_at` | `TIMESTAMPTZ` | No | `now()` | Generation timestamp |
 
-Indexes: `idx_report_snapshots_institution_type`, `idx_report_snapshots_generated_at`.
+Indexes: `idx_report_snap_inst_type`, `idx_report_snap_generated`.
 
 ### DB-ANALYTICS-004 `usage_metrics`
 Purpose: Time-bucketed platform usage metrics.

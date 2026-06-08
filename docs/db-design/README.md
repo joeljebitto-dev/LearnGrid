@@ -22,6 +22,9 @@ Database design documents use stable IDs:
 | [DBD-008](DBD-008-content-upload-storage-access.md) | Content Upload, Storage, And Access | [T-008](../tasks/T-008-content-upload-storage-access.md) | [SPEC-008](../specs/008-content-upload-storage-access.md) |
 | [DBD-009](DBD-009-enrollment-access-management.md) | Enrollment And Access Management | [T-009](../tasks/T-009-enrollment-access-management.md) | [SPEC-009](../specs/009-enrollment-access-management.md) |
 | [DBD-010](DBD-010-learning-progress-tracking.md) | Learning Progress Tracking | [T-010](../tasks/T-010-learning-progress-tracking.md) | [SPEC-010](../specs/010-learning-progress-tracking.md) |
+| [DBD-011](DBD-011-dashboards-portals.md) | Dashboards And Portals | [T-011](../tasks/T-011-dashboards-portals.md) | [SPEC-011](../specs/011-dashboards-portals.md) |
+| [DBD-012](DBD-012-assessment-authoring.md) | Assessment Authoring | [T-012](../tasks/T-012-assessment-authoring.md) | [SPEC-012](../specs/012-assessment-authoring.md) |
+| [DBD-013](DBD-013-quiz-attempts-exams.md) | Quiz Attempts And Exams | [T-013](../tasks/T-013-quiz-attempts-exams.md) | [SPEC-013](../specs/013-quiz-attempts-exams.md) |
 
 ## Rules
 - Keep [DATABASE_SCHEMA.md](../DATABASE_SCHEMA.md) as the field-level source of truth.

@@ -6,7 +6,7 @@ Related tasks: [TASKS.md](TASKS.md)
 
 This file is the overall database structure reference for the application. It consolidates every documented database, table, field, datatype, key/constraint note, index note, relationship note, enum/status value, audit field, and soft-delete marker from the canonical schema.
 
-Implemented design notes currently exist for service database ownership, auth token/session storage, RBAC authorization, user profile management, institution/department/batch management, course catalog metadata, course structure/versioning, content upload/storage/access, enrollment/access management, and learning progress tracking. Future-domain tables remain included here because they are part of the documented schema baseline.
+Implemented design notes currently exist for service database ownership, auth token/session storage, RBAC authorization, user profile management, institution/department/batch management, course catalog metadata, course structure/versioning, content upload/storage/access, enrollment/access management, learning progress tracking, and dashboard/portal analytics. Future-domain tables remain included here because they are part of the documented schema baseline.
 
 ## DB-000 Schema Rules
 - Production uses PostgreSQL with database-per-service ownership.
@@ -930,7 +930,7 @@ Indexes: unique `uq_progress_events_event_id`, `idx_progress_events_event_type`.
 ## assessment_db
 
 Owning service: `assessment-service`
-Related implemented design: not yet implemented beyond baseline schema documentation.
+Related implemented designs: [DBD-012 Assessment Authoring](db-design/DBD-012-assessment-authoring.md), [DBD-013 Quiz Attempts And Exams](db-design/DBD-013-quiz-attempts-exams.md). `assignment_submissions` remains future [T-014](tasks/T-014-assignment-submissions.md) scope.
 
 ### DB-ASSESS-001 `question_banks`
 Owning service: `assessment-service`  
@@ -1354,7 +1354,7 @@ Indexes: unique `uq_user_notification_preferences_profile_event_channel`, `idx_u
 ## analytics_db
 
 Owning service: `analytics-service`
-Related implemented design: not yet implemented beyond baseline schema documentation.
+Related implemented design: [DBD-011 Dashboards And Portals](db-design/DBD-011-dashboards-portals.md).
 
 ### DB-ANALYTICS-001 `event_facts`
 Owning service: `analytics-service`  
@@ -1374,7 +1374,7 @@ Purpose: Analytics event fact table populated from Kafka.
 | DB-ANALYTICS-001-F008 | `payload` | `JSONB` | No | None | Event payload |
 | DB-ANALYTICS-001-F009 | `ingested_at` | `TIMESTAMPTZ` | No | `now()` | Ingestion timestamp |
 
-Indexes: unique `uq_event_facts_event_id`, `idx_event_facts_type_time`, `idx_event_facts_institution_time`, `idx_event_facts_aggregate_id`.
+Indexes: unique `event_id`, `idx_event_facts_type_time`, `idx_event_facts_inst_time`, `idx_event_facts_aggregate_id`.
 
 ### DB-ANALYTICS-002 `dashboard_aggregates`
 Owning service: `analytics-service`  
@@ -1385,13 +1385,13 @@ Purpose: Cached dashboard metrics for students, instructors, and admins.
 | Field ID | Field name | PostgreSQL datatype | Nullable | Default | Key and details |
 | --- | --- | --- | --- | --- | --- |
 | DB-ANALYTICS-002-F001 | `id` | `UUID` | No | `gen_random_uuid()` | PK |
-| DB-ANALYTICS-002-F002 | `scope_type` | `VARCHAR(32)` | No | None | Enum: `student`, `instructor`, `institution`, `course` |
+| DB-ANALYTICS-002-F002 | `scope_type` | `VARCHAR(32)` | No | None | Enum: `student`, `instructor`, `institution`, `course`, `platform` |
 | DB-ANALYTICS-002-F003 | `scope_id` | `UUID` | No | None | Cross-service UUID reference |
 | DB-ANALYTICS-002-F004 | `metric_date` | `DATE` | No | None | Aggregate date |
 | DB-ANALYTICS-002-F005 | `metrics` | `JSONB` | No | None | Dashboard metric values |
 | DB-ANALYTICS-002-F006 | `computed_at` | `TIMESTAMPTZ` | No | `now()` | Computation timestamp |
 
-Indexes: unique `uq_dashboard_aggregates_scope_date`, `idx_dashboard_aggregates_scope_type`.
+Indexes: unique `uq_dash_aggr_scope_date`, `idx_dash_aggr_scope_type`.
 
 ### DB-ANALYTICS-003 `report_snapshots`
 Owning service: `analytics-service`  
@@ -1403,13 +1403,13 @@ Purpose: Saved admin reports and large-scale reporting output.
 | --- | --- | --- | --- | --- | --- |
 | DB-ANALYTICS-003-F001 | `id` | `UUID` | No | `gen_random_uuid()` | PK |
 | DB-ANALYTICS-003-F002 | `institution_id` | `UUID` | Yes | None | Cross-service UUID reference |
-| DB-ANALYTICS-003-F003 | `report_type` | `VARCHAR(80)` | No | None | Enum: `active_users`, `enrollments`, `completion_rates`, `assessment_results`, `system_usage` |
+| DB-ANALYTICS-003-F003 | `report_type` | `VARCHAR(80)` | No | None | Enum: `active_users`, `enrollments`, `completion_rates`, `assessment_results`, `system_usage`, `dashboard` |
 | DB-ANALYTICS-003-F004 | `parameters` | `JSONB` | No | `'{}'::jsonb` | Report filters |
 | DB-ANALYTICS-003-F005 | `result_payload` | `JSONB` | No | None | Report result snapshot |
 | DB-ANALYTICS-003-F006 | `generated_by_profile_id` | `UUID` | Yes | None | Cross-service UUID reference |
 | DB-ANALYTICS-003-F007 | `generated_at` | `TIMESTAMPTZ` | No | `now()` | Generation timestamp |
 
-Indexes: `idx_report_snapshots_institution_type`, `idx_report_snapshots_generated_at`.
+Indexes: `idx_report_snap_inst_type`, `idx_report_snap_generated`.
 
 ### DB-ANALYTICS-004 `usage_metrics`
 Owning service: `analytics-service`  

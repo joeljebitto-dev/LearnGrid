@@ -8,6 +8,7 @@ from .views import (
     ImportJobPlaceholderView,
     InstitutionDetailView,
     InstitutionListCreateView,
+    CurrentProfileView,
     ProfileDeactivateView,
     ProfileDetailView,
     ProfileListCreateView,
@@ -22,6 +23,7 @@ urlpatterns = [
     path("batches/", BatchListCreateView.as_view(), name="batch-list-create"),
     path("batches/<uuid:batch_id>/", BatchDetailView.as_view(), name="batch-detail"),
     path("profiles/", ProfileListCreateView.as_view(), name="profile-list-create"),
+    path("profiles/me/", CurrentProfileView.as_view(), name="profile-me"),
     path("profiles/<uuid:profile_id>/", ProfileDetailView.as_view(), name="profile-detail"),
     path(
         "profiles/<uuid:profile_id>/deactivate/",

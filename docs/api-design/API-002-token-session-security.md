@@ -48,7 +48,22 @@ Logout response:
 Session response:
 
 ```json
-{ "account_id": "<uuid>", "email": "student@example.com", "status": "active" }
+{
+  "account_id": "<uuid>",
+  "email": "student@example.com",
+  "status": "active",
+  "primary_role": "student",
+  "role_assignments": [
+    {
+      "id": "<uuid>",
+      "role_code": "student",
+      "role_name": "Student",
+      "scope_type": "institution",
+      "scope_id": "<uuid>",
+      "assigned_at": "<iso>"
+    }
+  ]
+}
 ```
 
 ## Auth And Failure Behavior

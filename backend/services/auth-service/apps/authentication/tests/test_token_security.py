@@ -15,6 +15,8 @@ from apps.authentication.models import (
     BlacklistReason,
     Credential,
     RefreshToken,
+    Role,
+    RoleAssignment,
     TokenBlacklist,
 )
 
@@ -74,6 +76,40 @@ def test_access_token_authorizes_session(api_client, active_account):
         "account_id": str(active_account.id),
         "email": active_account.email,
         "status": AccountStatus.ACTIVE,
+        "primary_role": None,
+        "role_assignments": [],
+    }
+
+
+@pytest.mark.django_db
+def test_session_returns_active_role_assignments_and_primary_role(api_client, active_account):
+    instructor_role = Role.objects.get(code="instructor")
+    student_role = Role.objects.get(code="student")
+    RoleAssignment.objects.create(
+        account=active_account,
+        role=student_role,
+        scope_type="institution",
+        scope_id="11111111-1111-1111-1111-111111111111",
+    )
+    RoleAssignment.objects.create(
+        account=active_account,
+        role=instructor_role,
+        scope_type="institution",
+        scope_id="11111111-1111-1111-1111-111111111111",
+    )
+    body = assert_token_pair_response(issue_tokens(api_client))
+
+    response = api_client.get(
+        "/api/auth/session/",
+        HTTP_AUTHORIZATION=f"Bearer {body['access']}",
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["primary_role"] == "instructor"
+    assert {assignment["role_code"] for assignment in payload["role_assignments"]} == {
+        "student",
+        "instructor",
     }
 
 

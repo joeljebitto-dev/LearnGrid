@@ -66,6 +66,22 @@ def auth_headers(token: str) -> dict[str, str]:
     return {"HTTP_AUTHORIZATION": f"Bearer {token}"}
 
 
+def token_for_account(account_id) -> str:
+    now = timezone.now()
+    return jwt.encode(
+        {
+            "iss": settings.AUTH_JWT_ISSUER,
+            "sub": str(account_id),
+            "typ": "access",
+            "jti": str(uuid4()),
+            "iat": int(now.timestamp()),
+            "exp": int((now + timedelta(minutes=5)).timestamp()),
+        },
+        settings.AUTH_JWT_SIGNING_KEY,
+        algorithm=settings.AUTH_JWT_ALGORITHM,
+    )
+
+
 def create_institution(code: str = "INST") -> Institution:
     return Institution.objects.create(name=f"{code} Institution", code=code)
 
@@ -393,3 +409,37 @@ def test_local_create_failure_after_auth_account_creation_triggers_compensation(
 
     assert response.status_code == 400
     assert deactivations[0]["auth_account_id"] == str(auth_account_id)
+
+
+@pytest.mark.django_db
+def test_current_profile_returns_authenticated_profile(api_client):
+    institution = create_institution()
+    account_id = uuid4()
+    profile = UserProfile.objects.create(
+        auth_account_id=account_id,
+        institution=institution,
+        first_name="Current",
+        last_name="Student",
+    )
+    StudentProfile.objects.create(user_profile=profile, student_number="STU-ME")
+
+    response = api_client.get(
+        "/api/users/profiles/me/",
+        **auth_headers(token_for_account(account_id)),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == str(profile.id)
+    assert body["auth_account_id"] == str(account_id)
+    assert body["profile_type"] == "student"
+
+
+@pytest.mark.django_db
+def test_current_profile_rejects_missing_profile(api_client):
+    response = api_client.get(
+        "/api/users/profiles/me/",
+        **auth_headers(token_for_account(uuid4())),
+    )
+
+    assert response.status_code == 404

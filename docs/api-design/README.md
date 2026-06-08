@@ -22,6 +22,9 @@ API design documents use stable IDs:
 | [API-008](API-008-content-upload-storage-access.md) | Content Upload, Storage, And Access | [T-008](../tasks/T-008-content-upload-storage-access.md) | [SPEC-008](../specs/008-content-upload-storage-access.md) |
 | [API-009](API-009-enrollment-access-management.md) | Enrollment And Access Management | [T-009](../tasks/T-009-enrollment-access-management.md) | [SPEC-009](../specs/009-enrollment-access-management.md) |
 | [API-010](API-010-learning-progress-tracking.md) | Learning Progress Tracking | [T-010](../tasks/T-010-learning-progress-tracking.md) | [SPEC-010](../specs/010-learning-progress-tracking.md) |
+| [API-011](API-011-dashboards-portals.md) | Dashboards And Portals | [T-011](../tasks/T-011-dashboards-portals.md) | [SPEC-011](../specs/011-dashboards-portals.md) |
+| [API-012](API-012-assessment-authoring.md) | Assessment Authoring | [T-012](../tasks/T-012-assessment-authoring.md) | [SPEC-012](../specs/012-assessment-authoring.md) |
+| [API-013](API-013-quiz-attempts-exams.md) | Quiz Attempts And Exams | [T-013](../tasks/T-013-quiz-attempts-exams.md) | [SPEC-013](../specs/013-quiz-attempts-exams.md) |
 
 ## Rules
 - Add one `API-###-<topic>.md` file after a task with API design is implemented.

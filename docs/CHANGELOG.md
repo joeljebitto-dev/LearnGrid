@@ -24,3 +24,5 @@ Source: [SRD.pdf](SRD.pdf)
 - CHG-015 Implemented `T-009 Enrollment And Access Management` with enrollment state, batch/cohort jobs, history, access grants, access checks, local enrollment events, tests, and design documentation.
 - CHG-016 Implemented `T-010 Learning Progress Tracking` with lesson/video/assessment/course progress, idempotent event ingestion, local progress events, tests, and design documentation.
 - CHG-017 Resolved `OD-002` by selecting MinIO, added local MinIO infrastructure, completed `T-008.03`, and implemented presigned/proxy upload plus MinIO-backed signed download behavior in content-service.
+- CHG-018 Implemented `T-011 Dashboards And Portals` with role-aware protected frontend routes, session/profile context, analytics dashboard/report APIs, analytics tables, Selenium smoke scaffolding, tests, and design documentation while keeping `OD-005` open.
+- CHG-019 Implemented `T-012 Assessment Authoring` and `T-013 Quiz Attempts And Exams` with assessment-service authoring APIs, quiz/exam attempts, durable answers, auto-submit behavior, local assessment events, tests, and design documentation.

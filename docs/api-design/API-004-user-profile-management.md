@@ -21,6 +21,7 @@ Account create accepts `email`, optional `phone`, `temporary_password`, optional
 | --- | --- | --- | --- |
 | `POST` | `/api/users/profiles/` | `profile.manage` | Create auth account, base profile, and role-specific profile |
 | `GET` | `/api/users/profiles/` | `profile.view` | Search profiles with pagination and filters |
+| `GET` | `/api/users/profiles/me/` | `profile.view` | Return current profile from the bearer token subject |
 | `GET` | `/api/users/profiles/<uuid>/` | `profile.view` | Return profile detail with role-specific data |
 | `PATCH` | `/api/users/profiles/<uuid>/` | `profile.manage` | Update profile and optional auth email/phone |
 | `POST` | `/api/users/profiles/<uuid>/deactivate/` | `profile.manage` | Deactivate profile and auth account together |

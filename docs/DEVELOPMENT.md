@@ -329,6 +329,87 @@ reads, and idempotent event ingestion for `LessonViewed`, `VideoCompleted`, `Qui
 `AssignmentSubmitted`. Optional `total_lessons` and `total_assessments` provide course completion
 denominators until cross-service course aggregate reads are added.
 
+## Dashboards And Portals
+`frontend-service`, `auth-service`, `user-service`, and `analytics-service` implement
+[T-011](tasks/T-011-dashboards-portals.md). The frontend stores the baseline access/refresh token
+pair in `localStorage`, attaches bearer tokens through the Axios client, and routes users by the
+`primary_role` returned from `GET /api/auth/session/`.
+
+Frontend routes:
+
+| Route | Purpose |
+| --- | --- |
+| `/login` | Sign in and store token pair |
+| `/dashboard` | Load session/profile context and redirect by role |
+| `/dashboard/student` | Student dashboard |
+| `/dashboard/instructor` | Instructor dashboard |
+| `/dashboard/admin` | Admin dashboard |
+| `/dashboard/no-access` | Unsupported role fallback |
+
+Vite proxies local API calls to:
+
+| Prefix | Target |
+| --- | --- |
+| `/api/auth` | `http://127.0.0.1:8001` |
+| `/api/users` | `http://127.0.0.1:8002` |
+| `/api/analytics` | `http://127.0.0.1:8010` |
+
+Dashboard APIs:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/users/profiles/me/` | Resolve the current profile from the access token |
+| `GET` | `/api/analytics/dashboards/student/` | Current student dashboard |
+| `GET` | `/api/analytics/dashboards/instructor/` | Current instructor dashboard |
+| `GET` | `/api/analytics/dashboards/admin/?institution_id=<uuid>` | Institution dashboard |
+| `GET` | `/api/analytics/dashboards/admin/system/` | Platform dashboard |
+| `POST` | `/api/analytics/events/ingest/` | Idempotently store analytics event facts |
+| `GET/POST` | `/api/analytics/reports/snapshots/` | List or create report snapshots |
+
+Student/instructor dashboards derive the current profile from the bearer token and never accept
+arbitrary profile IDs. Admin dashboards require `analytics.view` at institution or platform scope.
+If no dashboard aggregate exists, analytics-service returns `200` with empty arrays and zeroed
+summary values. PostgreSQL `analytics_db` is the current dashboard/report store; [OD-005](KNOWN_ISSUES.md#od-005-analytics-storage)
+remains open for the long-term analytics storage decision.
+
+## Assessment Authoring And Quiz Attempts
+`assessment-service` implements [T-012](tasks/T-012-assessment-authoring.md) and
+[T-013](tasks/T-013-quiz-attempts-exams.md) under `/api/assessments/`.
+
+Authoring APIs:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET/POST` | `/api/assessments/question-banks/` | Search or create question banks |
+| `GET/PATCH/DELETE` | `/api/assessments/question-banks/<uuid>/` | Read, update, or soft-delete a question bank |
+| `GET/POST` | `/api/assessments/question-banks/<uuid>/questions/` | Search or create questions |
+| `GET/PATCH/DELETE` | `/api/assessments/questions/<uuid>/` | Read, update, or soft-delete a question |
+| `GET/POST` | `/api/assessments/` | Search or create quizzes, exams, and assignment shells |
+| `GET/PATCH/DELETE` | `/api/assessments/<uuid>/` | Read, update, or archive an assessment |
+| `PUT` | `/api/assessments/<uuid>/questions/` | Replace ordered quiz/exam questions |
+| `POST` | `/api/assessments/<uuid>/publish/` | Publish and emit `AssessmentPublished` |
+| `POST` | `/api/assessments/<uuid>/close/` | Close and emit `AssessmentClosed` |
+
+Question types currently accepted are `multiple_choice`, `multiple_select`, `true_false`,
+`short_answer`, `essay`, and `file_upload`. `coding` is reserved in the schema and returns a
+validation error. Student-facing attempt responses omit `correct_answer`.
+
+Attempt APIs:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/assessments/<uuid>/attempts/start/` | Start a quiz/exam attempt |
+| `GET` | `/api/assessments/attempts/<uuid>/` | Read attempt status, answers, ordered questions, and deadline |
+| `PUT` | `/api/assessments/attempts/<uuid>/answers/` | Save answer payloads durably |
+| `POST` | `/api/assessments/attempts/<uuid>/submit/` | Submit and emit `QuizSubmitted` |
+| `POST` | `/api/assessments/attempts/<uuid>/auto-submit/` | Mark an attempt auto-submitted |
+
+Authoring checks `assessment.manage` at course scope first and then institution scope after
+course metadata is resolved from course-service. Student attempts require `assessment.view`, the
+current profile from user-service, and active course access from enrollment-service. Quiz answers
+are stored in PostgreSQL; Redis is not required for this baseline. Assignment submissions remain
+[T-014](tasks/T-014-assignment-submissions.md).
+
 ## CI
 GitHub Actions runs frontend lint, typecheck, tests, and build. It also runs Ruff, Django checks,
 and pytest for each backend service.

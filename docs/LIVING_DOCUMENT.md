@@ -8,8 +8,9 @@ completed `T-002` token/session security, completed `T-003` RBAC/object authoriz
 completed `T-004` user/profile management, completed `T-005` institution, department, and
 batch management, completed `T-006` course catalog metadata, completed `T-007` course
 structure/versioning, completed `T-008` content upload/storage/access with MinIO object storage,
-completed `T-009` enrollment/access management, and completed `T-010`
-learning progress tracking.
+completed `T-009` enrollment/access management, completed `T-010`
+learning progress tracking, completed `T-011` dashboards/portals, completed `T-012`
+assessment authoring, and completed `T-013` quiz attempts/exams.
 The scaffold includes the React `frontend-service`, Django REST Framework baselines for `SVC-001`
 through `SVC-010`, local PostgreSQL and Redis Compose configuration, health endpoints, lockfiles,
 basic tests, and GitHub Actions CI. Auth-service now includes JWT access and refresh token APIs,
@@ -25,8 +26,10 @@ filtering, pagination, and soft-delete behavior. Course-service now owns course 
 categories, tags, prerequisites, learning outcomes, published catalog cache behavior, lifecycle
 workflows, and local structured course events. Course-service also owns ordered modules, lessons,
 topics, lesson publishing, structure reordering, and course revision snapshots. Content domain
-metadata, MinIO-backed upload and signed access, enrollment/access management, and learning
-progress tracking are now implemented in their owning services. Kubernetes manifests and remaining
+metadata, MinIO-backed upload and signed access, enrollment/access management, learning
+progress tracking, analytics dashboard/report foundations, role-specific frontend portals,
+assessment authoring, and quiz/exam attempts are now implemented in their owning services.
+Assignment submissions, Kubernetes manifests, and remaining
 non-auth feature APIs remain for later tasks.
 
 ## LD-002 Source Of Truth

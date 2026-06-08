@@ -258,6 +258,18 @@ class ProfileListCreateView(APIView):
         return Response(UserProfileSerializer(profile).data, status=status.HTTP_201_CREATED)
 
 
+class CurrentProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        profile = get_object_or_404(
+            profile_queryset().filter(deleted_at__isnull=True),
+            auth_account_id=request.user.id,
+        )
+        require_profile_permission(request, "profile.view", profile.institution_id)
+        return Response(UserProfileSerializer(profile).data)
+
+
 class ProfileDetailView(APIView):
     permission_classes = [IsAuthenticated]
 

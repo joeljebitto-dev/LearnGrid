@@ -2,7 +2,7 @@
 
 Source of truth: [api-design/](api-design/README.md)
 Related implementation docs: [DEVELOPMENT.md](DEVELOPMENT.md), [TASKS.md](TASKS.md)
-Related implemented designs: [API-001](api-design/API-001-service-health-and-dev-stack.md), [API-002](api-design/API-002-token-session-security.md), [API-003](api-design/API-003-rbac-authorization.md), [API-004](api-design/API-004-user-profile-management.md), [API-005](api-design/API-005-institution-batch-department-management.md), [API-006](api-design/API-006-course-catalog-metadata.md), [API-007](api-design/API-007-course-structure-versioning.md), [API-008](api-design/API-008-content-upload-storage-access.md), [API-009](api-design/API-009-enrollment-access-management.md), [API-010](api-design/API-010-learning-progress-tracking.md)
+Related implemented designs: [API-001](api-design/API-001-service-health-and-dev-stack.md), [API-002](api-design/API-002-token-session-security.md), [API-003](api-design/API-003-rbac-authorization.md), [API-004](api-design/API-004-user-profile-management.md), [API-005](api-design/API-005-institution-batch-department-management.md), [API-006](api-design/API-006-course-catalog-metadata.md), [API-007](api-design/API-007-course-structure-versioning.md), [API-008](api-design/API-008-content-upload-storage-access.md), [API-009](api-design/API-009-enrollment-access-management.md), [API-010](api-design/API-010-learning-progress-tracking.md), [API-011](api-design/API-011-dashboards-portals.md)
 
 This file is the overall API structure reference for implemented LearnGrid LMS APIs. Future task APIs are intentionally not expanded here until implementation provides stable request and response contracts.
 
@@ -157,6 +157,8 @@ Response fields:
 | `account_id` | UUID | Auth account identifier |
 | `email` | string/email | Account email |
 | `status` | string | Account lifecycle status |
+| `primary_role` | string/null | Highest-precedence active role for frontend routing |
+| `role_assignments` | array | Active role assignment objects with `id`, `role_code`, `role_name`, `scope_type`, `scope_id`, and `assigned_at` |
 
 Status behavior: `200` on success; malformed, expired, revoked, wrong-type, inactive, or password-stale access tokens are rejected.
 
@@ -1453,5 +1455,103 @@ Create body parameters: `event_id` UUID, `event_type` enum `LessonViewed`, `Vide
 Response fields: `status` string, currently `processed` or `duplicate`, and `event_id`.
 Status behavior: duplicate `event_id` returns `status = duplicate`; new supported events update progress and return `status = processed`.
 
+## API-011 Dashboards And Portals APIs
+
+Related design: [API-011 Dashboards And Portals](api-design/API-011-dashboards-portals.md)
+
+### API-011-001 Frontend Portal Routes
+| Route | Purpose | Auth behavior |
+| --- | --- | --- |
+| `/login` | Sign in through auth-service token issue | Public |
+| `/dashboard` | Role-aware portal redirect | Requires stored access token plus session/profile lookup |
+| `/dashboard/student` | Student portal | `student` primary role |
+| `/dashboard/instructor` | Instructor portal | `instructor` or `teaching_assistant` primary role |
+| `/dashboard/admin` | Admin portal | `super_admin` or `institution_admin` primary role |
+| `/dashboard/no-access` | Unsupported-role state | Public fallback |
+
+### API-011-002 Current Profile
+Purpose: Resolve the authenticated account to a user-service profile.
+
+| Item | Value |
+| --- | --- |
+| Service | `user-service` |
+| Method | `GET` |
+| Path | `/api/users/profiles/me/` |
+| Auth | Bearer access token plus `profile.view` at profile institution/platform scope |
+| Path parameters | None |
+| Query parameters | None |
+| Request body | None |
+| Response fields | User profile object matching `/api/users/profiles/<uuid>/` |
+| Status behavior | `200` on success; `404` if no active profile exists; authorization failures deny access |
+
+### API-011-003 Dashboard APIs
+| Method | Path | Service | Purpose | Auth |
+| --- | --- | --- | --- | --- |
+| `GET` | `/api/analytics/dashboards/student/` | `analytics-service` | Current student dashboard | Bearer token, student profile, and `profile.view` |
+| `GET` | `/api/analytics/dashboards/instructor/` | `analytics-service` | Current instructor dashboard | Bearer token, instructor/admin profile, and `analytics.view` |
+| `GET` | `/api/analytics/dashboards/admin/?institution_id=<uuid>` | `analytics-service` | Institution dashboard | Bearer token with institution-scoped `analytics.view` |
+| `GET` | `/api/analytics/dashboards/admin/system/` | `analytics-service` | Platform dashboard | Bearer token with platform `analytics.view` |
+
+Student response fields: `portal`, `profile`, `institution_id`, `aggregate`, `active_courses`, `completed_lessons`, `pending_assessments`, `grades`, `upcoming_deadlines`, and `summary`.
+
+Instructor response fields: `portal`, `profile`, `institution_id`, `aggregate`, `learner_engagement`, `progress_distribution`, `assessment_status`, `course_summaries`, and `summary`.
+
+Admin response fields: `portal`, `profile`, `institution_id`, `aggregate`, `active_users`, `enrollments`, `completion_rates`, `assessment_results`, `system_usage`, and `summary`.
+
+If no aggregate exists, dashboard APIs return `200` with `aggregate = null`, empty arrays, and zeroed summary values.
+
+### API-011-004 Analytics Events And Report Snapshots
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `POST` | `/api/analytics/events/ingest/` | Idempotently store one analytics event | `analytics.view` at institution/platform scope |
+| `GET` | `/api/analytics/reports/snapshots/` | List report snapshots with optional `institution_id` and `report_type` filters | `analytics.view` at institution/platform scope |
+| `POST` | `/api/analytics/reports/snapshots/` | Create a report snapshot | `analytics.view` at institution/platform scope |
+
+Event body parameters: `event_id`, `event_type`, `producer_service`, `aggregate_id`, optional `institution_id`, `occurred_at`, and optional `payload`. Duplicate `event_id` returns `created = false`.
+
+Report snapshot body parameters: optional `institution_id`, `report_type`, optional `parameters`, and optional `result_payload`. `generated_by_profile_id` is resolved from `/api/users/profiles/me/`.
+
+## API-012 Assessment Authoring APIs
+
+Related design: [API-012 Assessment Authoring](api-design/API-012-assessment-authoring.md)
+
+### API-012-001 Question Banks And Questions
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET` | `/api/assessments/question-banks/` | Search question banks with `institution_id`, `owner_profile_id`, `q`, `sort`, `page`, and `page_size` | `assessment.view` |
+| `POST` | `/api/assessments/question-banks/` | Create a question bank | `assessment.manage` at institution |
+| `GET/PATCH/DELETE` | `/api/assessments/question-banks/<uuid>/` | Read, update, or soft-delete a bank | `assessment.view/manage` |
+| `GET` | `/api/assessments/question-banks/<uuid>/questions/` | Search questions with `question_type`, `status`, `q`, `sort`, `page`, and `page_size` | `assessment.view` |
+| `POST` | `/api/assessments/question-banks/<uuid>/questions/` | Create a supported question | `assessment.manage` |
+| `GET/PATCH/DELETE` | `/api/assessments/questions/<uuid>/` | Read, update, or soft-delete a question | `assessment.view/manage` |
+
+Question body parameters: `question_type`, `prompt`, optional `choices`, optional `correct_answer`, optional `points`, and optional `status`. Supported types are `multiple_choice`, `multiple_select`, `true_false`, `short_answer`, `essay`, and `file_upload`; `coding` is schema-reserved and rejected.
+
+### API-012-002 Assessment Authoring
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET` | `/api/assessments/` | Search assessments with course/type/status/window filters | `assessment.view`; non-published reads require manage |
+| `POST` | `/api/assessments/` | Create quiz, exam, or assignment shell | `assessment.manage` |
+| `GET/PATCH/DELETE` | `/api/assessments/<uuid>/` | Read, update, or archive one assessment | `assessment.view/manage` |
+| `PUT` | `/api/assessments/<uuid>/questions/` | Replace ordered quiz/exam questions | `assessment.manage` |
+| `POST` | `/api/assessments/<uuid>/publish/` | Publish assessment and emit `AssessmentPublished` | `assessment.manage` |
+| `POST` | `/api/assessments/<uuid>/close/` | Close assessment and emit `AssessmentClosed` | `assessment.manage` |
+
+Assessment body parameters: `course_id`, optional `lesson_id`, `created_by_profile_id`, `assessment_type`, `title`, optional `description`, optional `available_from`, optional `available_until`, optional `quiz_config`, optional `assignment_config`, and optional ordered `questions`.
+
+## API-013 Quiz Attempts And Exams APIs
+
+Related design: [API-013 Quiz Attempts And Exams](api-design/API-013-quiz-attempts-exams.md)
+
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `POST` | `/api/assessments/<uuid>/attempts/start/` | Start a quiz/exam attempt | `assessment.view`, student profile, active enrollment |
+| `GET` | `/api/assessments/attempts/<uuid>/` | Read attempt, saved answers, ordered student questions, and deadline | Attempt owner or `assessment.manage` |
+| `PUT` | `/api/assessments/attempts/<uuid>/answers/` | Upsert durable answer payloads | Attempt owner with `assessment.view` |
+| `POST` | `/api/assessments/attempts/<uuid>/submit/` | Submit an attempt and emit `QuizSubmitted` | Attempt owner with `assessment.view` |
+| `POST` | `/api/assessments/attempts/<uuid>/auto-submit/` | Mark attempt as auto-submitted | Attempt owner with `assessment.view` |
+
+Attempt start/detail responses include `attempt`, `questions`, and `deadline_at`. Student question objects omit `correct_answer`. Attempt start enforces published status, availability windows, active enrollment, max attempts, and time limits. Randomized question order is persisted in `submission_audit_logs`.
+
 ## Future APIs Not Implemented
-Dashboards, assessment authoring, quiz attempts, assignment submissions, grading, certificates, notifications, analytics reporting, API gateway, Kafka transport, Redis architecture operations, deployment, and broader security APIs remain future task scope unless explicitly listed above.
+Assignment submissions, grading, certificates, notifications, generalized analytics/search reporting, API gateway, Kafka transport, Redis architecture operations, deployment, and broader security APIs remain future task scope unless explicitly listed above.

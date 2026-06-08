@@ -44,6 +44,7 @@ DATABASES = {
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 AUTH_SERVICE_BASE_URL = os.getenv("AUTH_SERVICE_BASE_URL", "http://127.0.0.1:8001")
+USER_SERVICE_BASE_URL = os.getenv("USER_SERVICE_BASE_URL", "http://127.0.0.1:8002")
 AUTH_JWT_SIGNING_KEY = os.getenv(
     "AUTH_JWT_SIGNING_KEY",
     "insecure-local-auth-service-change-me-32bytes",

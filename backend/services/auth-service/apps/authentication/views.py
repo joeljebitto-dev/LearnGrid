@@ -82,11 +82,42 @@ class SessionView(APIView):
 
     def get(self, request):
         account = request.user
+        assignments = list(
+            RoleAssignment.objects.select_related("role").filter(
+                account=account,
+                revoked_at__isnull=True,
+            ).order_by("assigned_at", "id")
+        )
+        role_precedence = [
+            "super_admin",
+            "institution_admin",
+            "instructor",
+            "teaching_assistant",
+            "student",
+            "parent_guardian",
+        ]
+        active_role_codes = {assignment.role.code for assignment in assignments}
+        primary_role = next(
+            (role_code for role_code in role_precedence if role_code in active_role_codes),
+            None,
+        )
         return Response(
             {
                 "account_id": str(account.id),
                 "email": account.email,
                 "status": account.status,
+                "primary_role": primary_role,
+                "role_assignments": [
+                    {
+                        "id": str(assignment.id),
+                        "role_code": assignment.role.code,
+                        "role_name": assignment.role.name,
+                        "scope_type": assignment.scope_type,
+                        "scope_id": str(assignment.scope_id) if assignment.scope_id else None,
+                        "assigned_at": assignment.assigned_at.isoformat(),
+                    }
+                    for assignment in assignments
+                ],
             }
         )
 

@@ -16,9 +16,9 @@ coverage/
 .env
 .env.*
 !.env.example
+LOCAL_BOT_USERS.txt
 
 # Local tooling
 .DS_Store
 .idea/
 .vscode/
-
