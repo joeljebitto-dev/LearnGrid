@@ -19,6 +19,8 @@ from .models import (
     AssessmentStatus,
     AssessmentType,
     Assignment,
+    AssignmentSubmission,
+    AssignmentSubmissionStatus,
     Question,
     QuestionBank,
     QuestionStatus,
@@ -52,6 +54,12 @@ class EnrollmentServiceError(APIException):
     status_code = 502
     default_code = "enrollment_service_error"
     default_detail = "Enrollment-service request failed."
+
+
+class ContentServiceError(APIException):
+    status_code = 502
+    default_code = "content_service_error"
+    default_detail = "Content-service request failed."
 
 
 def auth_token(request) -> str:
@@ -132,6 +140,17 @@ def has_enrollment_access(*, token: str, student_profile_id, course_id) -> bool:
         error_class=EnrollmentServiceError,
     )
     return data.get("allowed") is True
+
+
+def validate_content_asset(*, token: str, asset_id) -> dict[str, Any]:
+    if not asset_id:
+        return {}
+    return _json_request(
+        base_url=settings.CONTENT_SERVICE_BASE_URL,
+        path=f"/api/content/assets/{asset_id}/",
+        token=token,
+        error_class=ContentServiceError,
+    )
 
 
 def create_question_bank(*, validated_data: dict[str, Any]) -> QuestionBank:
@@ -231,6 +250,117 @@ def update_assignment_config(*, assignment: Assignment, validated_data: dict[str
             setattr(assignment, field, validated_data[field])
     assignment.save()
     return assignment
+
+
+def save_assignment_submission(
+    *,
+    assignment: Assignment,
+    token: str,
+    profile: dict[str, Any],
+    validated_data: dict[str, Any],
+    submit: bool = False,
+    correlation_id: str | None = None,
+) -> AssignmentSubmission:
+    require_student_profile(profile)
+    _validate_assignment_available(assignment)
+    if not has_enrollment_access(
+        token=token,
+        student_profile_id=profile["id"],
+        course_id=assignment.assessment.course_id,
+    ):
+        raise PermissionDenied("Student does not have active access to this course.")
+    if attachment_asset_id := validated_data.get("attachment_asset_id"):
+        validate_content_asset(token=token, asset_id=attachment_asset_id)
+
+    submission, created = AssignmentSubmission.objects.get_or_create(
+        assignment=assignment,
+        student_profile_id=profile["id"],
+        defaults={"status": AssignmentSubmissionStatus.DRAFT},
+    )
+    if submission.status not in {AssignmentSubmissionStatus.DRAFT, AssignmentSubmissionStatus.SUBMITTED, AssignmentSubmissionStatus.LATE}:
+        raise ValidationError({"submission": "Submission cannot be changed in its current status."})
+
+    for field in ["submission_text", "attachment_asset_id"]:
+        if field in validated_data:
+            setattr(submission, field, validated_data[field])
+    if submit:
+        _finalize_assignment_submission(submission=submission, actor_profile_id=profile["id"], correlation_id=correlation_id)
+    else:
+        submission.status = AssignmentSubmissionStatus.DRAFT
+        submission.save()
+        SubmissionAuditLog.objects.create(
+            submission_type=SubmissionType.ASSIGNMENT_SUBMISSION,
+            submission_id=submission.id,
+            event_type="assignment_submission_created" if created else "assignment_submission_saved",
+            actor_profile_id=profile["id"],
+            metadata={"assignment_id": str(assignment.id)},
+        )
+    return submission
+
+
+def update_assignment_submission(
+    *,
+    submission: AssignmentSubmission,
+    token: str,
+    profile: dict[str, Any],
+    validated_data: dict[str, Any],
+) -> AssignmentSubmission:
+    if str(submission.student_profile_id) != str(profile.get("id")):
+        raise PermissionDenied("Submission belongs to another profile.")
+    if submission.status != AssignmentSubmissionStatus.DRAFT:
+        raise ValidationError({"submission": "Only draft submissions can be updated."})
+    if attachment_asset_id := validated_data.get("attachment_asset_id"):
+        validate_content_asset(token=token, asset_id=attachment_asset_id)
+    for field in ["submission_text", "attachment_asset_id"]:
+        if field in validated_data:
+            setattr(submission, field, validated_data[field])
+    submission.save()
+    SubmissionAuditLog.objects.create(
+        submission_type=SubmissionType.ASSIGNMENT_SUBMISSION,
+        submission_id=submission.id,
+        event_type="assignment_submission_saved",
+        actor_profile_id=profile["id"],
+        metadata={"assignment_id": str(submission.assignment_id)},
+    )
+    return submission
+
+
+def submit_assignment_submission(
+    *,
+    submission: AssignmentSubmission,
+    actor_profile_id,
+    correlation_id: str | None = None,
+) -> AssignmentSubmission:
+    if submission.status not in {AssignmentSubmissionStatus.DRAFT, AssignmentSubmissionStatus.SUBMITTED, AssignmentSubmissionStatus.LATE}:
+        raise ValidationError({"submission": "Submission cannot be submitted in its current status."})
+    _validate_assignment_available(submission.assignment)
+    return _finalize_assignment_submission(
+        submission=submission,
+        actor_profile_id=actor_profile_id,
+        correlation_id=correlation_id,
+    )
+
+
+def mark_assignment_submission_graded(
+    *,
+    submission: AssignmentSubmission,
+    actor_profile_id,
+    grade_record_id=None,
+) -> AssignmentSubmission:
+    previous_status = submission.status
+    submission.status = AssignmentSubmissionStatus.GRADED
+    submission.save(update_fields=["status", "updated_at"])
+    SubmissionAuditLog.objects.create(
+        submission_type=SubmissionType.ASSIGNMENT_SUBMISSION,
+        submission_id=submission.id,
+        event_type="assignment_submission_graded",
+        actor_profile_id=actor_profile_id,
+        metadata={
+            "previous_status": previous_status,
+            "grade_record_id": str(grade_record_id) if grade_record_id else None,
+        },
+    )
+    return submission
 
 
 @transaction.atomic
@@ -540,6 +670,43 @@ def publish_assessment_event(
     return event
 
 
+def quiz_attempt_grading_source(attempt: QuizAttempt) -> dict[str, Any]:
+    max_score = sum(points_by_question(attempt).values(), Decimal("0"))
+    return {
+        "submission_type": "quiz_attempt",
+        "submission_id": attempt.id,
+        "student_profile_id": attempt.student_profile_id,
+        "course_id": attempt.quiz.assessment.course_id,
+        "assessment_id": attempt.quiz.assessment_id,
+        "score": str(attempt.score) if attempt.score is not None else None,
+        "max_score": str(max_score),
+        "status": attempt.status,
+        "source_payload": {
+            "attempt_number": attempt.attempt_number,
+            "submitted_at": attempt.submitted_at.isoformat() if attempt.submitted_at else None,
+            "answer_count": attempt.answers.count(),
+        },
+    }
+
+
+def assignment_submission_grading_source(submission: AssignmentSubmission) -> dict[str, Any]:
+    return {
+        "submission_type": "assignment_submission",
+        "submission_id": submission.id,
+        "student_profile_id": submission.student_profile_id,
+        "course_id": submission.assignment.assessment.course_id,
+        "assessment_id": submission.assignment.assessment_id,
+        "score": None,
+        "max_score": str(submission.assignment.max_points),
+        "status": submission.status,
+        "source_payload": {
+            "submission_text": submission.submission_text,
+            "attachment_asset_id": str(submission.attachment_asset_id) if submission.attachment_asset_id else None,
+            "submitted_at": submission.submitted_at.isoformat() if submission.submitted_at else None,
+        },
+    }
+
+
 def _default_quiz_config(config: dict[str, Any]) -> dict[str, Any]:
     return {
         "time_limit_seconds": config.get("time_limit_seconds"),
@@ -565,6 +732,60 @@ def _validate_assessment_window(assessment: Assessment) -> None:
         raise PermissionDenied("Assessment is not open yet.")
     if assessment.available_until and now > assessment.available_until:
         raise PermissionDenied("Assessment window has closed.")
+
+
+def _validate_assignment_available(assignment: Assignment) -> None:
+    assessment = assignment.assessment
+    if (
+        assessment.assessment_type != AssessmentType.ASSIGNMENT
+        or assessment.status != AssessmentStatus.PUBLISHED
+        or assessment.deleted_at is not None
+    ):
+        raise PermissionDenied("Assignment is not available.")
+    now = timezone.now()
+    if assessment.available_from and now < assessment.available_from:
+        raise PermissionDenied("Assignment is not open yet.")
+    if assessment.available_until and now > assessment.available_until:
+        raise PermissionDenied("Assignment window has closed.")
+
+
+def _finalize_assignment_submission(
+    *,
+    submission: AssignmentSubmission,
+    actor_profile_id,
+    correlation_id: str | None,
+) -> AssignmentSubmission:
+    if not submission.submission_text and not submission.attachment_asset_id:
+        raise ValidationError({"submission": "Submission requires text or an attachment_asset_id."})
+    now = timezone.now()
+    assignment = submission.assignment
+    late = bool(assignment.due_at and now > assignment.due_at)
+    if late and not assignment.allow_late_submission:
+        raise ValidationError({"due_at": "Late submissions are not allowed for this assignment."})
+    submission.status = AssignmentSubmissionStatus.LATE if late else AssignmentSubmissionStatus.SUBMITTED
+    submission.submitted_at = now
+    submission.save(update_fields=["submission_text", "attachment_asset_id", "status", "submitted_at", "updated_at"])
+    SubmissionAuditLog.objects.create(
+        submission_type=SubmissionType.ASSIGNMENT_SUBMISSION,
+        submission_id=submission.id,
+        event_type="assignment_submitted_late" if late else "assignment_submitted",
+        actor_profile_id=actor_profile_id,
+        metadata={"assignment_id": str(assignment.id), "late": late},
+    )
+    publish_assessment_event(
+        event_type="AssignmentSubmitted",
+        aggregate_id=submission.id,
+        correlation_id=correlation_id,
+        payload={
+            "assignment_id": str(assignment.id),
+            "assessment_id": str(assignment.assessment_id),
+            "course_id": str(assignment.assessment.course_id),
+            "student_profile_id": str(submission.student_profile_id),
+            "status": submission.status,
+            "late": late,
+        },
+    )
+    return submission
 
 
 def _question_order_for_attempt(attempt: QuizAttempt) -> list:

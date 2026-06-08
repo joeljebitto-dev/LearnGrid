@@ -7,6 +7,8 @@ from .models import (
     AssessmentStatus,
     AssessmentType,
     Assignment,
+    AssignmentSubmission,
+    AssignmentSubmissionStatus,
     Question,
     QuestionBank,
     QuestionStatus,
@@ -245,6 +247,54 @@ class AssignmentSerializer(serializers.ModelSerializer):
         ]
 
 
+class AssignmentSubmissionSerializer(serializers.ModelSerializer):
+    assignment_id = serializers.UUIDField(read_only=True)
+    assessment_id = serializers.UUIDField(source="assignment.assessment_id", read_only=True)
+    course_id = serializers.UUIDField(source="assignment.assessment.course_id", read_only=True)
+
+    class Meta:
+        model = AssignmentSubmission
+        fields = [
+            "id",
+            "assignment_id",
+            "assessment_id",
+            "course_id",
+            "student_profile_id",
+            "submission_text",
+            "attachment_asset_id",
+            "status",
+            "submitted_at",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class AssignmentSubmissionCreateSerializer(serializers.Serializer):
+    submission_text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    attachment_asset_id = serializers.UUIDField(required=False, allow_null=True)
+    submit = serializers.BooleanField(default=False, required=False)
+
+    def validate(self, attrs):
+        if not attrs.get("submission_text") and not attrs.get("attachment_asset_id"):
+            raise serializers.ValidationError("Submission requires text or an attachment_asset_id.")
+        return attrs
+
+
+class AssignmentSubmissionUpdateSerializer(serializers.Serializer):
+    submission_text = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    attachment_asset_id = serializers.UUIDField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        if "submission_text" in attrs and attrs.get("submission_text") == "":
+            attrs["submission_text"] = None
+        return attrs
+
+
+class AssignmentSubmissionSearchSerializer(serializers.Serializer):
+    student_profile_id = serializers.UUIDField(required=False)
+    status = serializers.ChoiceField(choices=AssignmentSubmissionStatus.choices, required=False)
+
+
 class AssessmentSerializer(serializers.ModelSerializer):
     quiz = QuizSerializer(read_only=True)
     assignment = AssignmentSerializer(read_only=True)
@@ -385,6 +435,34 @@ class QuizAnswerPayloadSerializer(serializers.Serializer):
 
 class QuizAnswersUpsertSerializer(serializers.Serializer):
     answers = QuizAnswerPayloadSerializer(many=True)
+
+
+class AssignmentSubmissionMarkGradedSerializer(serializers.Serializer):
+    grade_record_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class QuizAttemptGradingSourceSerializer(serializers.Serializer):
+    submission_type = serializers.CharField()
+    submission_id = serializers.UUIDField()
+    student_profile_id = serializers.UUIDField()
+    course_id = serializers.UUIDField()
+    assessment_id = serializers.UUIDField()
+    score = serializers.CharField(allow_null=True)
+    max_score = serializers.CharField()
+    status = serializers.CharField()
+    source_payload = serializers.JSONField()
+
+
+class AssignmentSubmissionGradingSourceSerializer(serializers.Serializer):
+    submission_type = serializers.CharField()
+    submission_id = serializers.UUIDField()
+    student_profile_id = serializers.UUIDField()
+    course_id = serializers.UUIDField()
+    assessment_id = serializers.UUIDField()
+    score = serializers.CharField(allow_null=True)
+    max_score = serializers.CharField()
+    status = serializers.CharField()
+    source_payload = serializers.JSONField()
 
 
 def _validate_window(attrs: dict) -> None:

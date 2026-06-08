@@ -772,7 +772,7 @@ Indexes: unique `uq_progress_events_event_id`, `idx_progress_events_event_type`.
 
 ## assessment_db
 
-Implementation note: `T-012` implements `DB-ASSESS-001` through `DB-ASSESS-005` and `DB-ASSESS-008`; `T-013` implements `DB-ASSESS-006`, `DB-ASSESS-007`, and `DB-ASSESS-010`. `DB-ASSESS-009 assignment_submissions` remains future `T-014` scope.
+Implementation note: `T-012` implements `DB-ASSESS-001` through `DB-ASSESS-005` and `DB-ASSESS-008`; `T-013` implements `DB-ASSESS-006`, `DB-ASSESS-007`, and `DB-ASSESS-010`; `T-014` implements `DB-ASSESS-009 assignment_submissions`.
 
 ### DB-ASSESS-001 `question_banks`
 Purpose: Question bank owned by instructor or institution.
@@ -944,6 +944,8 @@ Purpose: Preserve assessment submission audit trails.
 Indexes: `idx_submission_audit_submission`, `idx_submission_audit_event_type`, `idx_submission_audit_created_at`.
 
 ## grading_db
+
+Implementation note: `T-015` implements `DB-GRADE-001` through `DB-GRADE-005`. `DB-GRADE-006 certificate_eligibility` and `DB-GRADE-007 certificates` remain future `T-016` scope.
 
 ### DB-GRADE-001 `grading_rules`
 Purpose: Course or assessment grading rule configuration.

@@ -5,6 +5,7 @@ from django.db.models import Prefetch, Q
 from .models import (
     Assessment,
     AssessmentStatus,
+    AssignmentSubmission,
     Question,
     QuestionBank,
     QuizAttempt,
@@ -53,6 +54,13 @@ def quiz_attempt_queryset():
     )
 
 
+def assignment_submission_queryset():
+    return AssignmentSubmission.objects.select_related(
+        "assignment",
+        "assignment__assessment",
+    )
+
+
 def search_question_banks(filters: dict):
     queryset = question_bank_queryset()
     if institution_id := filters.get("institution_id"):
@@ -90,3 +98,12 @@ def search_assessments(filters: dict, *, management: bool):
     if not management:
         queryset = queryset.filter(status=AssessmentStatus.PUBLISHED)
     return queryset.order_by(filters.get("sort") or "-created_at", "id")
+
+
+def search_assignment_submissions(assignment, filters: dict):
+    queryset = assignment_submission_queryset().filter(assignment=assignment)
+    if student_profile_id := filters.get("student_profile_id"):
+        queryset = queryset.filter(student_profile_id=student_profile_id)
+    if status := filters.get("status"):
+        queryset = queryset.filter(status=status)
+    return queryset.order_by("-updated_at", "id")

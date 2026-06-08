@@ -5,7 +5,7 @@ Related spec: [SPEC-013](../specs/013-quiz-attempts-exams.md)
 Canonical schema: [assessment_db](../DATABASE_SCHEMA.md#assessment_db)
 
 ## DBD-013-001 Scope
-`assessment-service` now owns durable quiz/exam attempts, submitted answers, objective score snapshots, and submission audit logs. Full grading records remain future [T-015](../tasks/T-015-grading-results-audit.md) scope.
+`assessment-service` owns durable quiz/exam attempts, submitted answers, objective score snapshots, and submission audit logs. Grading records and published results are documented separately in [DBD-015](DBD-015-grading-results-audit.md).
 
 ## DBD-013-002 Tables
 | Table ID | Table | Purpose |

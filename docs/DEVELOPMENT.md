@@ -407,8 +407,48 @@ Attempt APIs:
 Authoring checks `assessment.manage` at course scope first and then institution scope after
 course metadata is resolved from course-service. Student attempts require `assessment.view`, the
 current profile from user-service, and active course access from enrollment-service. Quiz answers
-are stored in PostgreSQL; Redis is not required for this baseline. Assignment submissions remain
-[T-014](tasks/T-014-assignment-submissions.md).
+are stored in PostgreSQL; Redis is not required for this baseline.
+
+Assignment submission APIs:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET/POST` | `/api/assessments/assignments/<uuid>/submissions/` | List submissions or save a student draft/final submission |
+| `GET/PATCH` | `/api/assessments/submissions/<uuid>/` | Read or update an own draft submission |
+| `POST` | `/api/assessments/submissions/<uuid>/submit/` | Finalize an assignment submission |
+| `POST` | `/api/assessments/submissions/<uuid>/mark-graded/` | Mark a submission graded after grade publication |
+| `GET` | `/api/assessments/grading/quiz-attempts/<uuid>/` | Return grading-safe quiz attempt data |
+| `GET` | `/api/assessments/grading/assignment-submissions/<uuid>/` | Return grading-safe assignment submission data |
+
+Assignment submissions accept `submission_text`, optional `attachment_asset_id`, and optional
+`submit`. Attachment UUIDs are validated through content-service. Final submission enforces the
+published assignment status, assessment availability window, due date, late policy, current
+student profile, and active enrollment. `AssignmentSubmitted` is emitted locally when a draft or
+new submission is finalized.
+
+## Grading, Results, And Audit
+`grading-service` implements [T-015](tasks/T-015-grading-results-audit.md) under `/api/grading/`.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET/POST` | `/api/grading/rules/` | List or create grading rules |
+| `GET/PATCH` | `/api/grading/rules/<uuid>/` | Read or update one grading rule |
+| `GET` | `/api/grading/records/` | List grade records |
+| `GET` | `/api/grading/records/<uuid>/` | Read one grade record with history and reviews |
+| `POST` | `/api/grading/records/calculate/` | Calculate objective quiz grades from assessment-service source data |
+| `POST` | `/api/grading/records/manual-reviews/` | Create a manual review for a quiz attempt or assignment submission |
+| `POST` | `/api/grading/manual-reviews/<uuid>/complete/` | Complete a manual review with score and feedback |
+| `POST` | `/api/grading/records/<uuid>/override/` | Override a grade with required `change_reason` |
+| `POST` | `/api/grading/records/<uuid>/publish/` | Publish a grade result |
+| `GET` | `/api/grading/results/` | List published results |
+| `GET` | `/api/grading/results/<uuid>/` | Read one published result |
+
+Grading APIs use `grade.view` and `grade.manage` through auth-service authorization checks after
+resolving course scope from course-service. Automated quiz grading consumes durable attempt scores
+from assessment-service. Manual review completion and overrides write immutable grade history.
+Publishing creates a student-visible result snapshot, emits `GradePublished`, and asks
+assessment-service to mark assignment submissions graded where applicable. Notification delivery
+remains future [T-017](tasks/T-017-notifications.md).
 
 ## CI
 GitHub Actions runs frontend lint, typecheck, tests, and build. It also runs Ruff, Django checks,

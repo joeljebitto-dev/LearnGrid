@@ -930,7 +930,7 @@ Indexes: unique `uq_progress_events_event_id`, `idx_progress_events_event_type`.
 ## assessment_db
 
 Owning service: `assessment-service`
-Related implemented designs: [DBD-012 Assessment Authoring](db-design/DBD-012-assessment-authoring.md), [DBD-013 Quiz Attempts And Exams](db-design/DBD-013-quiz-attempts-exams.md). `assignment_submissions` remains future [T-014](tasks/T-014-assignment-submissions.md) scope.
+Related implemented designs: [DBD-012 Assessment Authoring](db-design/DBD-012-assessment-authoring.md), [DBD-013 Quiz Attempts And Exams](db-design/DBD-013-quiz-attempts-exams.md), [DBD-014 Assignment Submissions](db-design/DBD-014-assignment-submissions.md).
 
 ### DB-ASSESS-001 `question_banks`
 Owning service: `assessment-service`  
@@ -1134,7 +1134,7 @@ Indexes: `idx_submission_audit_submission`, `idx_submission_audit_event_type`, `
 ## grading_db
 
 Owning service: `grading-service`
-Related implemented design: not yet implemented beyond baseline schema documentation.
+Related implemented design: [DBD-015 Grading, Results, And Audit](db-design/DBD-015-grading-results-audit.md). `certificate_eligibility` and `certificates` remain future [T-016](tasks/T-016-certificates.md) scope.
 
 ### DB-GRADE-001 `grading_rules`
 Owning service: `grading-service`  

@@ -1553,5 +1553,47 @@ Related design: [API-013 Quiz Attempts And Exams](api-design/API-013-quiz-attemp
 
 Attempt start/detail responses include `attempt`, `questions`, and `deadline_at`. Student question objects omit `correct_answer`. Attempt start enforces published status, availability windows, active enrollment, max attempts, and time limits. Randomized question order is persisted in `submission_audit_logs`.
 
+## API-014 Assignment Submissions APIs
+
+Related design: [API-014 Assignment Submissions](api-design/API-014-assignment-submissions.md)
+
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET` | `/api/assessments/assignments/<uuid>/submissions/` | List assignment submissions with `student_profile_id` and `status` filters | Owner or `submission.view` |
+| `POST` | `/api/assessments/assignments/<uuid>/submissions/` | Save a draft or submit assignment work | Student profile, `assessment.view`, active enrollment |
+| `GET` | `/api/assessments/submissions/<uuid>/` | Read one assignment submission | Owner or `submission.view/manage` |
+| `PATCH` | `/api/assessments/submissions/<uuid>/` | Update an own draft submission | Owner only |
+| `POST` | `/api/assessments/submissions/<uuid>/submit/` | Finalize a draft and emit `AssignmentSubmitted` | Owner only |
+| `POST` | `/api/assessments/submissions/<uuid>/mark-graded/` | Mark submission graded after grade publication | `submission.manage` |
+
+Submission body parameters: optional `submission_text`, optional `attachment_asset_id`, and optional `submit`. Create requires text or attachment. Attachment UUIDs are validated through content-service. Late submissions are rejected unless `allow_late_submission=true`, and accepted late submissions use status `late`.
+
+## API-015 Grading, Results, And Audit APIs
+
+Related design: [API-015 Grading, Results, And Audit](api-design/API-015-grading-results-audit.md)
+
+### API-015-001 Assessment Grading Sources
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET` | `/api/assessments/grading/quiz-attempts/<uuid>/` | Return grading-safe quiz attempt metadata | `grade.manage` scoped to course/institution |
+| `GET` | `/api/assessments/grading/assignment-submissions/<uuid>/` | Return grading-safe assignment submission metadata | `grade.manage` scoped to course/institution |
+
+### API-015-002 Grading Service
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET/POST` | `/api/grading/rules/` | List or create grading rules | `grade.view/manage` |
+| `GET/PATCH` | `/api/grading/rules/<uuid>/` | Read or update one grading rule | `grade.view/manage` |
+| `GET` | `/api/grading/records/` | List grade records with filters | `grade.view` |
+| `GET` | `/api/grading/records/<uuid>/` | Read one grade record with history and reviews | `grade.view` |
+| `POST` | `/api/grading/records/calculate/` | Calculate an objective quiz grade from assessment-service source data | `grade.manage` |
+| `POST` | `/api/grading/records/manual-reviews/` | Create a pending manual review | `grade.manage` |
+| `POST` | `/api/grading/manual-reviews/<uuid>/complete/` | Complete manual review with score and feedback | `grade.manage` |
+| `POST` | `/api/grading/records/<uuid>/override/` | Override score with required `change_reason` | `grade.manage` |
+| `POST` | `/api/grading/records/<uuid>/publish/` | Publish a result and emit `GradePublished` | `grade.manage` |
+| `GET` | `/api/grading/results/` | List published results | Owning student or `grade.view` |
+| `GET` | `/api/grading/results/<uuid>/` | Read one published result | Owning student or `grade.view` |
+
+Grading request bodies use rule fields (`course_id`, optional `assessment_id`, `rule_type`, `configuration`, `created_by_profile_id`), calculation fields (`submission_type`, `submission_id`, optional `rule_id`), manual review fields (`submission_type`, `submission_id`, optional `reviewer_profile_id`), completion fields (`score`, optional `feedback`), override fields (`score`, optional `max_score`, required `change_reason`), and publish fields (`published_feedback`). Remote assessment, course, or user-service failures return controlled `502` responses.
+
 ## Future APIs Not Implemented
-Assignment submissions, grading, certificates, notifications, generalized analytics/search reporting, API gateway, Kafka transport, Redis architecture operations, deployment, and broader security APIs remain future task scope unless explicitly listed above.
+Certificates, notifications, generalized analytics/search reporting, API gateway, Kafka transport, Redis architecture operations, deployment, and broader security APIs remain future task scope unless explicitly listed above.

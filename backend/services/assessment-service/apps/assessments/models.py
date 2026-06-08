@@ -47,6 +47,14 @@ class SubmissionType(models.TextChoices):
     ASSIGNMENT_SUBMISSION = "assignment_submission", "Assignment submission"
 
 
+class AssignmentSubmissionStatus(models.TextChoices):
+    DRAFT = "draft", "Draft"
+    SUBMITTED = "submitted", "Submitted"
+    LATE = "late", "Late"
+    WITHDRAWN = "withdrawn", "Withdrawn"
+    GRADED = "graded", "Graded"
+
+
 class QuestionBank(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     institution_id = models.UUIDField()
@@ -261,6 +269,42 @@ class Assignment(models.Model):
 
     def __str__(self) -> str:
         return self.assessment.title
+
+
+class AssignmentSubmission(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    assignment = models.ForeignKey(
+        Assignment,
+        on_delete=models.CASCADE,
+        related_name="submissions",
+    )
+    student_profile_id = models.UUIDField()
+    submission_text = models.TextField(null=True, blank=True)
+    attachment_asset_id = models.UUIDField(null=True, blank=True)
+    status = models.CharField(
+        max_length=24,
+        choices=AssignmentSubmissionStatus.choices,
+        default=AssignmentSubmissionStatus.SUBMITTED,
+    )
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "assignment_submissions"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["assignment", "student_profile_id"],
+                name="uq_asub_assignment_student",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["status"], name="idx_asub_status"),
+            models.Index(fields=["student_profile_id"], name="idx_asub_student_id"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.assignment_id}:{self.student_profile_id}"
 
 
 class SubmissionAuditLog(models.Model):

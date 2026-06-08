@@ -23,4 +23,4 @@ Attempt start/detail responses include:
 Student question responses never include `correct_answer`.
 
 ## API-013-003 Behavior
-Attempt start enforces published status, availability windows, active enrollment, max attempts, and question availability. Randomized question order is persisted in `submission_audit_logs` and reused on later reads. Answer saves after expiry auto-submit when quiz `auto_submit` is enabled. Objective answers are scored locally; grading-service publication remains future T-015 work.
+Attempt start enforces published status, availability windows, active enrollment, max attempts, and question availability. Randomized question order is persisted in `submission_audit_logs` and reused on later reads. Answer saves after expiry auto-submit when quiz `auto_submit` is enabled. Objective answers are scored locally, and grading-service consumes the grading-safe source endpoint documented in [API-015](API-015-grading-results-audit.md).

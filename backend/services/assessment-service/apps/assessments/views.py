@@ -8,12 +8,19 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import AssessmentStatus
-from .permissions import has_assessment_permission, require_assessment_permission
+from .permissions import (
+    has_assessment_permission,
+    has_scoped_permission,
+    require_assessment_permission,
+    require_scoped_permission,
+)
 from .selectors import (
+    assignment_submission_queryset,
     assessment_queryset,
     question_bank_queryset,
     question_queryset,
     quiz_attempt_queryset,
+    search_assignment_submissions,
     search_assessments,
     search_question_banks,
     search_questions,
@@ -23,6 +30,12 @@ from .serializers import (
     AssessmentSearchSerializer,
     AssessmentSerializer,
     AssessmentUpdateSerializer,
+    AssignmentSubmissionCreateSerializer,
+    AssignmentSubmissionGradingSourceSerializer,
+    AssignmentSubmissionMarkGradedSerializer,
+    AssignmentSubmissionSearchSerializer,
+    AssignmentSubmissionSerializer,
+    AssignmentSubmissionUpdateSerializer,
     QuestionBankCreateSerializer,
     QuestionBankSearchSerializer,
     QuestionBankSerializer,
@@ -33,6 +46,7 @@ from .serializers import (
     QuestionUpdateSerializer,
     QuizAnswersUpsertSerializer,
     QuizAttemptSerializer,
+    QuizAttemptGradingSourceSerializer,
     QuizQuestionReplaceSerializer,
     StudentQuestionSerializer,
 )
@@ -49,14 +63,19 @@ from .services import (
     current_profile,
     get_course_context,
     has_enrollment_access,
+    assignment_submission_grading_source,
+    mark_assignment_submission_graded,
     ordered_attempt_questions,
     points_by_question,
     publish_assessment,
     replace_quiz_questions,
     save_attempt_answers,
+    save_assignment_submission,
     start_quiz_attempt,
+    submit_assignment_submission,
     submit_attempt,
     update_assessment,
+    update_assignment_submission,
     update_question,
     update_question_bank,
 )
@@ -129,6 +148,31 @@ def _assessment_attempt_payload(attempt):
         ).data,
         "deadline_at": attempt_deadline(attempt),
     }
+
+
+def _assignment_submission_manage_allowed(request, assignment) -> tuple[bool, dict]:
+    course = _course_context_for_request(request, assignment.assessment.course_id)
+    return (
+        has_scoped_permission(
+            request,
+            "submission.manage",
+            course_id=assignment.assessment.course_id,
+            institution_id=course["institution_id"],
+        ),
+        course,
+    )
+
+
+def _require_submission_scope(request, permission: str, assignment) -> dict:
+    course = _course_context_for_request(request, assignment.assessment.course_id)
+    require_scoped_permission(
+        request,
+        permission,
+        course_id=assignment.assessment.course_id,
+        institution_id=course["institution_id"],
+        message="You do not have permission to access this submission scope.",
+    )
+    return course
 
 
 class QuestionBankListCreateView(APIView):
@@ -490,3 +534,195 @@ class QuizAttemptAutoSubmitView(APIView):
             correlation_id=_correlation_id(request),
         )
         return Response(QuizAttemptSerializer(attempt).data)
+
+
+class AssignmentSubmissionListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+    pagination_class = AssessmentPagination
+
+    def get(self, request, assignment_id):
+        from .models import Assignment
+
+        assignment = get_object_or_404(Assignment.objects.select_related("assessment"), id=assignment_id)
+        management, course = _assignment_submission_manage_allowed(request, assignment)
+        serializer = AssignmentSubmissionSearchSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        filters = serializer.validated_data
+        profile = current_profile(token=auth_token(request))
+        if profile.get("profile_type") == "student":
+            management = False
+        if not management:
+            require_scoped_permission(
+                request,
+                "submission.view",
+                course_id=assignment.assessment.course_id,
+                institution_id=course["institution_id"],
+            )
+            if profile.get("profile_type") != "student":
+                from rest_framework.exceptions import PermissionDenied
+
+                raise PermissionDenied("Submission list requires a student profile or manager access.")
+            filters["student_profile_id"] = profile["id"]
+            if not has_enrollment_access(
+                token=auth_token(request),
+                student_profile_id=profile["id"],
+                course_id=assignment.assessment.course_id,
+            ):
+                from rest_framework.exceptions import PermissionDenied
+
+                raise PermissionDenied("Student does not have active access to this course.")
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(
+            search_assignment_submissions(assignment, filters),
+            request,
+            view=self,
+        )
+        return paginator.get_paginated_response(AssignmentSubmissionSerializer(page, many=True).data)
+
+    def post(self, request, assignment_id):
+        from .models import Assignment
+
+        assignment = get_object_or_404(Assignment.objects.select_related("assessment"), id=assignment_id)
+        _require_submission_scope(request, "submission.manage", assignment)
+        profile = current_profile(token=auth_token(request))
+        if profile.get("profile_type") != "student":
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied("Assignment submission requires a student profile.")
+        if not has_enrollment_access(
+            token=auth_token(request),
+            student_profile_id=profile["id"],
+            course_id=assignment.assessment.course_id,
+        ):
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied("Student does not have active access to this course.")
+        serializer = AssignmentSubmissionCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        submission = save_assignment_submission(
+            assignment=assignment,
+            token=auth_token(request),
+            profile=profile,
+            validated_data=serializer.validated_data,
+            submit=serializer.validated_data.get("submit", False),
+            correlation_id=_correlation_id(request),
+        )
+        return Response(AssignmentSubmissionSerializer(submission).data, status=status.HTTP_201_CREATED)
+
+
+class AssignmentSubmissionDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, submission_id):
+        submission = get_object_or_404(assignment_submission_queryset(), id=submission_id)
+        management, course = _assignment_submission_manage_allowed(request, submission.assignment)
+        profile = current_profile(token=auth_token(request))
+        if profile.get("profile_type") == "student":
+            management = False
+        if not management:
+            require_scoped_permission(
+                request,
+                "submission.view",
+                course_id=submission.assignment.assessment.course_id,
+                institution_id=course["institution_id"],
+            )
+            if str(profile.get("id")) != str(submission.student_profile_id):
+                from rest_framework.exceptions import PermissionDenied
+
+                raise PermissionDenied("Submission belongs to another profile.")
+        return Response(AssignmentSubmissionSerializer(submission).data)
+
+    def patch(self, request, submission_id):
+        submission = get_object_or_404(assignment_submission_queryset(), id=submission_id)
+        _require_submission_scope(request, "submission.manage", submission.assignment)
+        profile = current_profile(token=auth_token(request))
+        serializer = AssignmentSubmissionUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        submission = update_assignment_submission(
+            submission=submission,
+            token=auth_token(request),
+            profile=profile,
+            validated_data=serializer.validated_data,
+        )
+        return Response(AssignmentSubmissionSerializer(submission).data)
+
+
+class AssignmentSubmissionSubmitView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, submission_id):
+        submission = get_object_or_404(assignment_submission_queryset(), id=submission_id)
+        _require_submission_scope(request, "submission.manage", submission.assignment)
+        profile = current_profile(token=auth_token(request))
+        if str(profile.get("id")) != str(submission.student_profile_id):
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied("Submission belongs to another profile.")
+        submission = submit_assignment_submission(
+            submission=submission,
+            actor_profile_id=profile["id"],
+            correlation_id=_correlation_id(request),
+        )
+        return Response(AssignmentSubmissionSerializer(submission).data)
+
+
+class AssignmentSubmissionMarkGradedView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, submission_id):
+        submission = get_object_or_404(assignment_submission_queryset(), id=submission_id)
+        course = _course_context_for_request(request, submission.assignment.assessment.course_id)
+        require_scoped_permission(
+            request,
+            "grade.manage",
+            course_id=submission.assignment.assessment.course_id,
+            institution_id=course["institution_id"],
+            message="You do not have permission to grade this submission.",
+        )
+        serializer = AssignmentSubmissionMarkGradedSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        profile = current_profile(token=auth_token(request))
+        submission = mark_assignment_submission_graded(
+            submission=submission,
+            actor_profile_id=profile.get("id"),
+            grade_record_id=serializer.validated_data.get("grade_record_id"),
+        )
+        return Response(AssignmentSubmissionSerializer(submission).data)
+
+
+class QuizAttemptGradingSourceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, attempt_id):
+        from .services import quiz_attempt_grading_source
+
+        attempt = get_object_or_404(quiz_attempt_queryset(), id=attempt_id)
+        course = _course_context_for_request(request, attempt.quiz.assessment.course_id)
+        require_scoped_permission(
+            request,
+            "grade.manage",
+            course_id=attempt.quiz.assessment.course_id,
+            institution_id=course["institution_id"],
+            message="You do not have permission to grade this attempt.",
+        )
+        return Response(QuizAttemptGradingSourceSerializer(quiz_attempt_grading_source(attempt)).data)
+
+
+class AssignmentSubmissionGradingSourceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, submission_id):
+        submission = get_object_or_404(assignment_submission_queryset(), id=submission_id)
+        course = _course_context_for_request(request, submission.assignment.assessment.course_id)
+        require_scoped_permission(
+            request,
+            "grade.manage",
+            course_id=submission.assignment.assessment.course_id,
+            institution_id=course["institution_id"],
+            message="You do not have permission to grade this submission.",
+        )
+        return Response(
+            AssignmentSubmissionGradingSourceSerializer(
+                assignment_submission_grading_source(submission)
+            ).data
+        )

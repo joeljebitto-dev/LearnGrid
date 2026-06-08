@@ -25,6 +25,8 @@ Database design documents use stable IDs:
 | [DBD-011](DBD-011-dashboards-portals.md) | Dashboards And Portals | [T-011](../tasks/T-011-dashboards-portals.md) | [SPEC-011](../specs/011-dashboards-portals.md) |
 | [DBD-012](DBD-012-assessment-authoring.md) | Assessment Authoring | [T-012](../tasks/T-012-assessment-authoring.md) | [SPEC-012](../specs/012-assessment-authoring.md) |
 | [DBD-013](DBD-013-quiz-attempts-exams.md) | Quiz Attempts And Exams | [T-013](../tasks/T-013-quiz-attempts-exams.md) | [SPEC-013](../specs/013-quiz-attempts-exams.md) |
+| [DBD-014](DBD-014-assignment-submissions.md) | Assignment Submissions | [T-014](../tasks/T-014-assignment-submissions.md) | [SPEC-014](../specs/014-assignment-submissions.md) |
+| [DBD-015](DBD-015-grading-results-audit.md) | Grading, Results, And Audit | [T-015](../tasks/T-015-grading-results-audit.md) | [SPEC-015](../specs/015-grading-results-audit.md) |
 
 ## Rules
 - Keep [DATABASE_SCHEMA.md](../DATABASE_SCHEMA.md) as the field-level source of truth.

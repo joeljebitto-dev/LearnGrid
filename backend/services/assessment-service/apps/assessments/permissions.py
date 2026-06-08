@@ -128,3 +128,51 @@ def require_assessment_permission(
         institution_id=institution_id,
     ):
         raise PermissionDenied("You do not have permission to access this assessment scope.")
+
+
+def has_scoped_permission(
+    request,
+    permission: str,
+    *,
+    course_id=None,
+    institution_id=None,
+) -> bool:
+    if not request.user or not request.user.is_authenticated or not isinstance(request.auth, str):
+        return False
+    if course_id and remote_authorization_check(
+        token=request.auth,
+        permission=permission,
+        scope_type="course",
+        scope_id=str(course_id),
+    ):
+        return True
+    if institution_id:
+        return remote_authorization_check(
+            token=request.auth,
+            permission=permission,
+            scope_type="institution",
+            scope_id=str(institution_id),
+        )
+    return remote_authorization_check(
+        token=request.auth,
+        permission=permission,
+        scope_type="platform",
+        scope_id=None,
+    )
+
+
+def require_scoped_permission(
+    request,
+    permission: str,
+    *,
+    course_id=None,
+    institution_id=None,
+    message: str = "You do not have permission to access this scope.",
+) -> None:
+    if not has_scoped_permission(
+        request,
+        permission,
+        course_id=course_id,
+        institution_id=institution_id,
+    ):
+        raise PermissionDenied(message)

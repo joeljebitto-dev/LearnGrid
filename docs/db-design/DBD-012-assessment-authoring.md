@@ -5,7 +5,7 @@ Related spec: [SPEC-012](../specs/012-assessment-authoring.md)
 Canonical schema: [assessment_db](../DATABASE_SCHEMA.md#assessment_db)
 
 ## DBD-012-001 Scope
-`assessment-service` now owns authoring data for reusable question banks, questions, quiz/exam/assignment shells, quiz configuration, ordered quiz questions, and assignment configuration. Assignment submissions remain future [T-014](../tasks/T-014-assignment-submissions.md) scope.
+`assessment-service` owns authoring data for reusable question banks, questions, quiz/exam/assignment shells, quiz configuration, ordered quiz questions, and assignment configuration. Assignment submission persistence is documented separately in [DBD-014](DBD-014-assignment-submissions.md).
 
 ## DBD-012-002 Tables
 | Table ID | Table | Purpose |
