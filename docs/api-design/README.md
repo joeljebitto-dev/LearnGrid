@@ -27,6 +27,8 @@ API design documents use stable IDs:
 | [API-013](API-013-quiz-attempts-exams.md) | Quiz Attempts And Exams | [T-013](../tasks/T-013-quiz-attempts-exams.md) | [SPEC-013](../specs/013-quiz-attempts-exams.md) |
 | [API-014](API-014-assignment-submissions.md) | Assignment Submissions | [T-014](../tasks/T-014-assignment-submissions.md) | [SPEC-014](../specs/014-assignment-submissions.md) |
 | [API-015](API-015-grading-results-audit.md) | Grading, Results, And Audit | [T-015](../tasks/T-015-grading-results-audit.md) | [SPEC-015](../specs/015-grading-results-audit.md) |
+| [API-016](API-016-certificates.md) | Certificates | [T-016](../tasks/T-016-certificates.md) | [SPEC-016](../specs/016-certificates.md) |
+| [API-017](API-017-notifications.md) | Notifications | [T-017](../tasks/T-017-notifications.md) | [SPEC-017](../specs/017-notifications.md) |
 
 ## Rules
 - Add one `API-###-<topic>.md` file after a task with API design is implemented.

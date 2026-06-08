@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .models import GradeRecord, GradingRule, ManualReview, PublishedResult
+from .models import Certificate, CertificateEligibility, GradeRecord, GradingRule, ManualReview, PublishedResult
 
 
 def grading_rule_queryset():
@@ -17,6 +17,14 @@ def manual_review_queryset():
 
 def published_result_queryset():
     return PublishedResult.objects.select_related("grade_record")
+
+
+def certificate_eligibility_queryset():
+    return CertificateEligibility.objects.all()
+
+
+def certificate_queryset():
+    return Certificate.objects.select_related("certificate_eligibility")
 
 
 def search_grading_rules(filters: dict):
@@ -45,3 +53,22 @@ def search_published_results(filters: dict):
     if course_id := filters.get("course_id"):
         queryset = queryset.filter(course_id=course_id)
     return queryset.order_by("-published_at", "id")
+
+
+def search_certificate_eligibility(filters: dict):
+    queryset = certificate_eligibility_queryset()
+    for field in ["student_profile_id", "course_id", "eligible"]:
+        if field in filters:
+            queryset = queryset.filter(**{field: filters[field]})
+    return queryset.order_by("-evaluated_at", "id")
+
+
+def search_certificates(filters: dict):
+    queryset = certificate_queryset()
+    if student_profile_id := filters.get("student_profile_id"):
+        queryset = queryset.filter(student_profile_id=student_profile_id)
+    if course_id := filters.get("course_id"):
+        queryset = queryset.filter(course_id=course_id)
+    if not filters.get("include_revoked"):
+        queryset = queryset.filter(revoked_at__isnull=True)
+    return queryset.order_by("-issued_at", "id")

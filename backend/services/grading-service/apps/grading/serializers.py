@@ -3,6 +3,8 @@ from __future__ import annotations
 from rest_framework import serializers
 
 from .models import (
+    Certificate,
+    CertificateEligibility,
     GradeHistory,
     GradeRecord,
     GradeRecordStatus,
@@ -167,3 +169,62 @@ class PublishedResultSerializer(serializers.ModelSerializer):
 class PublishedResultSearchSerializer(serializers.Serializer):
     student_profile_id = serializers.UUIDField(required=False)
     course_id = serializers.UUIDField(required=False)
+
+
+class CertificateEligibilitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CertificateEligibility
+        fields = [
+            "id",
+            "student_profile_id",
+            "course_id",
+            "eligible",
+            "reason",
+            "evaluated_at",
+            "created_at",
+            "updated_at",
+        ]
+
+
+class CertificateSerializer(serializers.ModelSerializer):
+    certificate_eligibility_id = serializers.UUIDField(read_only=True)
+    valid = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Certificate
+        fields = [
+            "id",
+            "certificate_eligibility_id",
+            "student_profile_id",
+            "course_id",
+            "certificate_number",
+            "certificate_asset_id",
+            "issued_at",
+            "revoked_at",
+            "valid",
+        ]
+
+    def get_valid(self, certificate: Certificate) -> bool:
+        return certificate.revoked_at is None
+
+
+class CertificateEligibilitySearchSerializer(serializers.Serializer):
+    student_profile_id = serializers.UUIDField(required=False)
+    course_id = serializers.UUIDField(required=False)
+    eligible = serializers.BooleanField(required=False)
+
+
+class CertificateEligibilityEvaluateSerializer(serializers.Serializer):
+    student_profile_id = serializers.UUIDField()
+    course_id = serializers.UUIDField()
+    certificate_asset_id = serializers.UUIDField(required=False, allow_null=True)
+
+
+class CertificateSearchSerializer(serializers.Serializer):
+    student_profile_id = serializers.UUIDField(required=False)
+    course_id = serializers.UUIDField(required=False)
+    include_revoked = serializers.BooleanField(required=False, default=False)
+
+
+class CertificateAssetUpdateSerializer(serializers.Serializer):
+    certificate_asset_id = serializers.UUIDField(required=False, allow_null=True)

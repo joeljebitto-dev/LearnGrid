@@ -442,13 +442,50 @@ new submission is finalized.
 | `POST` | `/api/grading/records/<uuid>/publish/` | Publish a grade result |
 | `GET` | `/api/grading/results/` | List published results |
 | `GET` | `/api/grading/results/<uuid>/` | Read one published result |
+| `GET` | `/api/grading/certificates/eligibility/` | List certificate eligibility records |
+| `GET` | `/api/grading/certificates/eligibility/<uuid>/` | Read one eligibility record |
+| `POST` | `/api/grading/certificates/eligibility/evaluate/` | Evaluate eligibility and auto-issue when eligible |
+| `GET` | `/api/grading/certificates/` | List certificates |
+| `GET/PATCH` | `/api/grading/certificates/<uuid>/` | Read a certificate or update `certificate_asset_id` |
+| `POST` | `/api/grading/certificates/<uuid>/revoke/` | Revoke a certificate |
 
 Grading APIs use `grade.view` and `grade.manage` through auth-service authorization checks after
 resolving course scope from course-service. Automated quiz grading consumes durable attempt scores
 from assessment-service. Manual review completion and overrides write immutable grade history.
 Publishing creates a student-visible result snapshot, emits `GradePublished`, and asks
-assessment-service to mark assignment submissions graded where applicable. Notification delivery
-remains future [T-017](tasks/T-017-notifications.md).
+assessment-service to mark assignment submissions graded where applicable. Notification-service
+consumes `GradePublished` through [T-017](tasks/T-017-notifications.md); external email, SMS, and
+push delivery remain future scope.
+
+Certificate eligibility requires completed course progress from progress-service and passing
+published grades. The default pass threshold is `GRADING_CERTIFICATE_DEFAULT_PASS_PERCENT=70`,
+overridden by course-level grading rule `configuration.certificate_min_percent` when present.
+Eligible evaluations auto-issue certificates with numbers formatted as `LG-YYYYMMDD-XXXXXXXXXX`
+and emit `CertificateEligible`. Certificate assets are optional UUID references validated through
+content-service; certificate PDF generation remains outside this task.
+
+## Notifications
+`notification-service` implements [T-017](tasks/T-017-notifications.md) under `/api/notifications/`.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET/POST` | `/api/notifications/templates/` | List or upsert templates |
+| `GET/PATCH` | `/api/notifications/templates/<uuid>/` | Read or update one template |
+| `GET` | `/api/notifications/` | List notifications for the current profile or scoped admin filter |
+| `GET` | `/api/notifications/<uuid>/` | Read one notification |
+| `POST` | `/api/notifications/<uuid>/read/` | Mark one notification read |
+| `POST` | `/api/notifications/<uuid>/unread/` | Mark one notification unread |
+| `POST` | `/api/notifications/read-all/` | Mark current profile notifications read |
+| `GET/POST` | `/api/notifications/preferences/` | List or upsert user notification preferences |
+| `GET` | `/api/notifications/delivery-attempts/` | List delivery attempts |
+| `POST` | `/api/notifications/events/ingest/` | Idempotently process notification events |
+
+Supported event types are `StudentEnrolled`, `AssignmentDueSoon`, `GradePublished`, and
+`CourseCompleted`. Events include `event_id`, `event_type`, `aggregate_id`, optional
+`producer_service`, optional `timestamp`, and `payload`. In-app notifications are created for
+`payload.student_profile_id` or `payload.recipient_profile_ids`, unless the recipient disabled that
+event/channel preference. Email, SMS, and push are represented as template/preference channel
+placeholders; delivery remains future scope.
 
 ## CI
 GitHub Actions runs frontend lint, typecheck, tests, and build. It also runs Ruff, Django checks,

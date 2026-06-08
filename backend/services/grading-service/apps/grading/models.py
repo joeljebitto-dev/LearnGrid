@@ -146,3 +146,53 @@ class PublishedResult(models.Model):
         indexes = [
             models.Index(fields=["student_profile_id", "course_id"], name="idx_pub_results_student_course"),
         ]
+
+
+class CertificateEligibility(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student_profile_id = models.UUIDField()
+    course_id = models.UUIDField()
+    eligible = models.BooleanField(default=False)
+    reason = models.TextField(null=True, blank=True)
+    evaluated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "certificate_eligibility"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["student_profile_id", "course_id"],
+                name="uq_cert_elig_student_course",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["course_id", "eligible"], name="idx_cert_elig_course_eligible"),
+        ]
+
+
+class Certificate(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    certificate_eligibility = models.OneToOneField(
+        CertificateEligibility,
+        on_delete=models.CASCADE,
+        related_name="certificate",
+    )
+    student_profile_id = models.UUIDField()
+    course_id = models.UUIDField()
+    certificate_number = models.CharField(max_length=80, unique=True)
+    certificate_asset_id = models.UUIDField(null=True, blank=True)
+    issued_at = models.DateTimeField(auto_now_add=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "certificates"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["certificate_eligibility"],
+                name="uq_certificates_eligibility",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["student_profile_id", "course_id"], name="idx_certs_student_course"),
+        ]

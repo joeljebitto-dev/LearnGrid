@@ -5,7 +5,7 @@ Related spec: [SPEC-015](../specs/015-grading-results-audit.md)
 Canonical schema: [grading_db](../DATABASE_SCHEMA.md#grading_db)
 
 ## DBD-015-001 Scope
-`grading-service` now owns grading rules, grade records, manual reviews, immutable grade history, and published result snapshots. Certificate eligibility and certificate issuance remain future [T-016](../tasks/T-016-certificates.md) scope.
+`grading-service` owns grading rules, grade records, manual reviews, immutable grade history, and published result snapshots. Certificate eligibility and issuance are documented separately in [DBD-016](DBD-016-certificates.md).
 
 ## DBD-015-002 Tables
 | Table ID | Table | Purpose |

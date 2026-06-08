@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
+import string
 import uuid
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
 from urllib import error, parse, request as urlrequest
 
@@ -13,6 +15,8 @@ from django.utils import timezone
 from rest_framework.exceptions import APIException, NotFound, PermissionDenied, ValidationError
 
 from .models import (
+    Certificate,
+    CertificateEligibility,
     GradeHistory,
     GradeRecord,
     GradeRecordStatus,
@@ -42,6 +46,18 @@ class AssessmentServiceError(APIException):
     status_code = 502
     default_code = "assessment_service_error"
     default_detail = "Assessment-service request failed."
+
+
+class ProgressServiceError(APIException):
+    status_code = 502
+    default_code = "progress_service_error"
+    default_detail = "Progress-service request failed."
+
+
+class ContentServiceError(APIException):
+    status_code = 502
+    default_code = "content_service_error"
+    default_detail = "Content-service request failed."
 
 
 def auth_token(request) -> str:
@@ -131,6 +147,32 @@ def mark_assignment_submission_graded(*, token: str, submission_id, grade_record
         method="POST",
         payload={"grade_record_id": str(grade_record_id)},
         error_class=AssessmentServiceError,
+    )
+
+
+def fetch_course_progress(*, token: str, student_profile_id, course_id) -> dict[str, Any] | None:
+    data = _json_request(
+        base_url=settings.PROGRESS_SERVICE_BASE_URL,
+        path="/api/progress/courses/",
+        token=token,
+        query={"student_profile_id": student_profile_id, "course_id": course_id},
+        error_class=ProgressServiceError,
+    )
+    if isinstance(data, list):
+        return data[0] if data else None
+    if isinstance(data, dict) and isinstance(data.get("results"), list):
+        return data["results"][0] if data["results"] else None
+    raise ProgressServiceError("Progress-service response did not include course progress results.")
+
+
+def validate_content_asset(*, token: str, asset_id) -> dict[str, Any]:
+    if not asset_id:
+        return {}
+    return _json_request(
+        base_url=settings.CONTENT_SERVICE_BASE_URL,
+        path=f"/api/content/assets/{asset_id}/",
+        token=token,
+        error_class=ContentServiceError,
     )
 
 
@@ -272,6 +314,188 @@ def publish_grade(
         payload=_grade_event_payload(grade_record),
     )
     return result
+
+
+@transaction.atomic
+def evaluate_certificate_eligibility(
+    *,
+    token: str,
+    student_profile_id,
+    course_id,
+    certificate_asset_id=None,
+    correlation_id: str | None = None,
+) -> dict[str, Any]:
+    if certificate_asset_id:
+        validate_content_asset(token=token, asset_id=certificate_asset_id)
+
+    threshold = certificate_pass_threshold(course_id=course_id)
+    progress = fetch_course_progress(token=token, student_profile_id=student_profile_id, course_id=course_id)
+    grade_percent = None
+    eligible = False
+    reason = "course_progress_missing"
+
+    if progress:
+        if not course_progress_complete(progress):
+            reason = "course_incomplete"
+        else:
+            grade_percent = published_grade_percent(student_profile_id=student_profile_id, course_id=course_id)
+            if grade_percent is None:
+                reason = "published_results_missing"
+            elif grade_percent < threshold:
+                reason = "grade_below_threshold"
+            else:
+                eligible = True
+                reason = "eligible"
+
+    eligibility = upsert_certificate_eligibility(
+        student_profile_id=student_profile_id,
+        course_id=course_id,
+        eligible=eligible,
+        reason=reason,
+    )
+    certificate = None
+    if eligible:
+        certificate = issue_certificate(
+            eligibility=eligibility,
+            certificate_asset_id=certificate_asset_id,
+        )
+        publish_certificate_event(
+            event_type="CertificateEligible",
+            aggregate_id=eligibility.id,
+            correlation_id=correlation_id,
+            payload={
+                "student_profile_id": str(student_profile_id),
+                "course_id": str(course_id),
+                "eligibility_id": str(eligibility.id),
+                "certificate_id": str(certificate.id),
+                "certificate_number": certificate.certificate_number,
+                "grade_percent": str(grade_percent),
+                "threshold_percent": str(threshold),
+            },
+        )
+    return {
+        "eligibility": eligibility,
+        "certificate": certificate,
+        "grade_percent": str(grade_percent) if grade_percent is not None else None,
+        "threshold_percent": str(threshold),
+    }
+
+
+def certificate_pass_threshold(*, course_id) -> Decimal:
+    for rule in GradingRule.objects.filter(course_id=course_id, assessment_id__isnull=True).order_by(
+        "-updated_at",
+        "-created_at",
+    ):
+        configuration = rule.configuration or {}
+        if "certificate_min_percent" in configuration:
+            value = _decimal_or_none(configuration.get("certificate_min_percent"))
+            if value is not None:
+                return value
+    return Decimal(str(settings.GRADING_CERTIFICATE_DEFAULT_PASS_PERCENT))
+
+
+def course_progress_complete(progress: dict[str, Any]) -> bool:
+    if progress.get("status") == "completed":
+        return True
+    completion_percent = _decimal_or_none(progress.get("completion_percent")) or Decimal("0")
+    return completion_percent >= Decimal("100")
+
+
+def published_grade_percent(*, student_profile_id, course_id) -> Decimal | None:
+    results = list(
+        PublishedResult.objects.select_related("grade_record").filter(
+            student_profile_id=student_profile_id,
+            course_id=course_id,
+        )
+    )
+    if not results:
+        return None
+    total_score = sum((result.published_score for result in results), Decimal("0"))
+    total_max = sum((result.grade_record.max_score for result in results), Decimal("0"))
+    if total_max <= 0:
+        return None
+    return ((total_score / total_max) * Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def upsert_certificate_eligibility(*, student_profile_id, course_id, eligible: bool, reason: str) -> CertificateEligibility:
+    eligibility, _created = CertificateEligibility.objects.update_or_create(
+        student_profile_id=student_profile_id,
+        course_id=course_id,
+        defaults={"eligible": eligible, "reason": reason},
+    )
+    return eligibility
+
+
+def issue_certificate(*, eligibility: CertificateEligibility, certificate_asset_id=None) -> Certificate:
+    certificate, created = Certificate.objects.get_or_create(
+        certificate_eligibility=eligibility,
+        defaults={
+            "student_profile_id": eligibility.student_profile_id,
+            "course_id": eligibility.course_id,
+            "certificate_number": generate_certificate_number(),
+            "certificate_asset_id": certificate_asset_id,
+        },
+    )
+    if not created and certificate_asset_id and certificate.certificate_asset_id != certificate_asset_id:
+        certificate.certificate_asset_id = certificate_asset_id
+        certificate.save(update_fields=["certificate_asset_id"])
+    return certificate
+
+
+def update_certificate_asset(*, token: str, certificate: Certificate, certificate_asset_id) -> Certificate:
+    if certificate_asset_id:
+        validate_content_asset(token=token, asset_id=certificate_asset_id)
+    certificate.certificate_asset_id = certificate_asset_id
+    certificate.save(update_fields=["certificate_asset_id"])
+    return certificate
+
+
+def revoke_certificate(*, certificate: Certificate) -> Certificate:
+    if certificate.revoked_at is None:
+        certificate.revoked_at = timezone.now()
+        certificate.save(update_fields=["revoked_at"])
+    return certificate
+
+
+def generate_certificate_number() -> str:
+    alphabet = string.ascii_uppercase + string.digits
+    issued_on = timezone.now().strftime("%Y%m%d")
+    for _attempt in range(20):
+        suffix = "".join(secrets.choice(alphabet) for _ in range(10))
+        certificate_number = f"LG-{issued_on}-{suffix}"
+        if not Certificate.objects.filter(certificate_number=certificate_number).exists():
+            return certificate_number
+    raise APIException("Could not generate a unique certificate number.")
+
+
+def publish_certificate_event(
+    *,
+    event_type: str,
+    aggregate_id,
+    payload: dict[str, Any],
+    correlation_id: str | None = None,
+) -> dict[str, Any]:
+    event = {
+        "event_id": str(uuid.uuid4()),
+        "event_type": event_type,
+        "aggregate_id": str(aggregate_id),
+        "producer_service": settings.SERVICE_NAME,
+        "timestamp": timezone.now().isoformat(),
+        "version": 1,
+        "correlation_id": correlation_id,
+        "payload": payload,
+    }
+    logger.info("certificate_event %s", json.dumps(event, sort_keys=True))
+    return event
+
+
+def _decimal_or_none(value) -> Decimal | None:
+    if value is None:
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError, TypeError):
+        return None
 
 
 def upsert_grade_record(

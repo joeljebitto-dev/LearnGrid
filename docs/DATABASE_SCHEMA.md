@@ -945,7 +945,7 @@ Indexes: `idx_submission_audit_submission`, `idx_submission_audit_event_type`, `
 
 ## grading_db
 
-Implementation note: `T-015` implements `DB-GRADE-001` through `DB-GRADE-005`. `DB-GRADE-006 certificate_eligibility` and `DB-GRADE-007 certificates` remain future `T-016` scope.
+Implementation note: `T-015` implements `DB-GRADE-001` through `DB-GRADE-005`; `T-016` implements `DB-GRADE-006 certificate_eligibility` and `DB-GRADE-007 certificates`.
 
 ### DB-GRADE-001 `grading_rules`
 Purpose: Course or assessment grading rule configuration.
@@ -1030,7 +1030,7 @@ Purpose: Published result snapshot visible to students.
 Indexes: unique `uq_published_results_grade_record`, `idx_published_results_student_course`.
 
 ### DB-GRADE-006 `certificate_eligibility`
-Purpose: Future certificate eligibility decisions.
+Purpose: Certificate eligibility decisions calculated from course progress and published grades.
 
 | Field ID | Field name | PostgreSQL datatype | Nullable | Default | Key and details |
 | --- | --- | --- | --- | --- | --- |
@@ -1046,7 +1046,7 @@ Purpose: Future certificate eligibility decisions.
 Indexes: unique `uq_certificate_eligibility_student_course`, `idx_certificate_eligibility_course_eligible`.
 
 ### DB-GRADE-007 `certificates`
-Purpose: Future course completion certificates.
+Purpose: Issued course completion certificates.
 
 | Field ID | Field name | PostgreSQL datatype | Nullable | Default | Key and details |
 | --- | --- | --- | --- | --- | --- |
@@ -1062,6 +1062,8 @@ Purpose: Future course completion certificates.
 Indexes: unique `uq_certificates_certificate_number`, unique `uq_certificates_eligibility`, `idx_certificates_student_course`.
 
 ## notification_db
+
+Implementation note: `T-017` implements `DB-NOTIFY-001` through `DB-NOTIFY-004` for in-app notifications, delivery attempts, and channel preference placeholders.
 
 ### DB-NOTIFY-001 `notification_templates`
 Purpose: Templates for in-app and future delivery channels.

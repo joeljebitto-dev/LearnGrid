@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.shortcuts import get_object_or_404
+from rest_framework.exceptions import PermissionDenied
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -9,15 +10,25 @@ from rest_framework.views import APIView
 
 from .permissions import has_grade_permission, require_grade_permission
 from .selectors import (
+    certificate_eligibility_queryset,
+    certificate_queryset,
     grade_record_queryset,
     grading_rule_queryset,
     manual_review_queryset,
     published_result_queryset,
+    search_certificate_eligibility,
+    search_certificates,
     search_grade_records,
     search_grading_rules,
     search_published_results,
 )
 from .serializers import (
+    CertificateAssetUpdateSerializer,
+    CertificateEligibilityEvaluateSerializer,
+    CertificateEligibilitySearchSerializer,
+    CertificateEligibilitySerializer,
+    CertificateSearchSerializer,
+    CertificateSerializer,
     GradeCalculateSerializer,
     GradeOverrideSerializer,
     GradePublishSerializer,
@@ -40,11 +51,14 @@ from .services import (
     create_grading_rule,
     create_manual_review,
     current_profile,
+    evaluate_certificate_eligibility,
     fetch_grading_source,
     get_course_context,
     override_grade,
     publish_grade,
+    revoke_certificate,
     update_grading_rule,
+    update_certificate_asset,
 )
 
 
@@ -71,6 +85,16 @@ def _require_grade_scope(request, permission: str, course_id) -> dict:
         institution_id=course["institution_id"],
     )
     return course
+
+
+def _has_certificate_view_scope(request, course_id) -> bool:
+    course = _course_for_request(request, course_id)
+    return has_grade_permission(
+        request,
+        "grade.view",
+        course_id=course_id,
+        institution_id=course["institution_id"],
+    )
 
 
 class GradingRuleListCreateView(APIView):
@@ -278,3 +302,129 @@ class PublishedResultDetailView(APIView):
 
                 raise PermissionDenied("Result belongs to another profile.")
         return Response(PublishedResultSerializer(result).data)
+
+
+class CertificateEligibilityListView(APIView):
+    permission_classes = [IsAuthenticated]
+    pagination_class = GradingPagination
+
+    def get(self, request):
+        serializer = CertificateEligibilitySearchSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        course_id = serializer.validated_data.get("course_id")
+        if course_id:
+            _require_grade_scope(request, "grade.view", course_id)
+        else:
+            require_grade_permission(request, "grade.view")
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(
+            search_certificate_eligibility(serializer.validated_data),
+            request,
+            view=self,
+        )
+        return paginator.get_paginated_response(CertificateEligibilitySerializer(page, many=True).data)
+
+
+class CertificateEligibilityDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, eligibility_id):
+        eligibility = get_object_or_404(certificate_eligibility_queryset(), id=eligibility_id)
+        _require_grade_scope(request, "grade.view", eligibility.course_id)
+        return Response(CertificateEligibilitySerializer(eligibility).data)
+
+
+class CertificateEligibilityEvaluateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = CertificateEligibilityEvaluateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        _require_grade_scope(request, "grade.manage", serializer.validated_data["course_id"])
+        result = evaluate_certificate_eligibility(
+            token=auth_token(request),
+            student_profile_id=serializer.validated_data["student_profile_id"],
+            course_id=serializer.validated_data["course_id"],
+            certificate_asset_id=serializer.validated_data.get("certificate_asset_id"),
+            correlation_id=_correlation_id(request),
+        )
+        return Response(
+            {
+                "eligibility": CertificateEligibilitySerializer(result["eligibility"]).data,
+                "certificate": (
+                    CertificateSerializer(result["certificate"]).data
+                    if result["certificate"] is not None
+                    else None
+                ),
+                "grade_percent": result["grade_percent"],
+                "threshold_percent": result["threshold_percent"],
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class CertificateListView(APIView):
+    permission_classes = [IsAuthenticated]
+    pagination_class = GradingPagination
+
+    def get(self, request):
+        serializer = CertificateSearchSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        filters = serializer.validated_data
+        profile = current_profile(token=auth_token(request))
+        if profile.get("profile_type") == "student":
+            filters["student_profile_id"] = profile.get("id")
+            filters["include_revoked"] = False
+        else:
+            course_id = filters.get("course_id")
+            manager = (
+                _has_certificate_view_scope(request, course_id)
+                if course_id
+                else has_grade_permission(request, "grade.view")
+            )
+            if not manager:
+                filters["student_profile_id"] = profile.get("id")
+                filters["include_revoked"] = False
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(
+            search_certificates(filters),
+            request,
+            view=self,
+        )
+        return paginator.get_paginated_response(CertificateSerializer(page, many=True).data)
+
+
+class CertificateDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, certificate_id):
+        certificate = get_object_or_404(certificate_queryset(), id=certificate_id)
+        profile = current_profile(token=auth_token(request))
+        if str(profile.get("id")) == str(certificate.student_profile_id) and certificate.revoked_at is None:
+            return Response(CertificateSerializer(certificate).data)
+        manager = _has_certificate_view_scope(request, certificate.course_id)
+        if not manager:
+            raise PermissionDenied("Certificate is not visible to this profile.")
+        return Response(CertificateSerializer(certificate).data)
+
+    def patch(self, request, certificate_id):
+        certificate = get_object_or_404(certificate_queryset(), id=certificate_id)
+        _require_grade_scope(request, "grade.manage", certificate.course_id)
+        serializer = CertificateAssetUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        certificate = update_certificate_asset(
+            token=auth_token(request),
+            certificate=certificate,
+            certificate_asset_id=serializer.validated_data.get("certificate_asset_id"),
+        )
+        return Response(CertificateSerializer(certificate).data)
+
+
+class CertificateRevokeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, certificate_id):
+        certificate = get_object_or_404(certificate_queryset(), id=certificate_id)
+        _require_grade_scope(request, "grade.manage", certificate.course_id)
+        certificate = revoke_certificate(certificate=certificate)
+        return Response(CertificateSerializer(certificate).data)

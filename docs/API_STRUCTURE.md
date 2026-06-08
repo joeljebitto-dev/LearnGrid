@@ -2,7 +2,7 @@
 
 Source of truth: [api-design/](api-design/README.md)
 Related implementation docs: [DEVELOPMENT.md](DEVELOPMENT.md), [TASKS.md](TASKS.md)
-Related implemented designs: [API-001](api-design/API-001-service-health-and-dev-stack.md), [API-002](api-design/API-002-token-session-security.md), [API-003](api-design/API-003-rbac-authorization.md), [API-004](api-design/API-004-user-profile-management.md), [API-005](api-design/API-005-institution-batch-department-management.md), [API-006](api-design/API-006-course-catalog-metadata.md), [API-007](api-design/API-007-course-structure-versioning.md), [API-008](api-design/API-008-content-upload-storage-access.md), [API-009](api-design/API-009-enrollment-access-management.md), [API-010](api-design/API-010-learning-progress-tracking.md), [API-011](api-design/API-011-dashboards-portals.md)
+Related implemented designs: [API-001](api-design/API-001-service-health-and-dev-stack.md) through [API-017](api-design/API-017-notifications.md)
 
 This file is the overall API structure reference for implemented LearnGrid LMS APIs. Future task APIs are intentionally not expanded here until implementation provides stable request and response contracts.
 
@@ -1595,5 +1595,41 @@ Related design: [API-015 Grading, Results, And Audit](api-design/API-015-grading
 
 Grading request bodies use rule fields (`course_id`, optional `assessment_id`, `rule_type`, `configuration`, `created_by_profile_id`), calculation fields (`submission_type`, `submission_id`, optional `rule_id`), manual review fields (`submission_type`, `submission_id`, optional `reviewer_profile_id`), completion fields (`score`, optional `feedback`), override fields (`score`, optional `max_score`, required `change_reason`), and publish fields (`published_feedback`). Remote assessment, course, or user-service failures return controlled `502` responses.
 
+## API-016 Certificates APIs
+
+Related design: [API-016 Certificates](api-design/API-016-certificates.md)
+
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET` | `/api/grading/certificates/eligibility/` | List eligibility records with filters | `grade.view` |
+| `GET` | `/api/grading/certificates/eligibility/<uuid>/` | Read one eligibility record | `grade.view` |
+| `POST` | `/api/grading/certificates/eligibility/evaluate/` | Evaluate eligibility and auto-issue a certificate when eligible | `grade.manage` |
+| `GET` | `/api/grading/certificates/` | List certificates with `student_profile_id`, `course_id`, and `include_revoked` filters | Owning student or `grade.view` |
+| `GET` | `/api/grading/certificates/<uuid>/` | Read one certificate | Owning student or `grade.view` |
+| `PATCH` | `/api/grading/certificates/<uuid>/` | Update optional `certificate_asset_id` | `grade.manage` |
+| `POST` | `/api/grading/certificates/<uuid>/revoke/` | Revoke a certificate by setting `revoked_at` | `grade.manage` |
+
+Eligibility evaluation requires completed course progress from progress-service and passing published-grade percentage from grading-service. The threshold uses `grading_rules.configuration.certificate_min_percent` when present, otherwise `GRADING_CERTIFICATE_DEFAULT_PASS_PERCENT=70`. Certificate responses include `valid`, which is false after revocation.
+
+## API-017 Notifications APIs
+
+Related design: [API-017 Notifications](api-design/API-017-notifications.md)
+
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET/POST` | `/api/notifications/templates/` | List or upsert notification templates | `notification.view/manage` |
+| `GET/PATCH` | `/api/notifications/templates/<uuid>/` | Read or update one template | `notification.view/manage` |
+| `GET` | `/api/notifications/` | List notifications with `recipient_profile_id`, `event_type`, `unread`, `include_deleted`, and `sort` filters | Owning profile or `notification.view` |
+| `GET` | `/api/notifications/<uuid>/` | Read one notification | Owning profile or `notification.view` |
+| `POST` | `/api/notifications/<uuid>/read/` | Mark one notification read | Owning profile or `notification.view` |
+| `POST` | `/api/notifications/<uuid>/unread/` | Mark one notification unread | Owning profile or `notification.view` |
+| `POST` | `/api/notifications/read-all/` | Mark current profile's unread notifications read | Owning profile |
+| `GET/POST` | `/api/notifications/preferences/` | List or upsert notification preferences | Owning profile or `notification.manage` |
+| `GET` | `/api/notifications/delivery-attempts/` | List delivery attempts | `notification.view` |
+| `GET` | `/api/notifications/delivery-attempts/<uuid>/` | Read one delivery attempt | `notification.view` |
+| `POST` | `/api/notifications/events/ingest/` | Ingest `StudentEnrolled`, `AssignmentDueSoon`, `GradePublished`, or `CourseCompleted` idempotently | `notification.manage` |
+
+Event ingestion stores `payload.source_event_id` for idempotency and returns `processed`, `duplicate`, or `skipped`. In-app delivery creates `delivery_attempts` with `sent` or `failed`; email, SMS, and push remain future delivery placeholders.
+
 ## Future APIs Not Implemented
-Certificates, notifications, generalized analytics/search reporting, API gateway, Kafka transport, Redis architecture operations, deployment, and broader security APIs remain future task scope unless explicitly listed above.
+Generalized analytics/search reporting, API gateway, Kafka transport, Redis architecture operations, deployment, and broader security APIs remain future task scope unless explicitly listed above.

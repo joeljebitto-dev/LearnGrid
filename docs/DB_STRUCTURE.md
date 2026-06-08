@@ -6,7 +6,7 @@ Related tasks: [TASKS.md](TASKS.md)
 
 This file is the overall database structure reference for the application. It consolidates every documented database, table, field, datatype, key/constraint note, index note, relationship note, enum/status value, audit field, and soft-delete marker from the canonical schema.
 
-Implemented design notes currently exist for service database ownership, auth token/session storage, RBAC authorization, user profile management, institution/department/batch management, course catalog metadata, course structure/versioning, content upload/storage/access, enrollment/access management, learning progress tracking, and dashboard/portal analytics. Future-domain tables remain included here because they are part of the documented schema baseline.
+Implemented design notes currently exist for service database ownership, auth token/session storage, RBAC authorization, user profile management, institution/department/batch management, course catalog metadata, course structure/versioning, content upload/storage/access, enrollment/access management, learning progress tracking, dashboard/portal analytics, assessment workflows, grading workflows, certificates, and notifications. Future-domain tables remain included here because they are part of the documented schema baseline.
 
 ## DB-000 Schema Rules
 - Production uses PostgreSQL with database-per-service ownership.
@@ -1134,7 +1134,7 @@ Indexes: `idx_submission_audit_submission`, `idx_submission_audit_event_type`, `
 ## grading_db
 
 Owning service: `grading-service`
-Related implemented design: [DBD-015 Grading, Results, And Audit](db-design/DBD-015-grading-results-audit.md). `certificate_eligibility` and `certificates` remain future [T-016](tasks/T-016-certificates.md) scope.
+Related implemented designs: [DBD-015 Grading, Results, And Audit](db-design/DBD-015-grading-results-audit.md), [DBD-016 Certificates](db-design/DBD-016-certificates.md).
 
 ### DB-GRADE-001 `grading_rules`
 Owning service: `grading-service`  
@@ -1237,7 +1237,7 @@ Indexes: unique `uq_published_results_grade_record`, `idx_published_results_stud
 Owning service: `grading-service`  
 Table ID: `DB-GRADE-006`  
 Table name: `certificate_eligibility`
-Purpose: Future certificate eligibility decisions.
+Purpose: Certificate eligibility decisions calculated from course progress and published grades.
 
 | Field ID | Field name | PostgreSQL datatype | Nullable | Default | Key and details |
 | --- | --- | --- | --- | --- | --- |
@@ -1256,7 +1256,7 @@ Indexes: unique `uq_certificate_eligibility_student_course`, `idx_certificate_el
 Owning service: `grading-service`  
 Table ID: `DB-GRADE-007`  
 Table name: `certificates`
-Purpose: Future course completion certificates.
+Purpose: Issued course completion certificates.
 
 | Field ID | Field name | PostgreSQL datatype | Nullable | Default | Key and details |
 | --- | --- | --- | --- | --- | --- |
@@ -1274,7 +1274,7 @@ Indexes: unique `uq_certificates_certificate_number`, unique `uq_certificates_el
 ## notification_db
 
 Owning service: `notification-service`
-Related implemented design: not yet implemented beyond baseline schema documentation.
+Related implemented design: [DBD-017 Notifications](db-design/DBD-017-notifications.md).
 
 ### DB-NOTIFY-001 `notification_templates`
 Owning service: `notification-service`  

@@ -1,6 +1,12 @@
 from django.urls import path
 
 from .views import (
+    CertificateDetailView,
+    CertificateEligibilityDetailView,
+    CertificateEligibilityEvaluateView,
+    CertificateEligibilityListView,
+    CertificateListView,
+    CertificateRevokeView,
     GradeCalculateView,
     GradeOverrideView,
     GradePublishView,
@@ -27,4 +33,22 @@ urlpatterns = [
     path("manual-reviews/<uuid:review_id>/complete/", ManualReviewCompleteView.as_view(), name="manual-review-complete"),
     path("results/", PublishedResultListView.as_view(), name="published-result-list"),
     path("results/<uuid:result_id>/", PublishedResultDetailView.as_view(), name="published-result-detail"),
+    path(
+        "certificates/eligibility/",
+        CertificateEligibilityListView.as_view(),
+        name="certificate-eligibility-list",
+    ),
+    path(
+        "certificates/eligibility/evaluate/",
+        CertificateEligibilityEvaluateView.as_view(),
+        name="certificate-eligibility-evaluate",
+    ),
+    path(
+        "certificates/eligibility/<uuid:eligibility_id>/",
+        CertificateEligibilityDetailView.as_view(),
+        name="certificate-eligibility-detail",
+    ),
+    path("certificates/", CertificateListView.as_view(), name="certificate-list"),
+    path("certificates/<uuid:certificate_id>/", CertificateDetailView.as_view(), name="certificate-detail"),
+    path("certificates/<uuid:certificate_id>/revoke/", CertificateRevokeView.as_view(), name="certificate-revoke"),
 ]

@@ -4,6 +4,7 @@ import json
 from urllib import error, request as urlrequest
 
 from django.conf import settings
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import BasePermission
 
 
@@ -80,3 +81,19 @@ class RemoteAuthorizationPermission(BasePermission):
             scope_type=scope_type,
             scope_id=self.get_scope_id(request, view, scope_type),
         )
+
+
+def has_notification_permission(request, permission: str) -> bool:
+    if not request.user or not request.user.is_authenticated or not isinstance(request.auth, str):
+        return False
+    return remote_authorization_check(
+        token=request.auth,
+        permission=permission,
+        scope_type="platform",
+        scope_id=None,
+    )
+
+
+def require_notification_permission(request, permission: str) -> None:
+    if not has_notification_permission(request, permission):
+        raise PermissionDenied("You do not have permission to access this notification resource.")
