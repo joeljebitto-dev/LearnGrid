@@ -6,7 +6,7 @@ Related tasks: [TASKS.md](TASKS.md)
 
 This file is the overall database structure reference for the application. It consolidates every documented database, table, field, datatype, key/constraint note, index note, relationship note, enum/status value, audit field, and soft-delete marker from the canonical schema.
 
-Implemented design notes currently exist for service database ownership, auth token/session storage, RBAC authorization, user profile management, institution/department/batch management, course catalog metadata, course structure/versioning, content upload/storage/access, enrollment/access management, learning progress tracking, dashboard/portal analytics, assessment workflows, grading workflows, certificates, and notifications. Future-domain tables remain included here because they are part of the documented schema baseline.
+Implemented design notes currently exist for service database ownership, auth token/session storage, RBAC authorization, user profile management, institution/department/batch management, course catalog metadata, course structure/versioning, content upload/storage/access, enrollment/access management, learning progress tracking, dashboard/portal analytics, assessment workflows, grading workflows, certificates, notifications, and search/reporting analytics. Future-domain tables remain included here because they are part of the documented schema baseline.
 
 ## DB-000 Schema Rules
 - Production uses PostgreSQL with database-per-service ownership.
@@ -1354,7 +1354,7 @@ Indexes: unique `uq_user_notification_preferences_profile_event_channel`, `idx_u
 ## analytics_db
 
 Owning service: `analytics-service`
-Related implemented design: [DBD-011 Dashboards And Portals](db-design/DBD-011-dashboards-portals.md).
+Related implemented designs: [DBD-011 Dashboards And Portals](db-design/DBD-011-dashboards-portals.md), [DBD-018 Search, Reporting, And Analytics](db-design/DBD-018-search-reporting-analytics.md).
 
 ### DB-ANALYTICS-001 `event_facts`
 Owning service: `analytics-service`  

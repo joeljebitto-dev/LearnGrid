@@ -35,4 +35,8 @@ Implemented Django-compatible names:
 | `search_index_records` | `uq_search_index_resource`, `idx_search_index_resource_type`, `idx_search_index_institution` |
 
 ## DBD-011-005 Notes
-Dashboard metric payloads are stored in `JSONB` because each portal has a different aggregate shape. The stable API shapes are documented in [API-011](../api-design/API-011-dashboards-portals.md). `search_index_records` is implemented with the analytics schema foundation but generalized search APIs remain future [T-018](../tasks/T-018-search-reporting-analytics.md) scope.
+Dashboard metric payloads are stored in `JSONB` because each portal has a different aggregate shape.
+The stable API shapes are documented in [API-011](../api-design/API-011-dashboards-portals.md).
+`search_index_records` was introduced with the analytics schema foundation and is now used by
+[T-018](../tasks/T-018-search-reporting-analytics.md), documented in
+[DBD-018](DBD-018-search-reporting-analytics.md).

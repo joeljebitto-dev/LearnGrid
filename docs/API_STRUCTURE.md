@@ -2,7 +2,7 @@
 
 Source of truth: [api-design/](api-design/README.md)
 Related implementation docs: [DEVELOPMENT.md](DEVELOPMENT.md), [TASKS.md](TASKS.md)
-Related implemented designs: [API-001](api-design/API-001-service-health-and-dev-stack.md) through [API-017](api-design/API-017-notifications.md)
+Related implemented designs: [API-001](api-design/API-001-service-health-and-dev-stack.md) through [API-019](api-design/API-019-api-gateway.md)
 
 This file is the overall API structure reference for implemented LearnGrid LMS APIs. Future task APIs are intentionally not expanded here until implementation provides stable request and response contracts.
 
@@ -1631,5 +1631,61 @@ Related design: [API-017 Notifications](api-design/API-017-notifications.md)
 
 Event ingestion stores `payload.source_event_id` for idempotency and returns `processed`, `duplicate`, or `skipped`. In-app delivery creates `delivery_attempts` with `sent` or `failed`; email, SMS, and push remain future delivery placeholders.
 
+## API-018 Search, Reporting, And Analytics APIs
+
+Related design: [API-018 Search, Reporting, And Analytics](api-design/API-018-search-reporting-analytics.md)
+
+### API-018-001 Search And Indexing
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET` | `/api/analytics/search/` | Search all permitted resource types with resource-specific authorization | Resource-specific view permissions |
+| `GET` | `/api/analytics/search/courses/` | Search course index records | `course.view` |
+| `GET` | `/api/analytics/search/users/` | Search user index records | `profile.view` |
+| `GET` | `/api/analytics/search/enrollments/` | Search enrollment index records | `enrollment.view` |
+| `GET` | `/api/analytics/search/assessments/` | Search assessment index records | `assessment.view` |
+| `GET` | `/api/analytics/search/submissions/` | Search submission index records | `submission.view` |
+| `POST` | `/api/analytics/search/index-records/` | Upsert a search index record | `analytics.view` |
+| `DELETE` | `/api/analytics/search/index-records/<resource_type>/<uuid>/` | Delete a search index record | Platform `analytics.view` |
+
+Search query parameters: `q`, `institution_id`, `resource_type`, `status`, `course_id`,
+`profile_type`, `assessment_type`, `submission_status`, `sort`, `page`, and `page_size`. Upsert
+body parameters: `resource_type`, `resource_id`, optional `institution_id`, `search_text`, and
+optional `metadata`.
+
+### API-018-002 Aggregates, Metrics, And Reports
+| Method | Path | Purpose | Auth |
+| --- | --- | --- | --- |
+| `GET/POST` | `/api/analytics/dashboards/aggregates/` | List or upsert institution/platform dashboard aggregates | `analytics.view` |
+| `GET/POST` | `/api/analytics/usage-metrics/` | List or create usage metric records | `analytics.view` |
+| `POST` | `/api/analytics/reports/generate/` | Generate and save a report snapshot from `analytics_db` | `analytics.view` |
+
+Generated report types: `active_users`, `enrollments`, `completion_rates`, `assessment_results`,
+and `system_usage`. Report responses are `report_snapshots` records with `result_payload.summary`.
+
+## API-019 API Gateway
+
+Related design: [API-019 API Gateway](api-design/API-019-api-gateway.md)
+
+| Gateway URL or prefix | Purpose |
+| --- | --- |
+| `http://127.0.0.1:8080` | Local HTTP gateway; redirects to HTTPS |
+| `https://127.0.0.1:8443` | Local HTTPS gateway with self-signed TLS |
+| `/gateway/health` | Gateway health response |
+| `/api/auth/` | Routes to auth-service |
+| `/api/users/` | Routes to user-service |
+| `/api/courses/` | Routes to course-service |
+| `/api/content/` | Routes to content-service |
+| `/api/enrollments/` | Routes to enrollment-service |
+| `/api/progress/` | Routes to progress-service |
+| `/api/assessments/` | Routes to assessment-service |
+| `/api/grading/` | Routes to grading-service |
+| `/api/grades/` | Alias rewritten to `/api/grading/` |
+| `/api/notifications/` | Routes to notification-service |
+| `/api/analytics/` | Routes to analytics-service |
+| `/api/v1/...` | Rewrites to current `/api/...` paths |
+
+Nginx terminates TLS, emits JSON request logs, forwards request IDs, applies local-origin CORS,
+rate limits API traffic, and rejects oversized requests above `20m`.
+
 ## Future APIs Not Implemented
-Generalized analytics/search reporting, API gateway, Kafka transport, Redis architecture operations, deployment, and broader security APIs remain future task scope unless explicitly listed above.
+Kafka transport, Redis architecture operations, deployment, and broader security APIs remain future task scope unless explicitly listed above.

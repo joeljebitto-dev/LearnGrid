@@ -4,7 +4,7 @@ from uuid import UUID
 
 from django.db.models import QuerySet
 
-from .models import DashboardAggregate, DashboardScopeType, ReportSnapshot
+from .models import DashboardAggregate, DashboardScopeType, ReportSnapshot, SearchIndexRecord, UsageMetric
 
 
 PLATFORM_SCOPE_ID = UUID("00000000-0000-0000-0000-000000000000")
@@ -124,3 +124,67 @@ def platform_dashboard_payload(profile: dict | None = None) -> dict:
         scope_id=PLATFORM_SCOPE_ID,
         profile=profile,
     )
+
+
+def search_index_records(filters: dict, *, resource_type: str | None = None) -> QuerySet[SearchIndexRecord]:
+    queryset = SearchIndexRecord.objects.order_by("-updated_at", "-id")
+    selected_resource_type = resource_type or filters.get("resource_type")
+    if selected_resource_type:
+        queryset = queryset.filter(resource_type=selected_resource_type)
+    if "institution_id" in filters:
+        queryset = queryset.filter(institution_id=filters.get("institution_id"))
+    if q := filters.get("q"):
+        queryset = queryset.filter(search_text__icontains=q)
+
+    metadata_filters = {
+        "status": "status",
+        "course_id": "course_id",
+        "profile_type": "profile_type",
+        "assessment_type": "assessment_type",
+        "submission_status": "submission_status",
+    }
+    for filter_key, metadata_key in metadata_filters.items():
+        if value := filters.get(filter_key):
+            queryset = queryset.filter(**{f"metadata__{metadata_key}": str(value)})
+
+    sort = filters.get("sort") or "-updated_at"
+    allowed_sorts = {"updated_at", "-updated_at", "resource_type"}
+    if sort in allowed_sorts:
+        queryset = queryset.order_by(sort, "-id")
+    return queryset
+
+
+def dashboard_aggregates(filters: dict) -> QuerySet[DashboardAggregate]:
+    queryset = DashboardAggregate.objects.order_by("-metric_date", "-computed_at", "-id")
+    if scope_type := filters.get("scope_type"):
+        queryset = queryset.filter(scope_type=scope_type)
+    if scope_id := filters.get("scope_id"):
+        queryset = queryset.filter(scope_id=scope_id)
+    if institution_id := filters.get("institution_id"):
+        queryset = queryset.filter(scope_type=DashboardScopeType.INSTITUTION, scope_id=institution_id)
+    if metric_date := filters.get("metric_date"):
+        queryset = queryset.filter(metric_date=metric_date)
+    sort = filters.get("sort") or "-metric_date"
+    allowed_sorts = {"metric_date", "-metric_date", "computed_at", "-computed_at"}
+    if sort in allowed_sorts:
+        queryset = queryset.order_by(sort, "-id")
+    return queryset
+
+
+def usage_metrics(filters: dict) -> QuerySet[UsageMetric]:
+    queryset = UsageMetric.objects.order_by("-bucket_start_at", "-id")
+    if metric_name := filters.get("metric_name"):
+        queryset = queryset.filter(metric_name=metric_name)
+    if scope_type := filters.get("scope_type"):
+        queryset = queryset.filter(scope_type=scope_type)
+    if scope_id := filters.get("scope_id"):
+        queryset = queryset.filter(scope_id=scope_id)
+    if bucket_start_at := filters.get("bucket_start_at"):
+        queryset = queryset.filter(bucket_start_at__gte=bucket_start_at)
+    if bucket_end_at := filters.get("bucket_end_at"):
+        queryset = queryset.filter(bucket_end_at__lte=bucket_end_at)
+    sort = filters.get("sort") or "-bucket_start_at"
+    allowed_sorts = {"bucket_start_at", "-bucket_start_at", "metric_name"}
+    if sort in allowed_sorts:
+        queryset = queryset.order_by(sort, "-id")
+    return queryset

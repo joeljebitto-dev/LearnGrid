@@ -29,6 +29,8 @@ API design documents use stable IDs:
 | [API-015](API-015-grading-results-audit.md) | Grading, Results, And Audit | [T-015](../tasks/T-015-grading-results-audit.md) | [SPEC-015](../specs/015-grading-results-audit.md) |
 | [API-016](API-016-certificates.md) | Certificates | [T-016](../tasks/T-016-certificates.md) | [SPEC-016](../specs/016-certificates.md) |
 | [API-017](API-017-notifications.md) | Notifications | [T-017](../tasks/T-017-notifications.md) | [SPEC-017](../specs/017-notifications.md) |
+| [API-018](API-018-search-reporting-analytics.md) | Search, Reporting, And Analytics | [T-018](../tasks/T-018-search-reporting-analytics.md) | [SPEC-018](../specs/018-search-reporting-analytics.md) |
+| [API-019](API-019-api-gateway.md) | API Gateway | [T-019](../tasks/T-019-api-gateway.md) | [SPEC-019](../specs/019-api-gateway.md) |
 
 ## Rules
 - Add one `API-###-<topic>.md` file after a task with API design is implemented.

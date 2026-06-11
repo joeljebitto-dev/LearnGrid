@@ -1130,6 +1130,8 @@ Indexes: unique `uq_user_notification_preferences_profile_event_channel`, `idx_u
 
 ## analytics_db
 
+Implemented designs: [DBD-011 Dashboards And Portals](db-design/DBD-011-dashboards-portals.md), [DBD-018 Search, Reporting, And Analytics](db-design/DBD-018-search-reporting-analytics.md).
+
 ### DB-ANALYTICS-001 `event_facts`
 Purpose: Analytics event fact table populated from Kafka.
 

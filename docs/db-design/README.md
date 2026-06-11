@@ -29,6 +29,7 @@ Database design documents use stable IDs:
 | [DBD-015](DBD-015-grading-results-audit.md) | Grading, Results, And Audit | [T-015](../tasks/T-015-grading-results-audit.md) | [SPEC-015](../specs/015-grading-results-audit.md) |
 | [DBD-016](DBD-016-certificates.md) | Certificates | [T-016](../tasks/T-016-certificates.md) | [SPEC-016](../specs/016-certificates.md) |
 | [DBD-017](DBD-017-notifications.md) | Notifications | [T-017](../tasks/T-017-notifications.md) | [SPEC-017](../specs/017-notifications.md) |
+| [DBD-018](DBD-018-search-reporting-analytics.md) | Search, Reporting, And Analytics | [T-018](../tasks/T-018-search-reporting-analytics.md) | [SPEC-018](../specs/018-search-reporting-analytics.md) |
 
 ## Rules
 - Keep [DATABASE_SCHEMA.md](../DATABASE_SCHEMA.md) as the field-level source of truth.

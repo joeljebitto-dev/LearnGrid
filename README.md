@@ -35,10 +35,13 @@ pnpm dev:fast
 
 ```bash
 curl http://127.0.0.1:8001/health/
+curl -k https://127.0.0.1:8443/gateway/health
 ```
 
-The default runner starts PostgreSQL, Redis, MinIO, all backend services, and the frontend. Press
-`Ctrl+C` to stop app processes. PostgreSQL, Redis, and MinIO stay running; stop them with:
+The default runner starts PostgreSQL, Redis, MinIO, all backend services, the frontend, and the
+local Nginx API Gateway. The gateway is available at `http://127.0.0.1:8080` and
+`https://127.0.0.1:8443`. Press `Ctrl+C` to stop app processes and the gateway. PostgreSQL, Redis,
+and MinIO stay running; stop them with:
 
 ```bash
 pnpm dev:infra:down

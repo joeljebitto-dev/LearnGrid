@@ -31,9 +31,10 @@ SERVICES=(
   "analytics-service:analytics_db:8010"
 )
 
-APP_PORTS=(5173 8001 8002 8003 8004 8005 8006 8007 8008 8009 8010)
+APP_PORTS=(5173 8001 8002 8003 8004 8005 8006 8007 8008 8009 8010 8080 8443)
 PIDS=()
 CLEANED_UP=false
+GATEWAY_STARTED=false
 
 usage() {
   cat <<'EOF'
@@ -120,6 +121,11 @@ cleanup() {
     done
     wait "${PIDS[@]}" >/dev/null 2>&1 || true
   fi
+
+  if [[ "$GATEWAY_STARTED" == true ]]; then
+    log "Stopping API gateway..."
+    compose stop api-gateway >/dev/null 2>&1 || true
+  fi
 }
 
 preflight() {
@@ -127,6 +133,7 @@ preflight() {
   need_command pnpm "Install pnpm 11+."
   need_command python3 "Install Python 3.12+."
   need_command setsid "Install util-linux or provide a shell environment with setsid."
+  need_command openssl "Install OpenSSL for local gateway TLS certificates."
 
   if ! command -v "$POETRY_BIN" >/dev/null 2>&1; then
     fail "$POETRY_BIN is required. Install Poetry 2+ or set POETRY_BIN=/path/to/poetry."
@@ -378,10 +385,35 @@ wait_for_applications() {
   wait_for_http "frontend-service" "http://127.0.0.1:5173/" 90
 }
 
+start_gateway() {
+  log "Preparing local API gateway TLS certificate..."
+  "$ROOT_DIR/scripts/generate-local-gateway-cert.sh"
+
+  log "Starting api-gateway on http://127.0.0.1:8080 and https://127.0.0.1:8443..."
+  compose up -d api-gateway >/dev/null
+  GATEWAY_STARTED=true
+
+  log "Waiting for api-gateway..."
+  until python3 - "https://127.0.0.1:8443/gateway/health" <<'PY' >/dev/null 2>&1; do
+import ssl
+import sys
+from urllib.request import urlopen
+
+context = ssl._create_unverified_context()
+with urlopen(sys.argv[1], context=context, timeout=2) as response:
+    if response.status >= 500:
+        raise SystemExit(1)
+PY
+    sleep 1
+  done
+}
+
 print_running_summary() {
   cat <<'EOF'
 [dev] LearnGrid LMS is running.
 [dev] Frontend: http://127.0.0.1:5173
+[dev] API Gateway HTTP: http://127.0.0.1:8080
+[dev] API Gateway HTTPS: https://127.0.0.1:8443
 [dev] MinIO API: http://127.0.0.1:9000
 [dev] MinIO Console: http://127.0.0.1:9001
 [dev] Backend health endpoints:
@@ -423,6 +455,7 @@ main() {
   run_migrations
   start_applications
   wait_for_applications
+  start_gateway
   print_running_summary
   wait_until_stopped
 }

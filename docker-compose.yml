@@ -61,6 +61,23 @@ services:
       mc anonymous set none local/${CONTENT_STORAGE_BUCKET:-learngrid-content} || true;
       "
 
+  api-gateway:
+    image: nginx:1.27-alpine
+    container_name: learngrid-api-gateway
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - ./infrastructure/docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/docker/nginx/certs:/etc/nginx/certs:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --no-check-certificate -O- https://localhost:8443/gateway/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   learngrid_postgres_data:
   learngrid_redis_data:

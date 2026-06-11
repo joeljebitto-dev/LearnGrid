@@ -64,6 +64,23 @@ MinIO local defaults:
 | Root password | `learngrid-minio-secret` |
 | Content bucket | `learngrid-content` |
 
+## API Gateway
+`T-019` resolves [OD-001](KNOWN_ISSUES.md#od-001-api-gateway-selection) to Nginx.
+`pnpm dev` and `pnpm dev:fast` start the gateway after backend and frontend services are healthy.
+
+| Item | Value |
+| --- | --- |
+| HTTP URL | `http://127.0.0.1:8080` |
+| HTTPS URL | `https://127.0.0.1:8443` |
+| Health URL | `https://127.0.0.1:8443/gateway/health` |
+| TLS helper | `scripts/generate-local-gateway-cert.sh` |
+
+Gateway HTTP redirects to HTTPS. The local HTTPS certificate is self-signed and generated into an
+ignored `infrastructure/docker/nginx/certs/` path. Nginx routes `/api/*` prefixes to backend
+services, rewrites `/api/v1/...` to `/api/...`, and aliases `/api/grades/...` to
+`/api/grading/...`. It also applies request IDs, JSON access logs, local-origin CORS, rate limits,
+and a `20m` request size limit.
+
 ## Frontend Service
 The frontend service is `SVC-011 frontend-service`.
 
@@ -371,6 +388,31 @@ arbitrary profile IDs. Admin dashboards require `analytics.view` at institution 
 If no dashboard aggregate exists, analytics-service returns `200` with empty arrays and zeroed
 summary values. PostgreSQL `analytics_db` is the current dashboard/report store; [OD-005](KNOWN_ISSUES.md#od-005-analytics-storage)
 remains open for the long-term analytics storage decision.
+
+## Search, Reporting, And Analytics
+`analytics-service` implements [T-018](tasks/T-018-search-reporting-analytics.md) under
+`/api/analytics/`. [OD-005](KNOWN_ISSUES.md#od-005-analytics-storage) remains open; reports use
+the existing PostgreSQL `analytics_db` baseline.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/analytics/search/` | Search all permitted resource types |
+| `GET` | `/api/analytics/search/courses/` | Search courses |
+| `GET` | `/api/analytics/search/users/` | Search users |
+| `GET` | `/api/analytics/search/enrollments/` | Search enrollments |
+| `GET` | `/api/analytics/search/assessments/` | Search assessments |
+| `GET` | `/api/analytics/search/submissions/` | Search submissions |
+| `POST` | `/api/analytics/search/index-records/` | Upsert an analytics search index record |
+| `DELETE` | `/api/analytics/search/index-records/<resource_type>/<uuid>/` | Delete an analytics search index record |
+| `GET/POST` | `/api/analytics/dashboards/aggregates/` | List or upsert dashboard aggregate records |
+| `GET/POST` | `/api/analytics/usage-metrics/` | List or create usage metrics |
+| `POST` | `/api/analytics/reports/generate/` | Generate and save a report snapshot |
+
+Search filters: `q`, `institution_id`, `resource_type`, `status`, `course_id`, `profile_type`,
+`assessment_type`, `submission_status`, `sort`, `page`, and `page_size`. Generated report types:
+`active_users`, `enrollments`, `completion_rates`, `assessment_results`, and `system_usage`.
+Report generation reads only analytics-service tables and does not join transactional service
+databases.
 
 ## Assessment Authoring And Quiz Attempts
 `assessment-service` implements [T-012](tasks/T-012-assessment-authoring.md) and

@@ -3,8 +3,10 @@
 Source: [SRD.pdf](SRD.pdf)
 
 ## OD-001 API Gateway Selection
-Status: Open.  
-Decision needed: Select Kong, Traefik, Nginx, or equivalent API Gateway.  
+Status: Resolved.
+Decision: Use Nginx as the LearnGrid API Gateway baseline for local development and gateway
+configuration. Production deployment can reuse the same routing policy behind the future deployment
+model selected under [OD-003](#od-003-deployment-model).
 Related spec: [SPEC-019](specs/019-api-gateway.md).  
 Related task: [T-019](tasks/T-019-api-gateway.md).
 

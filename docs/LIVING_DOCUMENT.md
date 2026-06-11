@@ -11,8 +11,9 @@ structure/versioning, completed `T-008` content upload/storage/access with MinIO
 completed `T-009` enrollment/access management, completed `T-010`
 learning progress tracking, completed `T-011` dashboards/portals, completed `T-012`
 assessment authoring, completed `T-013` quiz attempts/exams, completed `T-014`
-assignment submissions, completed `T-015` grading/results/audit, and completed `T-016`
-certificates, and completed `T-017` notifications.
+assignment submissions, completed `T-015` grading/results/audit, completed `T-016`
+certificates, completed `T-017` notifications, completed `T-018` search/reporting/analytics,
+and completed `T-019` API gateway.
 The scaffold includes the React `frontend-service`, Django REST Framework baselines for `SVC-001`
 through `SVC-010`, local PostgreSQL and Redis Compose configuration, health endpoints, lockfiles,
 basic tests, and GitHub Actions CI. Auth-service now includes JWT access and refresh token APIs,
@@ -33,7 +34,8 @@ progress tracking, analytics dashboard/report foundations, role-specific fronten
 assessment authoring, quiz/exam attempts, assignment submissions, and grading/results/audit
 workflows, plus certificate eligibility and auto-issued certificate records, are now implemented
 in their owning services. Notification templates, in-app notification records, preferences,
-delivery attempts, and idempotent notification event ingestion are also implemented.
+delivery attempts, idempotent notification event ingestion, generalized analytics search/reporting
+APIs, and the local Nginx API Gateway are also implemented.
 Kubernetes manifests and remaining
 non-auth feature APIs remain for later tasks.
 
@@ -59,7 +61,6 @@ non-auth feature APIs remain for later tasks.
 
 ## LD-004 Open Decision Register
 The following decisions remain open:
-- [OD-001 API Gateway Selection](KNOWN_ISSUES.md#od-001-api-gateway-selection)
 - [OD-003 Deployment Model](KNOWN_ISSUES.md#od-003-deployment-model)
 - [OD-004 Authentication Model](KNOWN_ISSUES.md#od-004-authentication-model)
 - [OD-005 Analytics Storage](KNOWN_ISSUES.md#od-005-analytics-storage)

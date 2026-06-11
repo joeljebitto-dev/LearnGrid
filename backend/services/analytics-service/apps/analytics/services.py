@@ -1,16 +1,40 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
+from datetime import timezone as dt_timezone
+from decimal import Decimal
 from typing import Any
 from urllib import error, request as urlrequest
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Avg
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from rest_framework.exceptions import APIException, NotFound, PermissionDenied
 
-from .models import DashboardScopeType, EventFact, ReportSnapshot
+from .models import (
+    DashboardAggregate,
+    DashboardScopeType,
+    EventFact,
+    ReportSnapshot,
+    ReportType,
+    SearchIndexRecord,
+    SearchResourceType,
+    UsageMetric,
+)
 from .permissions import remote_authorization_check
 from .selectors import PLATFORM_SCOPE_ID
+
+
+SEARCH_PERMISSION_BY_RESOURCE = {
+    SearchResourceType.COURSE: "course.view",
+    SearchResourceType.USER: "profile.view",
+    SearchResourceType.ENROLLMENT: "enrollment.view",
+    SearchResourceType.ASSESSMENT: "assessment.view",
+    SearchResourceType.SUBMISSION: "submission.view",
+}
 
 
 class UserServiceError(APIException):
@@ -62,6 +86,39 @@ def require_analytics_view(
         raise PermissionDenied("You do not have permission to view analytics.")
 
 
+def require_resource_search_view(
+    *,
+    token: str,
+    resource_type: str,
+    institution_id: str | None = None,
+) -> None:
+    permission = SEARCH_PERMISSION_BY_RESOURCE[resource_type]
+    scope_type = "institution" if institution_id else "platform"
+    if not remote_authorization_check(
+        token=token,
+        permission=permission,
+        scope_type=scope_type,
+        scope_id=institution_id,
+    ):
+        raise PermissionDenied("You do not have permission to search this resource type.")
+
+
+def allowed_search_resource_types(*, token: str, institution_id: str | None = None) -> list[str]:
+    scope_type = "institution" if institution_id else "platform"
+    allowed = []
+    for resource_type, permission in SEARCH_PERMISSION_BY_RESOURCE.items():
+        if remote_authorization_check(
+            token=token,
+            permission=permission,
+            scope_type=scope_type,
+            scope_id=institution_id,
+        ):
+            allowed.append(str(resource_type))
+    if not allowed:
+        raise PermissionDenied("You do not have permission to search analytics records.")
+    return allowed
+
+
 def require_profile_view(*, token: str, institution_id: str | None) -> None:
     scope_type = "institution" if institution_id else "platform"
     if not remote_authorization_check(
@@ -111,6 +168,234 @@ def create_report_snapshot(
         result_payload=validated_data.get("result_payload", {}),
         generated_by_profile_id=generated_by_profile_id,
     )
+
+
+@transaction.atomic
+def upsert_search_index_record(validated_data: dict[str, Any]) -> tuple[SearchIndexRecord, bool]:
+    record, created = SearchIndexRecord.objects.update_or_create(
+        resource_type=validated_data["resource_type"],
+        resource_id=validated_data["resource_id"],
+        defaults={
+            "institution_id": validated_data.get("institution_id"),
+            "search_text": validated_data["search_text"],
+            "metadata": validated_data.get("metadata", {}),
+            "updated_at": timezone.now(),
+        },
+    )
+    return record, created
+
+
+@transaction.atomic
+def delete_search_index_record(*, resource_type: str, resource_id: str) -> bool:
+    deleted_count, _ = SearchIndexRecord.objects.filter(
+        resource_type=resource_type,
+        resource_id=resource_id,
+    ).delete()
+    return deleted_count > 0
+
+
+@transaction.atomic
+def upsert_dashboard_aggregate(validated_data: dict[str, Any]) -> tuple[DashboardAggregate, bool]:
+    aggregate, created = DashboardAggregate.objects.update_or_create(
+        scope_type=validated_data["scope_type"],
+        scope_id=validated_data["scope_id"],
+        metric_date=validated_data["metric_date"],
+        defaults={
+            "metrics": validated_data.get("metrics", {}),
+            "computed_at": timezone.now(),
+        },
+    )
+    return aggregate, created
+
+
+def create_usage_metric(validated_data: dict[str, Any]) -> UsageMetric:
+    return UsageMetric.objects.create(**validated_data)
+
+
+def generate_report_snapshot(
+    *,
+    validated_data: dict[str, Any],
+    generated_by_profile_id,
+) -> ReportSnapshot:
+    payload = build_report_payload(
+        report_type=validated_data["report_type"],
+        institution_id=validated_data.get("institution_id"),
+        parameters=validated_data.get("parameters", {}),
+    )
+    return ReportSnapshot.objects.create(
+        institution_id=validated_data.get("institution_id"),
+        report_type=validated_data["report_type"],
+        parameters=validated_data.get("parameters", {}),
+        result_payload=payload,
+        generated_by_profile_id=generated_by_profile_id,
+    )
+
+
+def build_report_payload(
+    *,
+    report_type: str,
+    institution_id,
+    parameters: dict[str, Any],
+) -> dict[str, Any]:
+    if report_type == ReportType.ACTIVE_USERS:
+        return _active_users_report(institution_id=institution_id, parameters=parameters)
+    if report_type == ReportType.ENROLLMENTS:
+        return _enrollments_report(institution_id=institution_id, parameters=parameters)
+    if report_type == ReportType.COMPLETION_RATES:
+        return _completion_rates_report(institution_id=institution_id, parameters=parameters)
+    if report_type == ReportType.ASSESSMENT_RESULTS:
+        return _assessment_results_report(institution_id=institution_id, parameters=parameters)
+    if report_type == ReportType.SYSTEM_USAGE:
+        return _system_usage_report(institution_id=institution_id, parameters=parameters)
+    raise APIException("Unsupported report type.")
+
+
+def _search_records_for_report(*, resource_type: str, institution_id) -> Any:
+    queryset = SearchIndexRecord.objects.filter(resource_type=resource_type)
+    if institution_id:
+        queryset = queryset.filter(institution_id=institution_id)
+    return queryset
+
+
+def _events_for_report(*, institution_id, parameters: dict[str, Any]) -> Any:
+    queryset = EventFact.objects.all()
+    if institution_id:
+        queryset = queryset.filter(institution_id=institution_id)
+    if start_at := _parse_parameter_datetime(parameters.get("start_at")):
+        queryset = queryset.filter(occurred_at__gte=start_at)
+    if end_at := _parse_parameter_datetime(parameters.get("end_at")):
+        queryset = queryset.filter(occurred_at__lte=end_at)
+    return queryset
+
+
+def _usage_metrics_for_report(*, institution_id, parameters: dict[str, Any]) -> Any:
+    queryset = UsageMetric.objects.all()
+    if institution_id:
+        queryset = queryset.filter(scope_type=DashboardScopeType.INSTITUTION, scope_id=institution_id)
+    if start_at := _parse_parameter_datetime(parameters.get("start_at")):
+        queryset = queryset.filter(bucket_start_at__gte=start_at)
+    if end_at := _parse_parameter_datetime(parameters.get("end_at")):
+        queryset = queryset.filter(bucket_end_at__lte=end_at)
+    return queryset
+
+
+def _parse_parameter_datetime(value) -> Any:
+    if not value or not isinstance(value, str):
+        return None
+    parsed = parse_datetime(value)
+    if parsed and timezone.is_naive(parsed):
+        return timezone.make_aware(parsed, timezone=dt_timezone.utc)
+    return parsed
+
+
+def _metadata_counts(records, *, key: str) -> dict[str, int]:
+    counter: Counter[str] = Counter()
+    for metadata in records.values_list("metadata", flat=True):
+        value = (metadata or {}).get(key) or "unknown"
+        counter[str(value)] += 1
+    return dict(sorted(counter.items()))
+
+
+def _decimal_to_float(value) -> float:
+    if value is None:
+        return 0.0
+    if isinstance(value, Decimal):
+        return float(value)
+    return float(value)
+
+
+def _active_users_report(*, institution_id, parameters: dict[str, Any]) -> dict[str, Any]:
+    users = _search_records_for_report(
+        resource_type=SearchResourceType.USER,
+        institution_id=institution_id,
+    )
+    active_users = users.filter(metadata__status="active")
+    events = _events_for_report(institution_id=institution_id, parameters=parameters)
+    return {
+        "report_type": ReportType.ACTIVE_USERS,
+        "summary": {
+            "active_user_count": active_users.count(),
+            "indexed_user_count": users.count(),
+            "activity_event_count": events.count(),
+        },
+        "users_by_status": _metadata_counts(users, key="status"),
+    }
+
+
+def _enrollments_report(*, institution_id, parameters: dict[str, Any]) -> dict[str, Any]:
+    enrollments = _search_records_for_report(
+        resource_type=SearchResourceType.ENROLLMENT,
+        institution_id=institution_id,
+    )
+    events = _events_for_report(institution_id=institution_id, parameters=parameters).filter(
+        event_type__icontains="Enrollment",
+    )
+    return {
+        "report_type": ReportType.ENROLLMENTS,
+        "summary": {
+            "indexed_enrollment_count": enrollments.count(),
+            "enrollment_event_count": events.count(),
+        },
+        "enrollments_by_status": _metadata_counts(enrollments, key="status"),
+    }
+
+
+def _completion_rates_report(*, institution_id, parameters: dict[str, Any]) -> dict[str, Any]:
+    metrics = _usage_metrics_for_report(institution_id=institution_id, parameters=parameters).filter(
+        metric_name="course_completion_percent",
+    )
+    events = _events_for_report(institution_id=institution_id, parameters=parameters).filter(
+        event_type="CourseCompleted",
+    )
+    average = metrics.aggregate(value=Avg("metric_value"))["value"]
+    return {
+        "report_type": ReportType.COMPLETION_RATES,
+        "summary": {
+            "metric_count": metrics.count(),
+            "average_completion_percent": _decimal_to_float(average),
+            "course_completed_event_count": events.count(),
+        },
+    }
+
+
+def _assessment_results_report(*, institution_id, parameters: dict[str, Any]) -> dict[str, Any]:
+    metrics = _usage_metrics_for_report(institution_id=institution_id, parameters=parameters).filter(
+        metric_name="assessment_score_percent",
+    )
+    submissions = _search_records_for_report(
+        resource_type=SearchResourceType.SUBMISSION,
+        institution_id=institution_id,
+    )
+    average = metrics.aggregate(value=Avg("metric_value"))["value"]
+    return {
+        "report_type": ReportType.ASSESSMENT_RESULTS,
+        "summary": {
+            "metric_count": metrics.count(),
+            "average_score_percent": _decimal_to_float(average),
+            "indexed_submission_count": submissions.count(),
+        },
+        "submissions_by_status": _metadata_counts(submissions, key="submission_status"),
+    }
+
+
+def _system_usage_report(*, institution_id, parameters: dict[str, Any]) -> dict[str, Any]:
+    metrics = _usage_metrics_for_report(institution_id=institution_id, parameters=parameters)
+    events = _events_for_report(institution_id=institution_id, parameters=parameters)
+    metric_names: Counter[str] = Counter()
+    for metric_name in metrics.values_list("metric_name", flat=True):
+        metric_names[str(metric_name)] += 1
+    event_types: Counter[str] = Counter()
+    for event_type in events.values_list("event_type", flat=True):
+        event_types[str(event_type)] += 1
+    return {
+        "report_type": ReportType.SYSTEM_USAGE,
+        "summary": {
+            "usage_metric_count": metrics.count(),
+            "event_count": events.count(),
+        },
+        "metrics_by_name": dict(sorted(metric_names.items())),
+        "events_by_type": dict(sorted(event_types.items())),
+    }
 
 
 def dashboard_scope_for_profile(profile: dict[str, Any]) -> tuple[str, str]:

@@ -2,7 +2,7 @@
 
 Source: [../SRD.pdf](../SRD.pdf)  
 Related task: [T-019](../tasks/T-019-api-gateway.md)  
-Open decision: [OD-001 API Gateway Selection](../KNOWN_ISSUES.md#od-001-api-gateway-selection)
+Resolved decision: [OD-001 API Gateway Selection](../KNOWN_ISSUES.md#od-001-api-gateway-selection)
 
 ## Functional Requirements
 - SPEC-019-FR-001 The system shall use an API Gateway such as Kong, Nginx, Traefik, or equivalent.
