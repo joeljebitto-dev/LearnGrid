@@ -17,6 +17,10 @@ CONTENT_STORAGE_BUCKET_VALUE="${CONTENT_STORAGE_BUCKET:-learngrid-content}"
 CONTENT_MINIO_ENDPOINT_URL_VALUE="${CONTENT_MINIO_ENDPOINT_URL:-http://127.0.0.1:9000}"
 CONTENT_MINIO_ACCESS_KEY_VALUE="${CONTENT_MINIO_ACCESS_KEY:-learngrid}"
 CONTENT_MINIO_SECRET_KEY_VALUE="${CONTENT_MINIO_SECRET_KEY:-learngrid-minio-secret}"
+KAFKA_BOOTSTRAP_SERVERS_VALUE="${KAFKA_BOOTSTRAP_SERVERS:-127.0.0.1:9092}"
+KAFKA_DEFAULT_PARTITIONS_VALUE="${KAFKA_DEFAULT_PARTITIONS:-3}"
+KAFKA_REPLICATION_FACTOR_VALUE="${KAFKA_REPLICATION_FACTOR:-1}"
+KAFKA_MAX_RETRY_ATTEMPTS_VALUE="${KAFKA_MAX_RETRY_ATTEMPTS:-3}"
 
 SERVICES=(
   "auth-service:auth_db:8001"
@@ -56,6 +60,10 @@ Environment:
   CONTENT_MINIO_ENDPOINT_URL  Local MinIO endpoint. Defaults to "http://127.0.0.1:9000".
   CONTENT_MINIO_ACCESS_KEY    Local MinIO access key. Defaults to "learngrid".
   CONTENT_MINIO_SECRET_KEY    Local MinIO secret key. Defaults to "learngrid-minio-secret".
+  KAFKA_BOOTSTRAP_SERVERS     Kafka bootstrap servers. Defaults to "127.0.0.1:9092".
+  KAFKA_DEFAULT_PARTITIONS    Kafka topic partitions. Defaults to "3".
+  KAFKA_REPLICATION_FACTOR    Kafka topic replication factor. Defaults to "1".
+  KAFKA_MAX_RETRY_ATTEMPTS    Kafka consumer retry attempts. Defaults to "3".
 EOF
 }
 
@@ -162,11 +170,13 @@ PY
 }
 
 start_infrastructure() {
-  log "Starting PostgreSQL, Redis, and MinIO..."
+  log "Starting PostgreSQL, Redis, MinIO, and Kafka..."
   MINIO_ROOT_USER="$CONTENT_MINIO_ACCESS_KEY_VALUE" \
     MINIO_ROOT_PASSWORD="$CONTENT_MINIO_SECRET_KEY_VALUE" \
     CONTENT_STORAGE_BUCKET="$CONTENT_STORAGE_BUCKET_VALUE" \
-    compose up -d postgres redis minio
+    KAFKA_DEFAULT_PARTITIONS="$KAFKA_DEFAULT_PARTITIONS_VALUE" \
+    KAFKA_REPLICATION_FACTOR="$KAFKA_REPLICATION_FACTOR_VALUE" \
+    compose up -d postgres redis minio kafka kafka-ui
 
   log "Waiting for PostgreSQL..."
   until compose exec -T postgres pg_isready -U "$POSTGRES_USER_VALUE" -d learngrid >/dev/null 2>&1; do
@@ -195,6 +205,17 @@ PY
     MINIO_ROOT_PASSWORD="$CONTENT_MINIO_SECRET_KEY_VALUE" \
     CONTENT_STORAGE_BUCKET="$CONTENT_STORAGE_BUCKET_VALUE" \
     compose up minio-init >/dev/null
+
+  log "Waiting for Kafka..."
+  until compose exec -T kafka /opt/kafka/bin/kafka-broker-api-versions.sh \
+    --bootstrap-server localhost:9092 >/dev/null 2>&1; do
+    sleep 1
+  done
+
+  log "Ensuring Kafka topics exist..."
+  KAFKA_DEFAULT_PARTITIONS="$KAFKA_DEFAULT_PARTITIONS_VALUE" \
+    KAFKA_REPLICATION_FACTOR="$KAFKA_REPLICATION_FACTOR_VALUE" \
+    compose up kafka-init >/dev/null
 }
 
 ensure_database() {
@@ -274,6 +295,11 @@ export_backend_env() {
   export AUTH_JWT_SIGNING_KEY="${AUTH_JWT_SIGNING_KEY:-${DJANGO_SECRET_KEY:-insecure-local-auth-service-change-me-32bytes}}"
   export AUTH_JWT_ISSUER="${AUTH_JWT_ISSUER:-learngrid-auth-service}"
   export AUTH_JWT_ALGORITHM="${AUTH_JWT_ALGORITHM:-HS256}"
+  export KAFKA_ENABLED="${KAFKA_ENABLED:-true}"
+  export KAFKA_BOOTSTRAP_SERVERS="$KAFKA_BOOTSTRAP_SERVERS_VALUE"
+  export KAFKA_DEFAULT_PARTITIONS="$KAFKA_DEFAULT_PARTITIONS_VALUE"
+  export KAFKA_REPLICATION_FACTOR="$KAFKA_REPLICATION_FACTOR_VALUE"
+  export KAFKA_MAX_RETRY_ATTEMPTS="$KAFKA_MAX_RETRY_ATTEMPTS_VALUE"
 }
 
 run_migrations() {
@@ -416,6 +442,8 @@ print_running_summary() {
 [dev] API Gateway HTTPS: https://127.0.0.1:8443
 [dev] MinIO API: http://127.0.0.1:9000
 [dev] MinIO Console: http://127.0.0.1:9001
+[dev] Kafka broker: 127.0.0.1:9092
+[dev] Kafka UI: http://127.0.0.1:8090
 [dev] Backend health endpoints:
 [dev]   auth-service         http://127.0.0.1:8001/health/
 [dev]   user-service         http://127.0.0.1:8002/health/
@@ -427,7 +455,7 @@ print_running_summary() {
 [dev]   grading-service      http://127.0.0.1:8008/health/
 [dev]   notification-service http://127.0.0.1:8009/health/
 [dev]   analytics-service    http://127.0.0.1:8010/health/
-[dev] Press Ctrl+C to stop app processes. PostgreSQL, Redis, and MinIO stay running.
+[dev] Press Ctrl+C to stop app processes. PostgreSQL, Redis, MinIO, and Kafka stay running.
 EOF
 }
 

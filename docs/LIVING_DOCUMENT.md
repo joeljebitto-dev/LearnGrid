@@ -13,7 +13,7 @@ learning progress tracking, completed `T-011` dashboards/portals, completed `T-0
 assessment authoring, completed `T-013` quiz attempts/exams, completed `T-014`
 assignment submissions, completed `T-015` grading/results/audit, completed `T-016`
 certificates, completed `T-017` notifications, completed `T-018` search/reporting/analytics,
-and completed `T-019` API gateway.
+completed `T-019` API gateway, and completed `T-020` Kafka eventing.
 The scaffold includes the React `frontend-service`, Django REST Framework baselines for `SVC-001`
 through `SVC-010`, local PostgreSQL and Redis Compose configuration, health endpoints, lockfiles,
 basic tests, and GitHub Actions CI. Auth-service now includes JWT access and refresh token APIs,
@@ -27,7 +27,7 @@ and deactivate APIs that coordinate account lifecycle through auth-service. User
 institution, department, and batch management APIs with scoped `institution.manage` authorization,
 filtering, pagination, and soft-delete behavior. Course-service now owns course catalog records,
 categories, tags, prerequisites, learning outcomes, published catalog cache behavior, lifecycle
-workflows, and local structured course events. Course-service also owns ordered modules, lessons,
+workflows, and Kafka-capable structured course events. Course-service also owns ordered modules, lessons,
 topics, lesson publishing, structure reordering, and course revision snapshots. Content domain
 metadata, MinIO-backed upload and signed access, enrollment/access management, learning
 progress tracking, analytics dashboard/report foundations, role-specific frontend portals,
@@ -36,6 +36,9 @@ workflows, plus certificate eligibility and auto-issued certificate records, are
 in their owning services. Notification templates, in-app notification records, preferences,
 delivery attempts, idempotent notification event ingestion, generalized analytics search/reporting
 APIs, and the local Nginx API Gateway are also implemented.
+Shared Kafka eventing with Apache Kafka local infrastructure, base/retry/DLQ topics, producer
+helpers, consumer helpers, idempotent service handlers, and lag commands is implemented for
+`T-020`.
 Kubernetes manifests and remaining
 non-auth feature APIs remain for later tasks.
 
@@ -48,6 +51,7 @@ non-auth feature APIs remain for later tasks.
 - Overall implemented API structure: [API_STRUCTURE.md](API_STRUCTURE.md).
 - Implemented database design notes: [db-design/](db-design/README.md).
 - Implemented API design notes: [api-design/](api-design/README.md).
+- Implemented event design notes: [event-design/](event-design/README.md).
 
 ## LD-003 Update Rules
 - Add or revise a spec before implementing a new feature.
@@ -55,6 +59,7 @@ non-auth feature APIs remain for later tasks.
 - Update [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) before model or migration work.
 - Add implemented database design notes under [db-design/](db-design/README.md) after database-backed tasks are complete.
 - Add implemented API design notes under [api-design/](api-design/README.md) after API-backed tasks are complete.
+- Add implemented event design notes under [event-design/](event-design/README.md) after event-backed tasks are complete.
 - Update [DB_STRUCTURE.md](DB_STRUCTURE.md) and [API_STRUCTURE.md](API_STRUCTURE.md) after schema or implemented API changes.
 - Move open decisions out of [KNOWN_ISSUES.md](KNOWN_ISSUES.md) only after an explicit decision is recorded.
 - Update [CHANGELOG.md](CHANGELOG.md) after meaningful documentation or implementation changes.

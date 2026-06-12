@@ -336,6 +336,44 @@ files = [
 ]
 
 [[package]]
+name = "kafka-python"
+version = "2.3.2"
+description = "Pure Python client for Apache Kafka"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "kafka_python-2.3.2-py2.py3-none-any.whl", hash = "sha256:e8a5e6f2c4ce13a8041669337038d5125e0e09e6d6f0911902ae5939e5b9595e"},
+    {file = "kafka_python-2.3.2.tar.gz", hash = "sha256:2d2469bcabc2551be7eaf7fb512e1241484d358800f2665b90e7e24fea84259d"},
+]
+
+[package.extras]
+benchmarks = ["pyperf"]
+crc32c = ["crc32c"]
+lz4 = ["lz4"]
+snappy = ["python-snappy"]
+testing = ["mock ; python_version < \"3.3\"", "pytest", "pytest-mock", "pytest-timeout"]
+zstd = ["zstandard"]
+
+[[package]]
+name = "learngrid-events"
+version = "0.1.0"
+description = "Shared Kafka eventing helpers for LearnGrid LMS"
+optional = false
+python-versions = ">=3.12,<3.15"
+groups = ["main"]
+files = []
+develop = true
+
+[package.dependencies]
+django = "^5.2.8"
+kafka-python = "^2.0.2"
+
+[package.source]
+type = "directory"
+url = "../../shared/learngrid-events"
+
+[[package]]
 name = "librt"
 version = "0.11.0"
 description = "Mypyc runtime library"
@@ -925,4 +963,4 @@ zstd = ["backports-zstd (>=1.0.0) ; python_version < \"3.14\""]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12,<3.15"
-content-hash = "ad0addb27d8149a76639838822bb0b8e7212c1e5cfeb6d2c22f4607bc4810baf"
+content-hash = "5faab1ce760064d52ec16d7ef84edaf96adf905258ac1843fc9fc321dd446473"

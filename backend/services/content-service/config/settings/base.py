@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "corsheaders",
     "rest_framework",
+    "learngrid_events",
     "apps.content",
 ]
 
@@ -43,6 +44,14 @@ DATABASES = {
 }
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+KAFKA_ENABLED = os.getenv("KAFKA_ENABLED", "false").lower() == "true"
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "127.0.0.1:9092")
+KAFKA_CLIENT_ID = os.getenv("KAFKA_CLIENT_ID", SERVICE_NAME)
+KAFKA_DEFAULT_PARTITIONS = int(os.getenv("KAFKA_DEFAULT_PARTITIONS", "3"))
+KAFKA_REPLICATION_FACTOR = int(os.getenv("KAFKA_REPLICATION_FACTOR", "1"))
+KAFKA_CONSUMER_GROUP = os.getenv("KAFKA_CONSUMER_GROUP", f"{SERVICE_NAME}-consumer")
+KAFKA_MAX_RETRY_ATTEMPTS = int(os.getenv("KAFKA_MAX_RETRY_ATTEMPTS", "3"))
+KAFKA_EVENT_HANDLERS = {}
 CONTENT_STORAGE_PROVIDER = os.getenv("CONTENT_STORAGE_PROVIDER", "minio")
 CONTENT_STORAGE_BUCKET = os.getenv("CONTENT_STORAGE_BUCKET", "learngrid-content")
 CONTENT_MINIO_ENDPOINT_URL = os.getenv("CONTENT_MINIO_ENDPOINT_URL", "http://127.0.0.1:9000")

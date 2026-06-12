@@ -7,6 +7,7 @@ import jwt
 import pytest
 from django.conf import settings
 from django.utils import timezone
+from learngrid_events import DuplicateEvent
 from rest_framework.test import APIClient
 
 from apps.analytics import services, views
@@ -149,6 +150,26 @@ def test_search_index_upsert_and_delete(api_client, access_token):
     assert update_response.json()["created"] is False
     assert delete_response.status_code == 204
     assert SearchIndexRecord.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_kafka_analytics_handler_ingests_event_idempotently():
+    event_id = uuid4()
+    event = {
+        "event_id": str(event_id),
+        "event_type": "CoursePublished",
+        "aggregate_id": str(uuid4()),
+        "producer_service": "course-service",
+        "timestamp": timezone.now().isoformat(),
+        "payload": {"institution_id": str(uuid4()), "status": "published"},
+    }
+
+    result = services.handle_kafka_analytics_event(event)
+
+    assert result["status"] == "processed"
+    assert EventFact.objects.filter(event_id=event_id, event_type="CoursePublished").exists()
+    with pytest.raises(DuplicateEvent):
+        services.handle_kafka_analytics_event(event)
 
 
 @pytest.mark.django_db

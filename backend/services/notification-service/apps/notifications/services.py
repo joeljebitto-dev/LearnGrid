@@ -9,6 +9,8 @@ from urllib import error, parse, request as urlrequest
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+from learngrid_events import DuplicateEvent
+from learngrid_events import publish_event as publish_kafka_event
 from rest_framework.exceptions import APIException, NotFound, PermissionDenied, ValidationError
 
 from .models import (
@@ -188,6 +190,26 @@ def ingest_notification_event(*, event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def handle_kafka_notification_event(event: dict[str, Any]) -> dict[str, Any]:
+    if event["event_type"] not in DEFAULT_TEMPLATES:
+        return {"status": "skipped", "event_id": event["event_id"]}
+    result = ingest_notification_event(event=event)
+    if result["status"] == "duplicate":
+        raise DuplicateEvent()
+    publish_notification_event(
+        event_type="NotificationEventProcessed",
+        aggregate_id=event["aggregate_id"],
+        payload={
+            "source_event_id": event["event_id"],
+            "source_event_type": event["event_type"],
+            "status": result["status"],
+            "notification_count": len(result["notifications"]),
+            "skipped_count": result["skipped_count"],
+        },
+    )
+    return result
+
+
 def recipient_profile_ids_for_event(*, event_type: str, payload: dict[str, Any]) -> list[str]:
     if recipients := payload.get("recipient_profile_ids"):
         if not isinstance(recipients, list) or not recipients:
@@ -267,6 +289,15 @@ def create_delivery_attempt(*, notification: Notification, payload: dict[str, An
         channel=NotificationChannel.IN_APP,
         status=DeliveryStatus.SENT,
         provider_message_id=f"in-app:{notification.id}",
+    )
+
+
+def publish_notification_event(*, event_type: str, aggregate_id, payload: dict[str, Any]) -> dict[str, Any]:
+    return publish_kafka_event(
+        event_type=event_type,
+        aggregate_id=aggregate_id,
+        producer_service=settings.SERVICE_NAME,
+        payload=payload,
     )
 
 

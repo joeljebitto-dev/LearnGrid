@@ -43,9 +43,12 @@ apps/<domain>/tests/
 - Use transactions for multi-step writes inside a service boundary.
 
 ## BE-005 Event Standards
-- Kafka events follow [SPEC-020](specs/020-kafka-eventing.md).
+- Kafka events follow [SPEC-020](specs/020-kafka-eventing.md) and the implemented [EVT-020](event-design/EVT-020-kafka-eventing.md) design.
+- Shared event code lives in [backend/shared/learngrid-events](../backend/shared/learngrid-events).
 - Events include `event_id`, `event_type`, `aggregate_id`, `producer_service`, `timestamp`, `version`, `correlation_id`, and `payload`.
+- Producers publish after database commit where possible and fall back to local logging when `KAFKA_ENABLED=false`.
 - Consumers are idempotent and use retry and dead-letter topics.
+- Management commands support `kafka_consume`, `kafka_retry_dlq`, and `kafka_consumer_lag`.
 
 ## BE-006 Related Tasks
 See [TASKS.md](TASKS.md) for implementation checklists, especially [T-001](tasks/T-001-project-setup.md), [T-020](tasks/T-020-kafka-eventing.md), and [T-024](tasks/T-024-testing-quality.md).

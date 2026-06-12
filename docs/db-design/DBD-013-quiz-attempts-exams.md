@@ -26,4 +26,4 @@ Canonical schema: [assessment_db](../DATABASE_SCHEMA.md#assessment_db)
 - Randomized question order is persisted in `submission_audit_logs.metadata.question_order`.
 - Answers are stored in PostgreSQL; Redis is not required for this baseline.
 - Objective answers are scored locally so `quiz_attempts.score` is available before the later grading-service workflow.
-- `QuizSubmitted` is emitted through the local structured event publisher; Kafka transport remains future [T-020](../tasks/T-020-kafka-eventing.md) scope.
+- `QuizSubmitted` is emitted through the shared Kafka-capable event publisher documented in [EVT-020](../event-design/EVT-020-kafka-eventing.md).

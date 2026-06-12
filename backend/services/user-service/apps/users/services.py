@@ -8,6 +8,7 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction
 from django.utils import timezone
+from learngrid_events import publish_event as publish_kafka_event
 from rest_framework.exceptions import APIException, ValidationError
 
 from .models import (
@@ -316,7 +317,9 @@ def create_user_profile(*, validated_data: dict[str, Any], token: str) -> UserPr
                 metadata=validated_data.get("metadata", {}),
             )
             _create_role_profile(profile, validated_data)
-            return get_profile(profile.id)
+            profile = get_profile(profile.id)
+            publish_user_event(event_type="UserProfileCreated", profile=profile)
+            return profile
     except Exception as exc:
         try:
             deactivate_auth_account(
@@ -395,7 +398,9 @@ def update_user_profile(*, profile: UserProfile, validated_data: dict[str, Any],
                 setattr(profile, field, validated_data[field])
         profile.save()
         _update_role_profile(profile, validated_data)
-    return get_profile(profile.id)
+    profile = get_profile(profile.id)
+    publish_user_event(event_type="UserProfileUpdated", profile=profile)
+    return profile
 
 
 def deactivate_user_profile(*, profile: UserProfile, token: str) -> UserProfile:
@@ -409,7 +414,23 @@ def deactivate_user_profile(*, profile: UserProfile, token: str) -> UserProfile:
     profile.status = UserProfileStatus.DEACTIVATED
     profile.deleted_at = timezone.now()
     profile.save(update_fields=["status", "deleted_at", "updated_at"])
-    return get_profile(profile.id)
+    profile = get_profile(profile.id)
+    publish_user_event(event_type="UserProfileDeactivated", profile=profile)
+    return profile
+
+
+def publish_user_event(*, event_type: str, profile: UserProfile) -> dict[str, Any]:
+    return publish_kafka_event(
+        event_type=event_type,
+        aggregate_id=profile.id,
+        producer_service=settings.SERVICE_NAME,
+        payload={
+            "profile_id": str(profile.id),
+            "auth_account_id": str(profile.auth_account_id),
+            "institution_id": str(profile.institution_id) if profile.institution_id else None,
+            "status": profile.status,
+        },
+    )
 
 
 def get_profile(profile_id) -> UserProfile:

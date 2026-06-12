@@ -7,6 +7,7 @@ import jwt
 import pytest
 from django.conf import settings
 from django.utils import timezone
+from learngrid_events import DuplicateEvent
 from rest_framework.test import APIClient
 
 from apps.progress import permissions, services
@@ -152,6 +153,38 @@ def test_event_ingestion_is_idempotent(api_client, access_token, monkeypatch):
     assert response.status_code == 200
     assert response.json()["status"] == "duplicate"
     assert ProgressEvent.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_kafka_progress_handler_processes_assessment_event_idempotently(monkeypatch):
+    course_id = uuid4()
+    student_id = uuid4()
+    event = {
+        "event_id": str(uuid4()),
+        "event_type": "QuizSubmitted",
+        "aggregate_id": str(uuid4()),
+        "producer_service": "assessment-service",
+        "timestamp": timezone.now().isoformat(),
+        "payload": {
+            "student_profile_id": str(student_id),
+            "course_id": str(course_id),
+            "assessment_id": str(uuid4()),
+        },
+    }
+    published_events = []
+    monkeypatch.setattr(
+        services,
+        "publish_progress_event",
+        lambda **kwargs: published_events.append(kwargs) or {"event_id": str(uuid4())},
+    )
+
+    result = services.handle_kafka_progress_event(event)
+
+    assert result["status"] == "processed"
+    assert ProgressEvent.objects.filter(event_id=event["event_id"]).exists()
+    assert published_events[-1]["event_type"] == "CourseCompleted"
+    with pytest.raises(DuplicateEvent):
+        services.handle_kafka_progress_event(event)
 
 
 @pytest.mark.django_db

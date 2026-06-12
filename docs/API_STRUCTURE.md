@@ -1687,5 +1687,24 @@ Related design: [API-019 API Gateway](api-design/API-019-api-gateway.md)
 Nginx terminates TLS, emits JSON request logs, forwards request IDs, applies local-origin CORS,
 rate limits API traffic, and rejects oversized requests above `20m`.
 
+## API-020 Kafka Eventing Interfaces
+
+Related design: [EVT-020 Kafka Eventing](event-design/EVT-020-kafka-eventing.md)
+
+Kafka is not an HTTP API, but it exposes local development and Django management interfaces:
+
+| Interface | Purpose |
+| --- | --- |
+| `127.0.0.1:9092` | Local Apache Kafka broker |
+| `http://127.0.0.1:8090` | Kafka UI for local topic, message, and consumer visibility |
+| `python manage.py kafka_consume --topic <topic> --group <group> --handler <handler-name>` | Consume events with an explicit service handler |
+| `python manage.py kafka_retry_dlq --topic <topic>.dlq --event-id <uuid>` | Replay one DLQ event to the retry topic |
+| `python manage.py kafka_consumer_lag --group <group>` | Print consumer group lag as JSON |
+
+Implemented base topics are `audit.events`, `user.events`, `course.events`, `content.events`,
+`enrollment.events`, `progress.events`, `assessment.events`, `grading.events`,
+`notification.events`, and `analytics.events`. Each base topic also has `.retry` and `.dlq`
+topics.
+
 ## Future APIs Not Implemented
-Kafka transport, Redis architecture operations, deployment, and broader security APIs remain future task scope unless explicitly listed above.
+Redis architecture operations, deployment, and broader security APIs remain future task scope unless explicitly listed above.

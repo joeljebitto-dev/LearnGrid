@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-import json
 import logging
-import uuid
 from decimal import Decimal
 from typing import Any
 
 from django.conf import settings
 from django.utils import timezone
+from learngrid_events import DuplicateEvent
+from learngrid_events import publish_event as publish_kafka_event
 
 from .models import (
     AssessmentProgress,
@@ -167,15 +167,25 @@ def process_progress_event(*, event_id, event_type: str, aggregate_id, payload: 
 
 
 def publish_progress_event(*, event_type: str, aggregate_id, payload: dict[str, Any]) -> dict[str, Any]:
-    event = {
-        "event_id": str(uuid.uuid4()),
-        "event_type": event_type,
-        "aggregate_id": str(aggregate_id),
-        "producer_service": settings.SERVICE_NAME,
-        "timestamp": timezone.now().isoformat(),
-        "version": 1,
-        "correlation_id": None,
-        "payload": payload,
-    }
-    logger.info("progress_event %s", json.dumps(event, sort_keys=True))
+    event = publish_kafka_event(
+        event_type=event_type,
+        aggregate_id=aggregate_id,
+        producer_service=settings.SERVICE_NAME,
+        payload=payload,
+    )
+    logger.info("progress_event %s", event)
     return event
+
+
+def handle_kafka_progress_event(event: dict[str, Any]) -> dict[str, Any]:
+    if event["event_type"] not in {"LessonViewed", "VideoCompleted", "QuizSubmitted", "AssignmentSubmitted"}:
+        return {"status": "skipped", "event_id": event["event_id"]}
+    result = process_progress_event(
+        event_id=event["event_id"],
+        event_type=event["event_type"],
+        aggregate_id=event["aggregate_id"],
+        payload=event["payload"],
+    )
+    if result["status"] == "duplicate":
+        raise DuplicateEvent()
+    return result

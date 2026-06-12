@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import uuid
 from typing import Any
 
 import redis
@@ -11,6 +10,7 @@ from django.db import transaction
 from django.db.models import Max
 from django.utils import timezone
 from django.utils.text import slugify
+from learngrid_events import publish_event as publish_kafka_event
 from rest_framework.exceptions import ValidationError
 
 from .models import (
@@ -506,16 +506,13 @@ def publish_course_event(
     payload: dict[str, Any],
     correlation_id: str | None = None,
 ) -> dict[str, Any]:
-    event = {
-        "event_id": str(uuid.uuid4()),
-        "event_type": event_type,
-        "aggregate_id": str(aggregate_id),
-        "producer_service": settings.SERVICE_NAME,
-        "timestamp": timezone.now().isoformat(),
-        "version": 1,
-        "correlation_id": correlation_id,
-        "payload": payload,
-    }
+    event = publish_kafka_event(
+        event_type=event_type,
+        aggregate_id=aggregate_id,
+        producer_service=settings.SERVICE_NAME,
+        correlation_id=correlation_id,
+        payload=payload,
+    )
     logger.info("course_event %s", json.dumps(event, sort_keys=True))
     return event
 

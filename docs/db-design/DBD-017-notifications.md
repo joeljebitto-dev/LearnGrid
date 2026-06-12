@@ -5,7 +5,7 @@ Related spec: [SPEC-017](../specs/017-notifications.md)
 Canonical schema: [notification_db](../DATABASE_SCHEMA.md#notification_db)
 
 ## DBD-017-001 Scope
-`notification-service` now owns in-app notification templates, notification records, delivery attempts, and user notification preferences. Kafka transport remains future [T-020](../tasks/T-020-kafka-eventing.md) scope; T-017 exposes an authenticated event-ingest API with idempotent processing.
+`notification-service` now owns in-app notification templates, notification records, delivery attempts, and user notification preferences. T-020 adds Kafka event consumption through [EVT-020](../event-design/EVT-020-kafka-eventing.md); the T-017 authenticated event-ingest API remains available for synchronous ingestion and tests.
 
 ## DBD-017-002 Tables
 | Table ID | Table | Purpose |

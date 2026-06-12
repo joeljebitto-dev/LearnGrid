@@ -1449,7 +1449,10 @@ Purpose: Search index metadata for courses, users, enrollments, assessments, and
 Indexes: unique `uq_search_index_resource`, `idx_search_index_resource_type`, `idx_search_index_institution`, GIN `gin_search_index_search_text`.
 
 ## Kafka Event Persistence Notes
-Kafka topics are not SQL tables, but service tables that consume events must record `event_id` values for idempotency. Event payloads use:
+Kafka topics are not SQL tables, but service tables that consume events must record `event_id`
+values for idempotency. The implemented topic catalog, retry topics, DLQ topics, producer
+behavior, consumer behavior, and lag commands are documented in
+[EVT-020 Kafka Eventing](event-design/EVT-020-kafka-eventing.md). Event payloads use:
 
 ```json
 {

@@ -12,6 +12,8 @@ from django.db import transaction
 from django.db.models import Avg
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from learngrid_events import DuplicateEvent
+from learngrid_events import publish_event as publish_kafka_event
 from rest_framework.exceptions import APIException, NotFound, PermissionDenied
 
 from .models import (
@@ -141,7 +143,11 @@ def require_instructor_profile(profile: dict[str, Any]) -> None:
 
 
 @transaction.atomic
-def ingest_event(validated_data: dict[str, Any]) -> tuple[EventFact, bool]:
+def ingest_event(
+    validated_data: dict[str, Any],
+    *,
+    publish_ingested_event: bool = True,
+) -> tuple[EventFact, bool]:
     event, created = EventFact.objects.get_or_create(
         event_id=validated_data["event_id"],
         defaults={
@@ -153,7 +159,45 @@ def ingest_event(validated_data: dict[str, Any]) -> tuple[EventFact, bool]:
             "payload": validated_data.get("payload", {}),
         },
     )
+    if created and publish_ingested_event:
+        publish_analytics_event(
+            event_type="AnalyticsEventIngested",
+            aggregate_id=event.id,
+            payload={
+                "source_event_id": str(event.event_id),
+                "source_event_type": event.event_type,
+                "producer_service": event.producer_service,
+                "institution_id": str(event.institution_id) if event.institution_id else None,
+            },
+        )
     return event, created
+
+
+def handle_kafka_analytics_event(event: dict[str, Any]) -> dict[str, Any]:
+    stored_event, created = ingest_event(
+        {
+            "event_id": event["event_id"],
+            "event_type": event["event_type"],
+            "producer_service": event["producer_service"],
+            "aggregate_id": event["aggregate_id"],
+            "institution_id": event["payload"].get("institution_id"),
+            "occurred_at": event["timestamp"],
+            "payload": event["payload"],
+        },
+        publish_ingested_event=False,
+    )
+    if not created:
+        raise DuplicateEvent()
+    return {"status": "processed", "event_id": str(stored_event.event_id)}
+
+
+def publish_analytics_event(*, event_type: str, aggregate_id, payload: dict[str, Any]) -> dict[str, Any]:
+    return publish_kafka_event(
+        event_type=event_type,
+        aggregate_id=aggregate_id,
+        producer_service=settings.SERVICE_NAME,
+        payload=payload,
+    )
 
 
 def create_report_snapshot(
@@ -222,13 +266,25 @@ def generate_report_snapshot(
         institution_id=validated_data.get("institution_id"),
         parameters=validated_data.get("parameters", {}),
     )
-    return ReportSnapshot.objects.create(
+    snapshot = ReportSnapshot.objects.create(
         institution_id=validated_data.get("institution_id"),
         report_type=validated_data["report_type"],
         parameters=validated_data.get("parameters", {}),
         result_payload=payload,
         generated_by_profile_id=generated_by_profile_id,
     )
+    publish_analytics_event(
+        event_type="AnalyticsReportGenerated",
+        aggregate_id=snapshot.id,
+        payload={
+            "institution_id": str(snapshot.institution_id) if snapshot.institution_id else None,
+            "report_type": snapshot.report_type,
+            "generated_by_profile_id": str(snapshot.generated_by_profile_id)
+            if snapshot.generated_by_profile_id
+            else None,
+        },
+    )
+    return snapshot
 
 
 def build_report_payload(

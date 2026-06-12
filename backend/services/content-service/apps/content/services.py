@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import logging
 import re
 import secrets
@@ -16,6 +15,7 @@ from django.conf import settings
 from django.db import transaction
 from django.db.models import Max
 from django.utils import timezone
+from learngrid_events import publish_event as publish_kafka_event
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from .models import (
@@ -469,15 +469,12 @@ def publish_content_event(
     payload: dict[str, Any],
     correlation_id: str | None = None,
 ) -> dict[str, Any]:
-    event = {
-        "event_id": str(uuid.uuid4()),
-        "event_type": event_type,
-        "aggregate_id": str(aggregate_id),
-        "producer_service": settings.SERVICE_NAME,
-        "timestamp": timezone.now().isoformat(),
-        "version": 1,
-        "correlation_id": correlation_id,
-        "payload": payload,
-    }
-    logger.info("content_event %s", json.dumps(event, sort_keys=True))
+    event = publish_kafka_event(
+        event_type=event_type,
+        aggregate_id=aggregate_id,
+        producer_service=settings.SERVICE_NAME,
+        correlation_id=correlation_id,
+        payload=payload,
+    )
+    logger.info("content_event %s", event)
     return event

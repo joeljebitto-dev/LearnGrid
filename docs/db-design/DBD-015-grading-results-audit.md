@@ -27,4 +27,4 @@ Canonical schema: [grading_db](../DATABASE_SCHEMA.md#grading_db)
 - Manual reviews and overrides always create `grade_history` rows.
 - Overrides require a non-empty reason.
 - Publishing writes `published_results`, marks the grade record `published`, emits `GradePublished`, and asks assessment-service to mark assignment submissions graded when applicable.
-- `GradeCalculated` and `GradePublished` are emitted through the local structured event publisher; Kafka transport remains future [T-020](../tasks/T-020-kafka-eventing.md) scope.
+- `GradeCalculated` and `GradePublished` are emitted through the shared Kafka-capable event publisher documented in [EVT-020](../event-design/EVT-020-kafka-eventing.md).

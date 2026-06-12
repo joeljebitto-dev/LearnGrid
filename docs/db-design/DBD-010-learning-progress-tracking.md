@@ -17,4 +17,4 @@ Canonical schema: [progress_db](../DATABASE_SCHEMA.md#progress_db)
 | `DB-PROGRESS-005` | `progress_events` | Idempotency and audit for consumed events |
 
 ## DBD-010-003 Notes
-Progress updates recalculate course progress from completed lessons and submitted/graded assessments. Event ingestion handles `LessonViewed`, `VideoCompleted`, `QuizSubmitted`, and `AssignmentSubmitted` idempotently. Course progress updates and completion emit local structured events until Kafka transport is implemented in [T-020](../tasks/T-020-kafka-eventing.md).
+Progress updates recalculate course progress from completed lessons and submitted/graded assessments. Event ingestion handles `LessonViewed`, `VideoCompleted`, `QuizSubmitted`, and `AssignmentSubmitted` idempotently. Course progress updates, completion events, and Kafka-consumed assessment events follow [EVT-020](../event-design/EVT-020-kafka-eventing.md).

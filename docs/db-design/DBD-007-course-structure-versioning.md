@@ -49,5 +49,5 @@ is set so the documented unique constraints remain valid.
 ## DBD-007-007 Cache And Events
 Course structure writes invalidate course catalog cache keys so published structure reads do
 not serve stale data. Publishing a lesson emits a structured local `LessonPublished` event
-using the same transport-neutral event envelope introduced in T-006. Real Kafka transport
-remains future [T-020](../tasks/T-020-kafka-eventing.md) scope.
+using the shared Kafka-capable event envelope documented in
+[EVT-020](../event-design/EVT-020-kafka-eventing.md).

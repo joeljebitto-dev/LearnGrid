@@ -52,6 +52,6 @@ Published catalog list/detail reads are cached in Redis with
 records bypass cache. Course, category, tag, prerequisite, and learning outcome writes
 invalidate catalog cache keys.
 
-`course-service` emits structured local events for `CourseCreated`, `CoursePublished`,
-and `CourseArchived`. The payload is intentionally transport-neutral; Kafka transport
-remains future [T-020](../tasks/T-020-kafka-eventing.md) scope.
+`course-service` emits `CourseCreated`, `CoursePublished`, and `CourseArchived`
+through the shared Kafka-capable publisher documented in
+[EVT-020](../event-design/EVT-020-kafka-eventing.md).

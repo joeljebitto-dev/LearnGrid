@@ -7,9 +7,10 @@ import jwt
 import pytest
 from django.conf import settings
 from django.utils import timezone
+from learngrid_events import DuplicateEvent
 from rest_framework.test import APIClient
 
-from apps.notifications import permissions, views
+from apps.notifications import permissions, services, views
 from apps.notifications.models import (
     DeliveryAttempt,
     DeliveryStatus,
@@ -155,6 +156,26 @@ def test_event_ingestion_is_idempotent(api_client, access_token, monkeypatch):
     assert second_response.json()["status"] == "duplicate"
     assert Notification.objects.count() == 1
     assert DeliveryAttempt.objects.count() == 1
+
+
+@pytest.mark.django_db
+def test_kafka_notification_handler_processes_and_rejects_duplicate(monkeypatch):
+    student_id = uuid4()
+    payload = event_payload("GradePublished", student_id)
+    published_events = []
+    monkeypatch.setattr(
+        services,
+        "publish_notification_event",
+        lambda **kwargs: published_events.append(kwargs) or {"event_id": str(uuid4())},
+    )
+
+    result = services.handle_kafka_notification_event(payload)
+
+    assert result["status"] == "processed"
+    assert Notification.objects.filter(recipient_profile_id=student_id).count() == 1
+    assert published_events[0]["event_type"] == "NotificationEventProcessed"
+    with pytest.raises(DuplicateEvent):
+        services.handle_kafka_notification_event(payload)
 
 
 @pytest.mark.django_db

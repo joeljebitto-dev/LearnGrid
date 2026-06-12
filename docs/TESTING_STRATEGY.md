@@ -18,7 +18,7 @@ Testing covers unit, API, integration, contract, browser end-to-end, load, secur
 ## TEST-004 Integration Tests
 - Verify PostgreSQL migrations and service-level transactions.
 - Verify Redis caching, rate limiting, OTPs, token blacklist, and locks.
-- Verify Kafka producers, consumers, retries, and dead-letter paths.
+- Verify Kafka producers, consumers, retries, dead-letter paths, idempotency, and lag reporting through the shared `learngrid-events` package.
 - Verify object storage upload, signed access, metadata, and permission behavior.
 - Use Testcontainers where suitable in CI.
 

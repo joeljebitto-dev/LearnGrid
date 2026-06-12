@@ -17,4 +17,4 @@ Canonical schema: [enrollment_db](../DATABASE_SCHEMA.md#enrollment_db)
 | `DB-ENROLL-005` | `access_grants` | Active/revoked/suspended/expired course access |
 
 ## DBD-009-003 Notes
-Student/course enrollment is unique. Status transitions append history and synchronize access grants. Student enrollment, removal, and access-expiry events are emitted locally until Kafka transport is implemented in [T-020](../tasks/T-020-kafka-eventing.md).
+Student/course enrollment is unique. Status transitions append history and synchronize access grants. Student enrollment, removal, and access-expiry events use the shared Kafka-capable event design in [EVT-020](../event-design/EVT-020-kafka-eventing.md).

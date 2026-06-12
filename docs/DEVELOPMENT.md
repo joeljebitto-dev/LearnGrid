@@ -271,10 +271,45 @@ Published catalog list/detail responses are cached in Redis for
 cache. Course, category, tag, prerequisite, and learning outcome writes invalidate catalog
 cache keys. Redis failures fall back to database reads.
 
-Course lifecycle emits structured local `CourseCreated`, `CoursePublished`, and
-`CourseArchived` events with `event_id`, `event_type`, `aggregate_id`, `producer_service`,
-`timestamp`, `version`, `correlation_id`, and `payload`. Kafka transport remains future
-[T-020](tasks/T-020-kafka-eventing.md) scope.
+Course lifecycle emits `CourseCreated`, `CoursePublished`, and `CourseArchived` through the
+shared Kafka-capable event publisher described in [EVT-020](event-design/EVT-020-kafka-eventing.md).
+When `KAFKA_ENABLED=false`, the same envelope is logged locally.
+
+## Kafka Eventing
+`pnpm dev`, `pnpm dev:fast`, and `pnpm dev:infra` start Apache Kafka with the local stack.
+
+| Component | Local endpoint |
+| --- | --- |
+| Kafka broker | `127.0.0.1:9092` |
+| Kafka UI | `http://127.0.0.1:8090` |
+
+Kafka settings:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `KAFKA_ENABLED` | `true` from `scripts/run-dev.sh` | Enables real Kafka publishing for local app processes |
+| `KAFKA_BOOTSTRAP_SERVERS` | `127.0.0.1:9092` | Broker bootstrap address |
+| `KAFKA_DEFAULT_PARTITIONS` | `3` | Topic partitions used by `kafka-init` |
+| `KAFKA_REPLICATION_FACTOR` | `1` | Local topic replication factor |
+| `KAFKA_CONSUMER_GROUP` | `<service-name>-consumer` | Default consumer group per service |
+| `KAFKA_MAX_RETRY_ATTEMPTS` | `3` | Attempts before DLQ routing |
+
+Kafka management commands are available in every Django service through the shared
+`learngrid-events` app:
+
+```bash
+poetry run python manage.py kafka_consume --topic course.events --group analytics-service-consumer --handler analytics.event_fact
+poetry run python manage.py kafka_retry_dlq --topic course.events.dlq --event-id <uuid>
+poetry run python manage.py kafka_consumer_lag --group analytics-service-consumer
+```
+
+Implemented consumer handlers:
+
+| Service | Handler key | Typical topics |
+| --- | --- | --- |
+| `analytics-service` | `analytics.event_fact` | All base topics |
+| `notification-service` | `notification.in_app` | `enrollment.events`, `progress.events`, `grading.events` |
+| `progress-service` | `progress.assessment` | `assessment.events` |
 
 ## Course Structure And Versioning
 `course-service` implements ordered course structure for

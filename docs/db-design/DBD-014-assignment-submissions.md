@@ -25,4 +25,4 @@ Canonical schema: [assessment_db](../DATABASE_SCHEMA.md#assessment_db)
 - Content attachments are validated through content-service before storing the UUID reference.
 - Due date and late-submission policy are enforced before final submit.
 - `submission_audit_logs` captures created, saved, submitted, late, and graded events for assignment submissions.
-- `AssignmentSubmitted` is emitted through the local structured event publisher; Kafka transport remains future [T-020](../tasks/T-020-kafka-eventing.md) scope.
+- `AssignmentSubmitted` is emitted through the shared Kafka-capable event publisher documented in [EVT-020](../event-design/EVT-020-kafka-eventing.md).

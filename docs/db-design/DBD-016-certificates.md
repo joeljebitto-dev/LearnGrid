@@ -23,4 +23,4 @@ Canonical schema: [grading_db](../DATABASE_SCHEMA.md#grading_db)
 - Eligibility reasons use stable values: `eligible`, `course_progress_missing`, `course_incomplete`, `published_results_missing`, and `grade_below_threshold`.
 - Eligible evaluations auto-issue a certificate if one does not already exist.
 - Revocation sets `revoked_at`; certificate records are not deleted.
-- `CertificateEligible` is emitted through the local structured event publisher; Kafka transport remains future [T-020](../tasks/T-020-kafka-eventing.md) scope.
+- `CertificateEligible` is emitted through the shared Kafka-capable event publisher documented in [EVT-020](../event-design/EVT-020-kafka-eventing.md).

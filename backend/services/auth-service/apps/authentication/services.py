@@ -15,6 +15,7 @@ from django.contrib.auth.hashers import make_password
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
+from learngrid_events import publish_event as publish_kafka_event
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 
 from .models import (
@@ -114,13 +115,31 @@ def _audit(
     request: Any = None,
     metadata: dict[str, Any] | None = None,
 ) -> None:
-    LoginAuditLog.objects.create(
+    audit_log = LoginAuditLog.objects.create(
         account=account,
         email_attempted=email_attempted,
         event_type=event_type,
         ip_address=_request_ip(request),
         user_agent=_request_user_agent(request),
         metadata=metadata or {},
+    )
+    publish_auth_event(
+        event_type=f"Auth{event_type.title().replace('_', '')}",
+        aggregate_id=audit_log.id,
+        payload={
+            "account_id": str(account.id) if account else None,
+            "email_attempted": email_attempted,
+            "event_type": event_type,
+        },
+    )
+
+
+def publish_auth_event(*, event_type: str, aggregate_id, payload: dict[str, Any]) -> dict[str, Any]:
+    return publish_kafka_event(
+        event_type=event_type,
+        aggregate_id=aggregate_id,
+        producer_service=settings.SERVICE_NAME,
+        payload=payload,
     )
 
 
@@ -317,6 +336,11 @@ def create_managed_account(
             assigned_by_account=actor_account,
             request=request,
         )
+    publish_auth_event(
+        event_type="AuthAccountCreated",
+        aggregate_id=account.id,
+        payload={"account_id": str(account.id), "email": account.email, "status": account.status},
+    )
     return account
 
 
@@ -346,6 +370,11 @@ def update_managed_account(
     account.save(update_fields=update_fields)
     if revoke_tokens:
         revoke_account_tokens(account, reason=BlacklistReason.ADMIN_REVOKE)
+    publish_auth_event(
+        event_type="AuthAccountUpdated",
+        aggregate_id=account.id,
+        payload={"account_id": str(account.id), "email": account.email, "status": account.status},
+    )
     return account
 
 
@@ -355,6 +384,11 @@ def deactivate_managed_account(account: Account) -> Account:
     account.deleted_at = timezone.now()
     account.save(update_fields=["status", "deleted_at", "updated_at"])
     revoke_account_tokens(account, reason=BlacklistReason.ADMIN_REVOKE)
+    publish_auth_event(
+        event_type="AuthAccountDeactivated",
+        aggregate_id=account.id,
+        payload={"account_id": str(account.id), "email": account.email, "status": account.status},
+    )
     return account
 
 
@@ -502,7 +536,7 @@ def _audit_authorization(
     request: Any = None,
     metadata: dict[str, Any] | None = None,
 ) -> None:
-    AuthorizationAuditLog.objects.create(
+    audit_log = AuthorizationAuditLog.objects.create(
         actor_account=actor_account,
         target_account=target_account,
         event_type=event_type,
@@ -514,6 +548,19 @@ def _audit_authorization(
         ip_address=_request_ip(request),
         user_agent=_request_user_agent(request),
         metadata=metadata or {},
+    )
+    publish_auth_event(
+        event_type=f"Authorization{event_type.title().replace('_', '')}",
+        aggregate_id=audit_log.id,
+        payload={
+            "actor_account_id": str(actor_account.id) if actor_account else None,
+            "target_account_id": str(target_account.id) if target_account else None,
+            "role_code": role.code if role else None,
+            "permission_code": permission.code if permission else None,
+            "scope_type": scope_type,
+            "scope_id": str(scope_id) if scope_id else None,
+            "event_type": event_type,
+        },
     )
 
 
