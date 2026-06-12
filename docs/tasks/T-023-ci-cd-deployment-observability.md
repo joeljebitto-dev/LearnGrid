@@ -16,6 +16,8 @@ Notes:
 - `OD-003` is resolved to on-prem Kubernetes.
 - Repository CI/CD, Helm charts, image build/scan/push jobs, staging deployment, production manual
   approval wiring, and smoke commands are implemented.
+- `scripts/verify-staging-release.sh` and the manual `production-readiness.yml` workflow create
+  the staging rollout, gateway health, service health, optional OpenAPI, and Selenium evidence path.
 - `T-023.06` remains unchecked until a real staging GitHub Actions deployment with
   `KUBE_CONFIG_STAGING` succeeds, because deployment tasks require staging verification before
   production completion.

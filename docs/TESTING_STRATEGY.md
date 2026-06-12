@@ -89,7 +89,12 @@ Run:
 ```bash
 k6 run tests/load/smoke.js
 k6 run tests/load/staging.js
+scripts/verify-performance-gates.sh
 ```
+
+`scripts/verify-performance-gates.sh` is the staging performance evidence gate. It can run k6 and
+Prometheus checks for p95 latency, error rate, throughput, PostgreSQL connections, Redis memory,
+Kafka lag, CPU, memory, and autoscaling-related signals once real staging metrics are available.
 
 ## TEST-007 Security Tests
 - Verify gateway HTTPS redirect, CORS allow/deny behavior, secure headers, rate limits, and request
@@ -109,6 +114,8 @@ k6 run tests/load/staging.js
 - Validate Grafana dashboard JSON and required observability components before cluster deployment.
 - CI validates Helm rendering, Kubernetes schemas, image scans, staging smoke tests, and production
   deployment gates.
+- `scripts/verify-staging-release.sh` and `.github/workflows/production-readiness.yml` provide the
+  real staging evidence path; completion still depends on a run against a real cluster.
 
 ## TEST-009 Repo Quality Commands
 Root-level test utilities are listed in `requirements-test.txt`.

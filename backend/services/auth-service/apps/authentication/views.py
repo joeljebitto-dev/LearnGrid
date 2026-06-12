@@ -14,6 +14,7 @@ from .serializers import (
     AccountUpdateSerializer,
     AuthorizationCheckSerializer,
     LogoutSerializer,
+    OidcCallbackSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
     PermissionSerializer,
@@ -26,16 +27,19 @@ from .serializers import (
 from .services import (
     assign_role,
     confirm_password_reset,
+    complete_oidc_callback,
     create_managed_account,
     deactivate_managed_account,
     has_active_role,
     has_permission,
     issue_token_pair_for_credentials,
     logout_tokens,
+    oidc_public_config,
     request_password_reset,
     refresh_token_pair,
     require_permission,
     revoke_role_assignment,
+    start_oidc_authorization,
     update_managed_account,
 )
 
@@ -111,6 +115,37 @@ class PasswordResetConfirmView(APIView):
             new_password=serializer.validated_data["new_password"],
         )
         return Response({"status": "reset"})
+
+
+class OidcConfigView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, _request):
+        return Response(oidc_public_config())
+
+
+class OidcAuthorizeView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, _request):
+        return Response(start_oidc_authorization())
+
+
+class OidcCallbackView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        serializer = OidcCallbackSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        token_pair = complete_oidc_callback(
+            code=serializer.validated_data["code"],
+            state=serializer.validated_data["state"],
+            request=request,
+        )
+        return Response(token_pair.as_response())
 
 
 class SessionView(APIView):

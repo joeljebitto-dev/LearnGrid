@@ -5,7 +5,7 @@ Related spec: [SPEC-011](../specs/011-dashboards-portals.md)
 Canonical schema: [analytics_db](../DATABASE_SCHEMA.md#analytics_db)
 
 ## DBD-011-001 Scope
-`analytics-service` now owns the dashboard/report foundations used by student, instructor, and admin portals. PostgreSQL `analytics_db` is the current implementation store while [OD-005 Analytics Storage](../KNOWN_ISSUES.md#od-005-analytics-storage) remains open for larger-scale analytics storage.
+`analytics-service` now owns the dashboard/report foundations used by student, instructor, and admin portals. PostgreSQL `analytics_db` is the selected implementation store under [OD-005 Analytics Storage](../KNOWN_ISSUES.md#od-005-analytics-storage).
 
 ## DBD-011-002 Tables
 | Table ID | Table | Purpose |

@@ -4,10 +4,12 @@ import hmac
 import json
 import secrets
 import uuid
+from base64 import urlsafe_b64encode
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from hashlib import sha256
 from typing import Any, cast
+from urllib import error, parse, request as urlrequest
 
 import jwt
 import redis
@@ -38,6 +40,7 @@ from .models import (
     AuthorizationAuditLog,
     BlacklistReason,
     Credential,
+    ExternalIdentity,
     LoginAuditEvent,
     LoginAuditLog,
     Permission,
@@ -55,6 +58,7 @@ _UNSET = object()
 AUTH_ACCOUNT_CREATED_AUDIT_EVENT = "auth_account_created"
 AUTH_ACCOUNT_UPDATED_AUDIT_EVENT = "auth_account_updated"
 AUTH_ACCOUNT_DEACTIVATED_AUDIT_EVENT = "auth_account_deactivated"
+OIDC_PROVIDER_NAME = "oidc"
 
 
 class RedisSecurityUnavailable(APIException):
@@ -112,6 +116,10 @@ def _redis_client() -> redis.Redis:
         decode_responses=True,
         socket_connect_timeout=settings.REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS,
         socket_timeout=settings.REDIS_SOCKET_TIMEOUT_SECONDS,
+        sentinel_urls=settings.REDIS_SENTINEL_URLS,
+        sentinel_master_name=settings.REDIS_SENTINEL_MASTER_NAME,
+        sentinel_password=settings.REDIS_SENTINEL_PASSWORD,
+        password=settings.REDIS_PASSWORD,
     )
 
 
@@ -133,6 +141,15 @@ def _otp_key(*, purpose: str, subject: str) -> str:
         purpose,
         digest_json({"purpose": purpose, "subject": subject}),
     )
+
+
+def _oidc_state_key(state: str) -> str:
+    return _key_builder().key("oidc", "state", digest_value(state))
+
+
+def _oidc_cache_key(kind: str) -> str:
+    issuer = settings.AUTH_OIDC_ISSUER_URL or "disabled"
+    return _key_builder().key("oidc", kind, digest_value(issuer))
 
 
 def _ttl_seconds(expires_at: datetime) -> int:
@@ -222,6 +239,258 @@ def _audit(
             "email_attempted": email_attempted,
             "event_type": event_type,
         },
+    )
+
+
+def oidc_enabled() -> bool:
+    return bool(
+        settings.AUTH_OIDC_ENABLED
+        and settings.AUTH_OIDC_ISSUER_URL
+        and settings.AUTH_OIDC_CLIENT_ID
+        and settings.AUTH_OIDC_CLIENT_SECRET
+        and settings.AUTH_OIDC_REDIRECT_URI
+    )
+
+
+def oidc_public_config() -> dict[str, Any]:
+    return {
+        "enabled": oidc_enabled(),
+        "provider": OIDC_PROVIDER_NAME,
+        "provider_label": settings.AUTH_OIDC_PROVIDER_LABEL,
+        "scopes": settings.AUTH_OIDC_SCOPES.split(),
+    }
+
+
+def _base64_url_digest(value: str) -> str:
+    return urlsafe_b64encode(sha256(value.encode("utf-8")).digest()).rstrip(b"=").decode("ascii")
+
+
+def _fetch_json_url(url: str, *, data: dict[str, str] | None = None) -> dict[str, Any]:
+    encoded_data = parse.urlencode(data).encode("utf-8") if data is not None else None
+    request = urlrequest.Request(
+        url,
+        data=encoded_data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST" if data is not None else "GET",
+    )
+    try:
+        with urlrequest.urlopen(request, timeout=5) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except (error.HTTPError, error.URLError, TimeoutError, OSError, ValueError) as exc:
+        raise AuthenticationFailed("OIDC provider is unavailable.") from exc
+
+
+def _cached_oidc_json(*, kind: str, url: str) -> dict[str, Any]:
+    key = _oidc_cache_key(kind)
+    try:
+        cached = _redis_client().get(key)
+    except (redis.RedisError, OSError):
+        cached = None
+    if cached:
+        try:
+            return json.loads(cached)
+        except (TypeError, ValueError):
+            pass
+    payload = _fetch_json_url(url)
+    try:
+        _redis_client().setex(key, settings.AUTH_OIDC_JWKS_CACHE_TTL_SECONDS, json.dumps(payload))
+    except (redis.RedisError, OSError):
+        pass
+    return payload
+
+
+def _oidc_discovery() -> dict[str, Any]:
+    if not settings.AUTH_OIDC_ISSUER_URL:
+        raise AuthenticationFailed("OIDC is not configured.")
+    return _cached_oidc_json(
+        kind="discovery",
+        url=f"{settings.AUTH_OIDC_ISSUER_URL}/.well-known/openid-configuration",
+    )
+
+
+def _oidc_jwks(jwks_uri: str) -> dict[str, Any]:
+    return _cached_oidc_json(kind="jwks", url=jwks_uri)
+
+
+def start_oidc_authorization() -> dict[str, str]:
+    if not oidc_enabled():
+        raise AuthenticationFailed("OIDC login is not enabled.")
+
+    discovery = _oidc_discovery()
+    authorization_endpoint = discovery.get("authorization_endpoint")
+    if not authorization_endpoint:
+        raise AuthenticationFailed("OIDC provider did not expose an authorization endpoint.")
+
+    state = secrets.token_urlsafe(32)
+    nonce = secrets.token_urlsafe(32)
+    code_verifier = secrets.token_urlsafe(64)
+    code_challenge = _base64_url_digest(code_verifier)
+    expires_at = timezone.now() + timedelta(seconds=settings.AUTH_OIDC_STATE_TTL_SECONDS)
+    state_payload = {
+        "nonce": nonce,
+        "code_verifier": code_verifier,
+        "redirect_uri": settings.AUTH_OIDC_REDIRECT_URI,
+        "expires_at": expires_at.isoformat(),
+    }
+    try:
+        _redis_client().setex(
+            _oidc_state_key(state),
+            settings.AUTH_OIDC_STATE_TTL_SECONDS,
+            json.dumps(state_payload),
+        )
+    except (redis.RedisError, OSError) as exc:
+        raise RedisSecurityUnavailable("OIDC login is temporarily unavailable.") from exc
+
+    query = parse.urlencode(
+        {
+            "client_id": settings.AUTH_OIDC_CLIENT_ID,
+            "redirect_uri": settings.AUTH_OIDC_REDIRECT_URI,
+            "response_type": "code",
+            "scope": settings.AUTH_OIDC_SCOPES,
+            "state": state,
+            "nonce": nonce,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
+        }
+    )
+    return {
+        "authorization_url": f"{authorization_endpoint}?{query}",
+        "state": state,
+        "expires_at": expires_at.isoformat(),
+    }
+
+
+def _pop_oidc_state(state: str) -> dict[str, Any]:
+    key = _oidc_state_key(state)
+    try:
+        raw_payload = _redis_client().get(key)
+        _redis_client().delete(key)
+    except (redis.RedisError, OSError) as exc:
+        raise RedisSecurityUnavailable("OIDC login is temporarily unavailable.") from exc
+    if not raw_payload:
+        raise AuthenticationFailed("OIDC state is invalid or expired.")
+    try:
+        payload = json.loads(raw_payload)
+    except (TypeError, ValueError) as exc:
+        raise AuthenticationFailed("OIDC state is invalid or expired.") from exc
+    if datetime.fromisoformat(payload["expires_at"]) <= timezone.now():
+        raise AuthenticationFailed("OIDC state is invalid or expired.")
+    return payload
+
+
+def _exchange_oidc_code(*, code: str, code_verifier: str, redirect_uri: str) -> dict[str, Any]:
+    discovery = _oidc_discovery()
+    token_endpoint = discovery.get("token_endpoint")
+    if not token_endpoint:
+        raise AuthenticationFailed("OIDC provider did not expose a token endpoint.")
+    body = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": redirect_uri,
+        "client_id": settings.AUTH_OIDC_CLIENT_ID,
+        "code_verifier": code_verifier,
+    }
+    if settings.AUTH_OIDC_CLIENT_AUTH_METHOD == "client_secret_post":
+        body["client_secret"] = settings.AUTH_OIDC_CLIENT_SECRET
+    return _fetch_json_url(token_endpoint, data=body)
+
+
+def _validate_oidc_id_token(id_token: str, *, expected_nonce: str) -> dict[str, Any]:
+    discovery = _oidc_discovery()
+    jwks_uri = discovery.get("jwks_uri")
+    if not jwks_uri:
+        raise AuthenticationFailed("OIDC provider did not expose JWKS.")
+    header = jwt.get_unverified_header(id_token)
+    jwks = _oidc_jwks(jwks_uri)
+    jwk = next((key for key in jwks.get("keys", []) if key.get("kid") == header.get("kid")), None)
+    if not jwk:
+        raise AuthenticationFailed("OIDC signing key was not found.")
+    key = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
+    try:
+        claims = jwt.decode(
+            id_token,
+            key=key,
+            algorithms=settings.AUTH_OIDC_ALLOWED_ALGORITHMS,
+            audience=settings.AUTH_OIDC_CLIENT_ID,
+            issuer=settings.AUTH_OIDC_ISSUER_URL,
+        )
+    except jwt.InvalidTokenError as exc:
+        raise AuthenticationFailed("OIDC identity token is invalid.") from exc
+    if claims.get("nonce") != expected_nonce:
+        raise AuthenticationFailed("OIDC nonce is invalid.")
+    return claims
+
+
+@transaction.atomic
+def complete_oidc_callback(*, code: str, state: str, request: Any = None) -> TokenPair:
+    if not oidc_enabled():
+        raise AuthenticationFailed("OIDC login is not enabled.")
+    state_payload = _pop_oidc_state(state)
+    token_payload = _exchange_oidc_code(
+        code=code,
+        code_verifier=state_payload["code_verifier"],
+        redirect_uri=state_payload["redirect_uri"],
+    )
+    id_token = token_payload.get("id_token")
+    if not id_token:
+        raise AuthenticationFailed("OIDC provider did not return an identity token.")
+    claims = _validate_oidc_id_token(id_token, expected_nonce=state_payload["nonce"])
+    subject = str(claims.get("sub") or "")
+    email = str(claims.get("email") or "").strip().lower()
+    if not subject or not email:
+        raise AuthenticationFailed("OIDC identity token is missing required claims.")
+    if settings.AUTH_OIDC_REQUIRE_EMAIL_VERIFIED and claims.get("email_verified") is not True:
+        _audit(LoginAuditEvent.LOGIN_FAILURE, email_attempted=email, request=request)
+        raise AuthenticationFailed("OIDC email is not verified.")
+
+    issuer = str(claims.get("iss") or settings.AUTH_OIDC_ISSUER_URL)
+    identity = (
+        ExternalIdentity.objects.select_related("account", "account__credential")
+        .filter(
+            issuer=issuer,
+            subject=subject,
+        )
+        .first()
+    )
+    if identity:
+        account = identity.account
+    else:
+        account = (
+            Account.objects.select_related("credential")
+            .filter(email__iexact=email, deleted_at__isnull=True)
+            .first()
+        )
+    if account is None or not account.is_active:
+        _audit(LoginAuditEvent.LOGIN_FAILURE, email_attempted=email, request=request)
+        raise AuthenticationFailed("OIDC account is not provisioned.")
+
+    identity, _created = ExternalIdentity.objects.update_or_create(
+        issuer=issuer,
+        subject=subject,
+        defaults={
+            "account": account,
+            "provider": OIDC_PROVIDER_NAME,
+            "email": email,
+            "claims": {
+                key: value
+                for key, value in claims.items()
+                if key not in {"nonce", "at_hash", "c_hash"}
+            },
+            "last_login_at": timezone.now(),
+        },
+    )
+    account.last_login_at = timezone.now()
+    account.save(update_fields=["last_login_at", "updated_at"])
+    _audit(
+        LoginAuditEvent.LOGIN_SUCCESS,
+        account=account,
+        request=request,
+        metadata={"auth_method": OIDC_PROVIDER_NAME, "external_identity_id": str(identity.id)},
+    )
+    return issue_token_pair(
+        account,
+        request=request,
+        device_label=settings.AUTH_OIDC_PROVIDER_LABEL,
     )
 
 

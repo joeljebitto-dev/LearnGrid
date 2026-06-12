@@ -57,6 +57,10 @@ DATABASES = {
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 REDIS_ENV = os.getenv("REDIS_ENV", "local")
+REDIS_SENTINEL_URLS = os.getenv("REDIS_SENTINEL_URLS", "")
+REDIS_SENTINEL_MASTER_NAME = os.getenv("REDIS_SENTINEL_MASTER_NAME", "mymaster")
+REDIS_SENTINEL_PASSWORD = os.getenv("REDIS_SENTINEL_PASSWORD")
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
 REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS = float(
     os.getenv("REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS", "0.2"),
 )
@@ -91,6 +95,28 @@ AUTH_PASSWORD_RESET_DEBUG_RETURN_TOKEN = (
 )
 AUTH_OTP_TTL_SECONDS = int(os.getenv("AUTH_OTP_TTL_SECONDS", "300"))
 AUTH_OTP_MAX_ATTEMPTS = int(os.getenv("AUTH_OTP_MAX_ATTEMPTS", "5"))
+AUTH_OIDC_ENABLED = os.getenv("AUTH_OIDC_ENABLED", "false").lower() == "true"
+AUTH_OIDC_PROVIDER_LABEL = os.getenv("AUTH_OIDC_PROVIDER_LABEL", "Organization SSO")
+AUTH_OIDC_ISSUER_URL = os.getenv("AUTH_OIDC_ISSUER_URL", "").rstrip("/")
+AUTH_OIDC_CLIENT_ID = os.getenv("AUTH_OIDC_CLIENT_ID", "")
+AUTH_OIDC_CLIENT_SECRET = os.getenv("AUTH_OIDC_CLIENT_SECRET", "")
+AUTH_OIDC_REDIRECT_URI = os.getenv("AUTH_OIDC_REDIRECT_URI", "")
+AUTH_OIDC_SCOPES = " ".join(
+    scope.strip()
+    for scope in os.getenv("AUTH_OIDC_SCOPES", "openid email profile").replace(",", " ").split()
+    if scope.strip()
+)
+AUTH_OIDC_STATE_TTL_SECONDS = int(os.getenv("AUTH_OIDC_STATE_TTL_SECONDS", "300"))
+AUTH_OIDC_JWKS_CACHE_TTL_SECONDS = int(os.getenv("AUTH_OIDC_JWKS_CACHE_TTL_SECONDS", "3600"))
+AUTH_OIDC_REQUIRE_EMAIL_VERIFIED = (
+    os.getenv("AUTH_OIDC_REQUIRE_EMAIL_VERIFIED", "true").lower() == "true"
+)
+AUTH_OIDC_ALLOWED_ALGORITHMS = [
+    item.strip()
+    for item in os.getenv("AUTH_OIDC_ALLOWED_ALGORITHMS", "RS256").split(",")
+    if item.strip()
+]
+AUTH_OIDC_CLIENT_AUTH_METHOD = os.getenv("AUTH_OIDC_CLIENT_AUTH_METHOD", "client_secret_post")
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",

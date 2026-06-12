@@ -2,7 +2,7 @@
 
 Source of truth: [api-design/](api-design/README.md), [redis-design/](redis-design/README.md)
 Related implementation docs: [DEVELOPMENT.md](DEVELOPMENT.md), [TASKS.md](TASKS.md)
-Related implemented designs: [API-001](api-design/API-001-service-health-and-dev-stack.md) through [API-019](api-design/API-019-api-gateway.md), plus [REDIS-021](redis-design/REDIS-021-redis-architecture.md)
+Related implemented designs: [API-001](api-design/API-001-service-health-and-dev-stack.md) through [API-019](api-design/API-019-api-gateway.md), plus [REDIS-021](redis-design/REDIS-021-redis-architecture.md), [SEC-022](security-design/SEC-022-security.md), and [DEPLOY-023](deployment-design/DEPLOY-023-ci-cd-deployment-observability.md)
 
 This file is the overall API structure reference for implemented LearnGrid LMS APIs. Future task APIs are intentionally not expanded here until implementation provides stable request and response contracts.
 
@@ -207,6 +207,65 @@ Response fields:
 | `role_assignments` | array | Active role assignment objects with `id`, `role_code`, `role_name`, `scope_type`, `scope_id`, and `assigned_at` |
 
 Status behavior: `200` on success; malformed, expired, revoked, wrong-type, inactive, or password-stale access tokens are rejected.
+
+### API-002-007 OIDC Config
+Purpose: Let the frontend discover whether generic OIDC SSO is enabled.
+
+| Item | Value |
+| --- | --- |
+| Service | `auth-service` |
+| Method | `GET` |
+| Path | `/api/auth/oidc/config/` |
+| Auth | Public |
+| Path parameters | None |
+| Query parameters | None |
+| Request body | None |
+
+Response fields: `enabled`, `provider`, `provider_label`, and `scopes`.
+Status behavior: `200`; disabled mode returns `enabled=false`.
+
+### API-002-008 OIDC Authorize
+Purpose: Create Redis-backed OIDC `state`, `nonce`, and PKCE verifier values, then return the
+provider authorization URL.
+
+| Item | Value |
+| --- | --- |
+| Service | `auth-service` |
+| Method | `POST` |
+| Path | `/api/auth/oidc/authorize/` |
+| Auth | Public |
+| Path parameters | None |
+| Query parameters | None |
+| Request body | Empty JSON object |
+
+Response fields: `authorization_url`, `state`, and `expires_at`.
+Status behavior: `200` when OIDC is enabled; disabled or incomplete provider configuration returns
+a controlled error.
+
+### API-002-009 OIDC Callback
+Purpose: Complete generic OIDC authorization-code login and issue the same JWT token response as
+email/password login.
+
+| Item | Value |
+| --- | --- |
+| Service | `auth-service` |
+| Method | `POST` |
+| Path | `/api/auth/oidc/callback/` |
+| Auth | Public with one-time OIDC callback payload |
+| Path parameters | None |
+| Query parameters | None |
+
+Request body parameters:
+
+| Parameter | Required | Type | Purpose |
+| --- | --- | --- | --- |
+| `code` | Yes | string | Authorization code from the OIDC provider |
+| `state` | Yes | string | One-time state value issued by `authorize` |
+
+Response fields: same as [API-002-001](#api-002-001-issue-token-pair).
+Status behavior: `200` on success. The callback rejects unknown/reused/expired state, invalid
+issuer/audience/nonce/signature, unverified email when required, unknown email, and inactive
+accounts. It only links to existing active accounts; it does not provision users.
 
 ## API-003 RBAC And Authorization APIs
 
@@ -1289,7 +1348,7 @@ Create body parameters: `created_by_profile_id` UUID and optional `change_note`.
 Response fields: version objects with `id`, `content_asset_id`, `version_number`, `file_metadata_id`, `change_note`, `created_by_profile_id`, and `created_at`.
 Status behavior: `200` for list and `201` for create.
 
-Storage note: [OD-002](KNOWN_ISSUES.md#od-002-object-storage-selection) is resolved with MinIO as the only supported object storage provider. [OD-006](KNOWN_ISSUES.md#od-006-video-delivery-strategy) remains open for video delivery strategy.
+Storage note: [OD-002](KNOWN_ISSUES.md#od-002-object-storage-selection) is resolved with MinIO as the only supported object storage provider. [OD-006](KNOWN_ISSUES.md#od-006-video-delivery-strategy) is resolved with MinIO signed URLs for video delivery.
 
 ## API-009 Enrollment And Access Management APIs
 
@@ -1509,6 +1568,7 @@ Related design: [API-011 Dashboards And Portals](api-design/API-011-dashboards-p
 | Route | Purpose | Auth behavior |
 | --- | --- | --- |
 | `/login` | Sign in through auth-service token issue | Public |
+| `/auth/oidc/callback` | Complete OIDC callback, store returned tokens, and redirect by role | Public callback route |
 | `/dashboard` | Role-aware portal redirect | Requires stored access token plus session/profile lookup |
 | `/dashboard/student` | Student portal | `student` primary role |
 | `/dashboard/instructor` | Instructor portal | `instructor` or `teaching_assistant` primary role |
@@ -1771,9 +1831,10 @@ limits, and distributed locks.
 | `course-service` catalog cache | Hashed Redis keys for published catalog list/detail/structure responses |
 | `course-service` structure locks | Redis locks around reorder writes; contention returns `409` |
 | `analytics-service` dashboard cache | Short-lived response cache invalidated after aggregate upserts |
+| `REDIS_SENTINEL_URLS` | Production switch that makes the shared client use Redis Sentinel |
 
-The T-023 on-prem Kubernetes runtime chart provides the first production Redis deployment baseline;
-Sentinel/Cluster-specific hardening remains tracked in T-021.
+Production Redis HA uses Sentinel in the T-023 on-prem Kubernetes runtime chart. Sentinel listens
+on `26379` with master name `mymaster`; local Compose continues to use direct `REDIS_URL`.
 
 ## API-022 Security Baseline Interfaces
 
@@ -1788,9 +1849,8 @@ T-022 does not add public product APIs. It adds operational interfaces:
 | `scripts/verify-postgres-backup-restore.sh` | Local/CI PostgreSQL dump and restore verification |
 | Content malware scanner command | Optional fail-closed upload scanning hook when enabled |
 
-JWT bearer authentication remains the current auth model. CSRF enforcement for authenticated API
-writes remains deferred until [OD-004](KNOWN_ISSUES.md#od-004-authentication-model) selects a
-cookie-based model.
+JWT bearer authentication remains the current API auth model. [OD-004](KNOWN_ISSUES.md#od-004-authentication-model)
+is resolved with optional generic OIDC SSO for login only; APIs continue to use bearer tokens.
 
 ## API-023 Deployment Health And Metrics
 
@@ -1820,6 +1880,9 @@ Related strategy: [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
 | `python -m pytest tests/e2e` | Selenium journey smoke tests; skipped unless `E2E_BASE_URL` and credentials are set |
 | `k6 run tests/load/smoke.js` | Offline-safe CI load smoke |
 | `k6 run tests/load/staging.js` | Staging load profile with p95, error-rate, and throughput thresholds |
+| `scripts/verify-staging-release.sh` | Staging rollout, gateway health, service health, optional OpenAPI, and Selenium evidence |
+| `scripts/verify-performance-gates.sh` | k6 and Prometheus evidence for production performance gates |
+| `.github/workflows/production-readiness.yml` | Manual staging evidence workflow requiring real staging secrets |
 
 ## Future APIs Not Implemented
 Broader product APIs remain future task scope unless explicitly listed above.

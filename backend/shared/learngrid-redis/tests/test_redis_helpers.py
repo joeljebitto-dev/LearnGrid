@@ -5,12 +5,14 @@ import json
 import pytest
 import redis
 
+import learngrid_redis.client as redis_client_module
 from learngrid_redis import (
     RedisKeyBuilder,
     RedisLockNotAcquired,
     digest_json,
     fixed_window_rate_limit,
     get_json_cache,
+    redis_client,
     redis_lock,
     set_json_cache,
 )
@@ -68,6 +70,19 @@ class BrokenRedis:
         raise redis.RedisError("unavailable")
 
 
+class FakeSentinel:
+    calls = []
+
+    def __init__(self, sentinels, **kwargs):
+        self.sentinels = sentinels
+        self.kwargs = kwargs
+        FakeSentinel.calls.append(("init", sentinels, kwargs))
+
+    def master_for(self, master_name, **kwargs):
+        FakeSentinel.calls.append(("master_for", master_name, kwargs))
+        return {"master_name": master_name, "kwargs": kwargs}
+
+
 def test_key_builder_normalizes_parts_and_hashes_sensitive_suffixes():
     builder = RedisKeyBuilder(service="auth-service", env="local")
     suffix = digest_json({"email": "USER@example.com", "ip": "127.0.0.1"})
@@ -78,6 +93,67 @@ def test_key_builder_normalizes_parts_and_hashes_sensitive_suffixes():
     assert "USER@example.com" not in key
     assert "127.0.0.1" not in key
     assert len(suffix) == 64
+
+
+def test_redis_client_uses_direct_url_by_default(monkeypatch):
+    calls = []
+
+    class FakeRedisFactory:
+        @staticmethod
+        def from_url(redis_url, **kwargs):
+            calls.append((redis_url, kwargs))
+            return {"redis_url": redis_url, "kwargs": kwargs}
+
+    monkeypatch.setattr(redis_client_module.redis, "Redis", FakeRedisFactory)
+
+    client = redis_client("redis://localhost:6379/2")
+
+    assert client["redis_url"] == "redis://localhost:6379/2"
+    assert calls[0][1]["decode_responses"] is True
+
+
+def test_redis_client_uses_sentinel_when_configured(monkeypatch):
+    FakeSentinel.calls = []
+    monkeypatch.setattr(redis_client_module, "Sentinel", FakeSentinel)
+
+    client = redis_client(
+        "redis://redis:6379/4",
+        sentinel_urls="redis://sentinel-a:26379,sentinel-b:26380",
+        sentinel_master_name="mymaster",
+        sentinel_password="sentinel-secret",
+        password="redis-secret",
+        decode_responses=False,
+    )
+
+    assert client["master_name"] == "mymaster"
+    assert FakeSentinel.calls[0] == (
+        "init",
+        [("sentinel-a", 26379), ("sentinel-b", 26380)],
+        {
+            "socket_connect_timeout": 0.2,
+            "socket_timeout": 0.2,
+            "sentinel_kwargs": {"password": "sentinel-secret"},
+        },
+    )
+    assert FakeSentinel.calls[1][2] == {
+        "db": 4,
+        "password": "redis-secret",
+        "decode_responses": False,
+        "socket_connect_timeout": 0.2,
+        "socket_timeout": 0.2,
+    }
+
+
+def test_redis_client_sentinel_uses_password_from_redis_url(monkeypatch):
+    FakeSentinel.calls = []
+    monkeypatch.setattr(redis_client_module, "Sentinel", FakeSentinel)
+
+    redis_client(
+        "redis://:url-secret@redis:6379/0",
+        sentinel_urls="sentinel-a:26379",
+    )
+
+    assert FakeSentinel.calls[1][2]["password"] == "url-secret"
 
 
 def test_json_cache_round_trips_with_ttl():

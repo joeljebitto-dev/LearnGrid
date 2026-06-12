@@ -3,7 +3,7 @@
 Source: [../SRD.pdf](../SRD.pdf)  
 Related task: [T-001](../tasks/T-001-project-setup.md)  
 Related schema: [auth_db](../DATABASE_SCHEMA.md#auth_db)  
-Open decision: [OD-004 Authentication Model](../KNOWN_ISSUES.md#od-004-authentication-model)
+Resolved decision: [OD-004 Authentication Model](../KNOWN_ISSUES.md#od-004-authentication-model)
 
 ## Functional Requirements
 - SPEC-001-FR-001 The system shall allow users to register.

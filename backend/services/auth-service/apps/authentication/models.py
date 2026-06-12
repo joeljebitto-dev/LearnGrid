@@ -150,6 +150,36 @@ class PasswordResetToken(models.Model):
         ]
 
 
+class ExternalIdentity(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    account = models.ForeignKey(
+        Account,
+        on_delete=models.CASCADE,
+        related_name="external_identities",
+    )
+    provider = models.CharField(max_length=64, default="oidc")
+    issuer = models.URLField(max_length=512)
+    subject = models.CharField(max_length=255)
+    email = models.EmailField()
+    claims = models.JSONField(default=dict)
+    last_login_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "external_identities"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["issuer", "subject"],
+                name="uq_external_identity_issuer_subject",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["account"], name="idx_external_identity_account"),
+            models.Index(fields=["email"], name="idx_external_identity_email"),
+        ]
+
+
 class LoginAuditEvent(models.TextChoices):
     LOGIN_SUCCESS = "login_success", "Login success"
     LOGIN_FAILURE = "login_failure", "Login failure"

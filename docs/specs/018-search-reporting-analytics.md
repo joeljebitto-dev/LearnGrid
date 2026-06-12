@@ -3,7 +3,7 @@
 Source: [../SRD.pdf](../SRD.pdf)  
 Related task: [T-018](../tasks/T-018-search-reporting-analytics.md)  
 Related schema: [analytics_db](../DATABASE_SCHEMA.md#analytics_db)  
-Open decision: [OD-005 Analytics Storage](../KNOWN_ISSUES.md#od-005-analytics-storage)
+Resolved decision: [OD-005 Analytics Storage](../KNOWN_ISSUES.md#od-005-analytics-storage)
 
 ## Functional Requirements
 - SPEC-018-FR-001 The system shall support searching courses.

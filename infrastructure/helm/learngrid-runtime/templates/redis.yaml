@@ -1,3 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: learngrid-redis-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: learngrid
+data:
+  redis-entrypoint.sh: |
+    #!/bin/sh
+    set -eu
+
+    AUTH_ARGS=""
+    if [ -n "${REDIS_PASSWORD:-}" ]; then
+      AUTH_ARGS="--requirepass ${REDIS_PASSWORD} --masterauth ${REDIS_PASSWORD}"
+    fi
+
+    if [ "${HOSTNAME##*-}" = "0" ]; then
+      exec redis-server --appendonly yes --protected-mode no ${AUTH_ARGS}
+    fi
+
+    exec redis-server \
+      --appendonly yes \
+      --protected-mode no \
+      --replicaof learngrid-redis-0.learngrid-redis-headless 6379 \
+      ${AUTH_ARGS}
+  sentinel-entrypoint.sh: |
+    #!/bin/sh
+    set -eu
+
+    cat > /tmp/sentinel.conf <<EOF
+    port 26379
+    bind 0.0.0.0
+    protected-mode no
+    resolve-hostnames yes
+    announce-hostnames yes
+    sentinel monitor {{ .Values.redis.sentinelMasterName }} learngrid-redis-0.learngrid-redis-headless 6379 {{ .Values.redis.sentinelQuorum }}
+    sentinel down-after-milliseconds {{ .Values.redis.sentinelDownAfterMilliseconds }}
+    sentinel failover-timeout {{ .Values.redis.sentinelFailoverTimeoutMilliseconds }}
+    sentinel parallel-syncs {{ .Values.redis.sentinelParallelSyncs }}
+    EOF
+
+    if [ -n "${REDIS_PASSWORD:-}" ]; then
+      echo "sentinel auth-pass {{ .Values.redis.sentinelMasterName }} ${REDIS_PASSWORD}" >> /tmp/sentinel.conf
+    fi
+
+    exec redis-sentinel /tmp/sentinel.conf --sentinel
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -7,7 +56,7 @@ metadata:
     app.kubernetes.io/name: redis
     app.kubernetes.io/part-of: learngrid
 spec:
-  serviceName: learngrid-redis
+  serviceName: learngrid-redis-headless
   replicas: {{ .Values.redis.replicas }}
   selector:
     matchLabels:
@@ -24,21 +73,83 @@ spec:
       containers:
         - name: redis
           image: redis:7-alpine
-          args: ["redis-server", "--appendonly", "yes"]
+          command: ["/bin/sh", "/etc/redis/redis-entrypoint.sh"]
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.redis.passwordSecret }}
+                  key: {{ .Values.redis.passwordKey }}
+                  optional: true
           ports:
             - name: redis
               containerPort: 6379
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - 'if [ -n "$REDIS_PASSWORD" ]; then redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping; else redis-cli ping; fi'
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - 'if [ -n "$REDIS_PASSWORD" ]; then redis-cli -a "$REDIS_PASSWORD" --no-auth-warning ping; else redis-cli ping; fi'
+            initialDelaySeconds: 10
+            periodSeconds: 10
           volumeMounts:
+            - name: config
+              mountPath: /etc/redis
             - name: data
               mountPath: /data
+        - name: sentinel
+          image: redis:7-alpine
+          command: ["/bin/sh", "/etc/redis/sentinel-entrypoint.sh"]
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.redis.passwordSecret }}
+                  key: {{ .Values.redis.passwordKey }}
+                  optional: true
+          ports:
+            - name: sentinel
+              containerPort: 26379
+          livenessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "redis-cli -p 26379 ping"]
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            exec:
+              command: ["/bin/sh", "-c", "redis-cli -p 26379 ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: config
+              mountPath: /etc/redis
         - name: redis-exporter
           image: oliver006/redis_exporter:v1.67.0
           env:
             - name: REDIS_ADDR
               value: redis://127.0.0.1:6379
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.redis.passwordSecret }}
+                  key: {{ .Values.redis.passwordKey }}
+                  optional: true
           ports:
             - name: metrics
               containerPort: 9121
+      volumes:
+        - name: config
+          configMap:
+            name: learngrid-redis-config
+            defaultMode: 0755
   volumeClaimTemplates:
     - metadata:
         name: data
@@ -47,6 +158,27 @@ spec:
         resources:
           requests:
             storage: {{ .Values.redis.storageSize }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: learngrid-redis-headless
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: learngrid
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+    - name: sentinel
+      port: 26379
+      targetPort: sentinel
+  selector:
+    app.kubernetes.io/name: redis
 ---
 apiVersion: v1
 kind: Service
@@ -63,3 +195,33 @@ spec:
       targetPort: redis
   selector:
     app.kubernetes.io/name: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: learngrid-redis-sentinel
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: learngrid
+spec:
+  ports:
+    - name: sentinel
+      port: 26379
+      targetPort: sentinel
+  selector:
+    app.kubernetes.io/name: redis
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: learngrid-redis
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: learngrid
+spec:
+  minAvailable: {{ .Values.redis.minAvailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis

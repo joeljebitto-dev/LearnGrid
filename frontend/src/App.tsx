@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import {
   Link,
@@ -14,9 +14,12 @@ import { z } from 'zod';
 
 import { getFrontendStatus } from './api/status';
 import {
+  completeOidcCallback,
   getSessionContext,
+  getOidcConfig,
   login,
   portalForRole,
+  startOidcAuthorization,
   type SessionContext
 } from './api/auth';
 import { clearStoredTokens, hasStoredAccessToken } from './api/client';
@@ -257,6 +260,11 @@ function LoginPage() {
     queryKey: ['frontend-status'],
     queryFn: getFrontendStatus
   });
+  const oidcConfigQuery = useQuery({
+    queryKey: ['oidc-config'],
+    queryFn: getOidcConfig,
+    retry: false
+  });
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: '', password: '' }
@@ -268,6 +276,14 @@ function LoginPage() {
       navigate('/dashboard', { replace: true });
     }
   });
+  const oidcAuthorizeMutation = useMutation({
+    mutationFn: startOidcAuthorization,
+    onSuccess: (result) => {
+      window.location.assign(result.authorization_url);
+    }
+  });
+  const oidcEnabled = oidcConfigQuery.data?.enabled === true;
+  const oidcProviderLabel = oidcConfigQuery.data?.provider_label || 'SSO';
 
   return (
     <main className="mx-auto flex min-h-screen max-w-6xl items-center px-6 py-10">
@@ -317,6 +333,11 @@ function LoginPage() {
               Sign in failed.
             </p>
           ) : null}
+          {oidcAuthorizeMutation.isError ? (
+            <p className="mt-3 rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+              SSO sign in could not be started.
+            </p>
+          ) : null}
           <button
             className="mt-5 w-full rounded bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400"
             type="submit"
@@ -324,7 +345,64 @@ function LoginPage() {
           >
             {loginMutation.isPending ? 'Signing in' : 'Sign in'}
           </button>
+          {oidcEnabled ? (
+            <button
+              className="mt-3 w-full rounded border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+              type="button"
+              disabled={oidcAuthorizeMutation.isPending}
+              onClick={() => oidcAuthorizeMutation.mutate()}
+            >
+              {oidcAuthorizeMutation.isPending
+                ? 'Opening SSO'
+                : `Continue with ${oidcProviderLabel}`}
+            </button>
+          ) : null}
         </form>
+      </section>
+    </main>
+  );
+}
+
+function OidcCallbackPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const submittedRef = useRef(false);
+  const params = new URLSearchParams(location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+  const callbackMutation = useMutation({
+    mutationFn: completeOidcCallback,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['session-context'] });
+      navigate('/dashboard', { replace: true });
+    }
+  });
+  const missingParams = !code || !state;
+
+  useEffect(() => {
+    if (submittedRef.current || !code || !state) {
+      return;
+    }
+    submittedRef.current = true;
+    callbackMutation.mutate({ code, state });
+  }, [callbackMutation, code, state]);
+
+  return (
+    <main className="mx-auto flex min-h-screen max-w-3xl items-center px-6">
+      <section className="w-full rounded border border-slate-200 bg-white p-6">
+        <h1 className="text-2xl font-semibold text-slate-950">Completing SSO sign in</h1>
+        {callbackMutation.isPending ? (
+          <p className="mt-2 text-sm text-slate-600">Validating identity provider response.</p>
+        ) : null}
+        {missingParams || callbackMutation.isError ? (
+          <div
+            className="mt-4 rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"
+            role="alert"
+          >
+            SSO sign in failed.
+          </div>
+        ) : null}
       </section>
     </main>
   );
@@ -873,6 +951,7 @@ export function App() {
     <Routes>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/auth/oidc/callback" element={<OidcCallbackPage />} />
       <Route
         path="/dashboard"
         element={

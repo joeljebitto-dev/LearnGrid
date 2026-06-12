@@ -39,6 +39,24 @@ export type LoginPayload = {
   password: string;
 };
 
+export type OidcConfig = {
+  enabled: boolean;
+  provider: string;
+  provider_label: string;
+  scopes: string[];
+};
+
+export type OidcAuthorizeResponse = {
+  authorization_url: string;
+  state: string;
+  expires_at: string;
+};
+
+export type OidcCallbackPayload = {
+  code: string;
+  state: string;
+};
+
 export type SessionContext = {
   session: Session;
   profile: UserProfile;
@@ -46,6 +64,22 @@ export type SessionContext = {
 
 export async function login(payload: LoginPayload): Promise<TokenPair> {
   const response = await apiClient.post<TokenPair>('/auth/token/issue/', payload);
+  storeTokens(response.data);
+  return response.data;
+}
+
+export async function getOidcConfig(): Promise<OidcConfig> {
+  const response = await apiClient.get<OidcConfig>('/auth/oidc/config/');
+  return response.data;
+}
+
+export async function startOidcAuthorization(): Promise<OidcAuthorizeResponse> {
+  const response = await apiClient.post<OidcAuthorizeResponse>('/auth/oidc/authorize/', {});
+  return response.data;
+}
+
+export async function completeOidcCallback(payload: OidcCallbackPayload): Promise<TokenPair> {
+  const response = await apiClient.post<TokenPair>('/auth/oidc/callback/', payload);
   storeTokens(response.data);
   return response.data;
 }

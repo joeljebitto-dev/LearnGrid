@@ -1,0 +1,88 @@
+name: Production Readiness Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      namespace:
+        description: Kubernetes namespace
+        required: true
+        default: learngrid
+      staging_base_url:
+        description: Public staging base URL
+        required: true
+      run_selenium:
+        description: Run Selenium smoke tests
+        required: true
+        type: boolean
+        default: false
+      run_k6:
+        description: Run k6 staging load gates
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    name: Staging And Performance Evidence
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-test.txt
+
+      - name: Install k6
+        if: ${{ inputs.run_k6 }}
+        uses: grafana/setup-k6-action@v1
+
+      - name: Configure kubeconfig
+        env:
+          KUBE_CONFIG_STAGING: ${{ secrets.KUBE_CONFIG_STAGING }}
+        run: |
+          mkdir -p "$HOME/.kube"
+          printf '%s' "$KUBE_CONFIG_STAGING" > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Run staging readiness verification
+        env:
+          NAMESPACE: ${{ inputs.namespace }}
+          STAGING_BASE_URL: ${{ inputs.staging_base_url }}
+          E2E_BASE_URL: ${{ inputs.staging_base_url }}
+          RUN_SELENIUM: ${{ inputs.run_selenium }}
+          E2E_STUDENT_EMAIL: ${{ secrets.E2E_STUDENT_EMAIL }}
+          E2E_STUDENT_PASSWORD: ${{ secrets.E2E_STUDENT_PASSWORD }}
+          E2E_INSTRUCTOR_EMAIL: ${{ secrets.E2E_INSTRUCTOR_EMAIL }}
+          E2E_INSTRUCTOR_PASSWORD: ${{ secrets.E2E_INSTRUCTOR_PASSWORD }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+        run: scripts/verify-staging-release.sh
+
+      - name: Run performance gates
+        env:
+          STAGING_BASE_URL: ${{ inputs.staging_base_url }}
+          LOAD_BASE_URL: ${{ inputs.staging_base_url }}
+          PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
+          RUN_K6: ${{ inputs.run_k6 }}
+          LOAD_STUDENT_EMAIL: ${{ secrets.E2E_STUDENT_EMAIL }}
+          LOAD_STUDENT_PASSWORD: ${{ secrets.E2E_STUDENT_PASSWORD }}
+          LOAD_INSTRUCTOR_EMAIL: ${{ secrets.E2E_INSTRUCTOR_EMAIL }}
+          LOAD_INSTRUCTOR_PASSWORD: ${{ secrets.E2E_INSTRUCTOR_PASSWORD }}
+          LOAD_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          LOAD_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+        run: scripts/verify-performance-gates.sh
+
+      - name: Upload readiness evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-readiness-evidence
+          path: artifacts/readiness

@@ -11,5 +11,6 @@ Related doc: [TESTING_STRATEGY.md](../TESTING_STRATEGY.md)
 - [x] T-024.06 Add load tests for login, dashboard, course listing, lesson access, quiz submission, and notifications.
 - [x] T-024.07 Add formatting, linting, type checking, and security checks to CI.
 - [ ] T-024.08 Verify p95 latency, error rate, throughput, PostgreSQL connections, Redis memory, Kafka lag, CPU, memory, and autoscaling behavior before production.
-  Remains open until a real staging/on-prem Kubernetes run proves the performance, resource, Kafka
-  lag, and autoscaling thresholds.
+  `scripts/verify-performance-gates.sh` and the manual production-readiness workflow define the
+  k6 and Prometheus evidence path. This remains open until a real staging/on-prem Kubernetes run
+  proves the performance, resource, Kafka lag, and autoscaling thresholds.

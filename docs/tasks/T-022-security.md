@@ -17,4 +17,4 @@ Notes:
   probes, and production backup/PITR wiring are now implemented under T-023; final staging rollout
   verification remains tracked by `T-023.06`.
 - JWT bearer authentication remains the active auth model. Cookie-auth CSRF enforcement remains
-  deferred until `OD-004 Authentication Model` is resolved.
+  implemented with bearer-token APIs and optional existing-account OIDC login.

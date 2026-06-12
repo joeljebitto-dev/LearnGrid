@@ -34,6 +34,14 @@ kafka:
 redis:
   replicas: 3
   storageSize: 10Gi
+  passwordSecret: redis-auth
+  passwordKey: password
+  sentinelMasterName: mymaster
+  sentinelQuorum: 2
+  sentinelDownAfterMilliseconds: 5000
+  sentinelFailoverTimeoutMilliseconds: 60000
+  sentinelParallelSyncs: 1
+  minAvailable: 2
 
 observability:
   retention: 15d

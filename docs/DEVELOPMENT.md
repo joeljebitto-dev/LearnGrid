@@ -71,11 +71,12 @@ Redis local defaults:
 | URL | `redis://localhost:6379/0` |
 | Key prefix | `lg:{REDIS_ENV}:{service}:...`, default `REDIS_ENV=local` |
 | Shared helper package | `backend/shared/learngrid-redis` |
+| Production HA | Redis Sentinel through `REDIS_SENTINEL_URLS`, master name `mymaster`, port `26379` |
 
 Redis design details, key naming, TTLs, invalidation, and outage behavior are documented in
 [REDIS-021](redis-design/REDIS-021-redis-architecture.md). The T-023 on-prem Kubernetes runtime
-chart provides the first production Redis deployment baseline; Sentinel/Cluster-specific hardening
-remains tracked in T-021.
+chart uses a Sentinel-backed primary/replica topology for production. Local development continues
+to use the direct `REDIS_URL` path.
 
 ## API Gateway
 `T-019` resolves [OD-001](KNOWN_ISSUES.md#od-001-api-gateway-selection) to Nginx.
@@ -257,6 +258,16 @@ completion requires a successful real staging deployment smoke run.
 | `AUTH_PASSWORD_RESET_TTL_SECONDS` | `900` | Password reset token Redis TTL and DB expiry |
 | `AUTH_OTP_TTL_SECONDS` | `300` | OTP Redis TTL |
 | `AUTH_OTP_MAX_ATTEMPTS` | `5` | OTP verification attempts before the key is removed |
+| `AUTH_OIDC_ENABLED` | `false` | Enables generic OIDC login |
+| `AUTH_OIDC_PROVIDER_LABEL` | `SSO` | Label shown on the frontend SSO button |
+| `AUTH_OIDC_ISSUER_URL` | empty | OIDC issuer discovery URL |
+| `AUTH_OIDC_CLIENT_ID` | empty | OIDC client ID |
+| `AUTH_OIDC_CLIENT_SECRET` | empty | OIDC client secret |
+| `AUTH_OIDC_REDIRECT_URI` | frontend callback URL | Redirect URI registered with the provider |
+| `AUTH_OIDC_SCOPES` | `openid email profile` | Requested scopes |
+| `AUTH_OIDC_REQUIRE_EMAIL_VERIFIED` | `true` | Reject unverified provider email claims |
+| `AUTH_OIDC_STATE_TTL_SECONDS` | `300` | Redis TTL for state, nonce, and PKCE verifier |
+| `AUTH_OIDC_JWKS_CACHE_TTL_SECONDS` | `3600` | Redis TTL for provider discovery/JWKS cache |
 
 Token blacklist entries are written to Redis with a TTL matching the remaining token lifetime
 and are also stored in `auth_db.token_blacklist` for durable fallback.
@@ -269,6 +280,17 @@ Password reset APIs:
 | --- | --- | --- |
 | `POST` | `/api/auth/password-reset/request/` | Request a reset token; always returns `{"status":"accepted"}` |
 | `POST` | `/api/auth/password-reset/confirm/` | Confirm a reset token and set a new password |
+
+OIDC APIs:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/auth/oidc/config/` | Report whether SSO is enabled and expose the provider label |
+| `POST` | `/api/auth/oidc/authorize/` | Create state/nonce/PKCE values and return the provider authorization URL |
+| `POST` | `/api/auth/oidc/callback/` | Validate provider callback, link to an existing active account, and return the standard token pair |
+
+OIDC does not provision users. Admins must create accounts, profiles, and roles before SSO can
+match a verified provider email or an existing `issuer + subject` link.
 
 ## RBAC And Object Authorization
 `auth-service` implements the RBAC baseline for [T-003](tasks/T-003-rbac-object-authorization.md).
@@ -526,6 +548,7 @@ Frontend routes:
 | Route | Purpose |
 | --- | --- |
 | `/login` | Sign in and store token pair |
+| `/auth/oidc/callback` | Complete SSO callback, store token pair, and redirect by role |
 | `/dashboard` | Load session/profile context and redirect by role |
 | `/dashboard/student` | Student dashboard |
 | `/dashboard/instructor` | Instructor dashboard |
@@ -555,16 +578,16 @@ Dashboard APIs:
 Student/instructor dashboards derive the current profile from the bearer token and never accept
 arbitrary profile IDs. Admin dashboards require `analytics.view` at institution or platform scope.
 If no dashboard aggregate exists, analytics-service returns `200` with empty arrays and zeroed
-summary values. PostgreSQL `analytics_db` is the current dashboard/report store; [OD-005](KNOWN_ISSUES.md#od-005-analytics-storage)
-remains open for the long-term analytics storage decision.
+summary values. PostgreSQL `analytics_db` is the dashboard/report store selected by
+[OD-005](KNOWN_ISSUES.md#od-005-analytics-storage).
 Dashboard responses are cached in Redis for `ANALYTICS_DASHBOARD_CACHE_TTL_SECONDS`, default
 `60`. Dashboard aggregate upserts invalidate matching scope cache keys, and Redis failures fall
 back to PostgreSQL reads.
 
 ## Search, Reporting, And Analytics
 `analytics-service` implements [T-018](tasks/T-018-search-reporting-analytics.md) under
-`/api/analytics/`. [OD-005](KNOWN_ISSUES.md#od-005-analytics-storage) remains open; reports use
-the existing PostgreSQL `analytics_db` baseline.
+`/api/analytics/`. [OD-005](KNOWN_ISSUES.md#od-005-analytics-storage) is resolved to PostgreSQL
+`analytics_db` for the implemented reporting and search scope.
 
 | Method | Path | Purpose |
 | --- | --- | --- |

@@ -7,7 +7,7 @@ Canonical schema: [analytics_db](../DATABASE_SCHEMA.md#analytics_db)
 ## DBD-018-001 Scope
 `analytics-service` implements generalized search, dashboard aggregate management, usage metrics,
 and report generation using PostgreSQL `analytics_db`. [OD-005 Analytics Storage](../KNOWN_ISSUES.md#od-005-analytics-storage)
-remains open; this implementation does not select the long-term large-scale analytics store.
+is resolved to PostgreSQL for the implemented analytics scope.
 
 ## DBD-018-002 Tables
 | Table ID | Table | T-018 use |

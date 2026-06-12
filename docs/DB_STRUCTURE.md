@@ -258,6 +258,27 @@ Purpose: Preserve RBAC role assignment and role-permission change history.
 
 Indexes: `idx_auth_audit_actor_created`, `idx_auth_audit_target`, `idx_auth_audit_event_type`.
 
+### DB-AUTH-012 `external_identities`
+Owning service: `auth-service`
+Table ID: `DB-AUTH-012`
+Table name: `external_identities`
+Purpose: Link a verified OIDC provider identity to an existing active LearnGrid auth account.
+
+| Field ID | Field name | PostgreSQL datatype | Nullable | Default | Key and details |
+| --- | --- | --- | --- | --- | --- |
+| DB-AUTH-012-F001 | `id` | `UUID` | No | `gen_random_uuid()` | PK |
+| DB-AUTH-012-F002 | `account_id` | `UUID` | No | None | FK to `accounts.id` |
+| DB-AUTH-012-F003 | `provider` | `VARCHAR(64)` | No | `'oidc'` | Provider family label |
+| DB-AUTH-012-F004 | `issuer` | `VARCHAR(512)` | No | None | OIDC issuer URL |
+| DB-AUTH-012-F005 | `subject` | `VARCHAR(255)` | No | None | OIDC subject claim |
+| DB-AUTH-012-F006 | `email` | `VARCHAR(254)` | No | None | Verified provider email matched to existing account |
+| DB-AUTH-012-F007 | `claims` | `JSONB` | No | `'{}'::jsonb` | Sanitized provider claims used for audit/debug |
+| DB-AUTH-012-F008 | `last_login_at` | `TIMESTAMPTZ` | Yes | None | Last successful OIDC login |
+| DB-AUTH-012-F009 | `created_at` | `TIMESTAMPTZ` | No | `now()` | Audit field |
+| DB-AUTH-012-F010 | `updated_at` | `TIMESTAMPTZ` | No | `now()` | Audit field |
+
+Indexes: unique `uq_external_identity_issuer_subject`, `idx_external_identity_account`, `idx_external_identity_email`.
+
 ## user_db
 
 Owning service: `user-service`

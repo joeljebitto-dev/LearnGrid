@@ -168,6 +168,10 @@ jobs:
           bash -n scripts/run-dev.sh
           bash -n scripts/generate-local-gateway-cert.sh
           bash -n scripts/verify-postgres-backup-restore.sh
+          bash -n scripts/verify-staging-release.sh
+          bash -n scripts/verify-performance-gates.sh
+          bash -n scripts/verify-staging-release.sh
+          bash -n scripts/verify-performance-gates.sh
 
   gateway:
     name: API Gateway
@@ -188,6 +192,8 @@ jobs:
         run: |
           bash -n scripts/run-dev.sh
           bash -n scripts/generate-local-gateway-cert.sh
+          bash -n scripts/verify-staging-release.sh
+          bash -n scripts/verify-performance-gates.sh
 
       - name: Docker Compose config
         run: docker compose config

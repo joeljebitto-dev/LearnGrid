@@ -3,7 +3,7 @@
 Source: [../SRD.pdf](../SRD.pdf)  
 Related task: [T-002](../tasks/T-002-token-session-security.md)  
 Related schema: [auth_db](../DATABASE_SCHEMA.md#auth_db)  
-Open decision: [OD-004 Authentication Model](../KNOWN_ISSUES.md#od-004-authentication-model)
+Resolved decision: [OD-004 Authentication Model](../KNOWN_ISSUES.md#od-004-authentication-model)
 
 ## Functional Requirements
 - SPEC-002-FR-001 The system shall support JWT-based authentication using access and refresh tokens.

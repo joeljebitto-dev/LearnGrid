@@ -59,8 +59,9 @@ apps/<domain>/tests/
 - Cache workloads fall back to source-of-truth reads when Redis is unavailable.
 - Security workloads such as rate limits, OTPs, password reset, and distributed locks fail closed
   when Redis is unavailable.
-- Production Redis uses the on-prem Kubernetes runtime baseline from [T-023](tasks/T-023-ci-cd-deployment-observability.md);
-  future Sentinel/Cluster hardening can evolve from that deployment topology.
+- Production Redis uses the Sentinel-backed on-prem Kubernetes runtime baseline from
+  [T-023](tasks/T-023-ci-cd-deployment-observability.md); local development uses direct
+  `REDIS_URL`.
 
 ## BE-007 Security Standards
 - Security helpers live in [backend/shared/learngrid-security](../backend/shared/learngrid-security).

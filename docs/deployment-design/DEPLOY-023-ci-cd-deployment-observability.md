@@ -35,3 +35,9 @@ CI runs frontend checks, backend service checks, shared package checks, security
 deployment static tests, Helm lint/template/schema validation, image builds, Trivy scans, GHCR
 pushes, staging deployment, staging smoke tests, production manual approval, production deployment,
 and post-deploy smoke tests.
+
+`scripts/verify-staging-release.sh` records rollout, gateway health, backend service health,
+optional OpenAPI, and optional Selenium evidence. The manual
+`.github/workflows/production-readiness.yml` workflow runs this script only when staging
+kubeconfig and runtime credentials are available. `T-023.06` remains open until that real staging
+evidence succeeds.

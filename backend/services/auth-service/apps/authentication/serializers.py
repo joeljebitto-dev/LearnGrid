@@ -38,6 +38,11 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     )
 
 
+class OidcCallbackSerializer(serializers.Serializer):
+    code = serializers.CharField(trim_whitespace=False, max_length=4096)
+    state = serializers.CharField(trim_whitespace=False, max_length=256)
+
+
 class RoleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Role

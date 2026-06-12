@@ -4,7 +4,8 @@ Related task: [T-022 Security](../tasks/T-022-security.md)
 Related spec: [SPEC-022 Security](../specs/022-security.md)
 
 T-022 established the shared security baseline before the later T-023 on-prem Kubernetes decision.
-[OD-004 Authentication Model](../KNOWN_ISSUES.md#od-004-authentication-model) remains open.
+[OD-004 Authentication Model](../KNOWN_ISSUES.md#od-004-authentication-model) is resolved with
+optional generic OIDC login for existing active accounts.
 
 ## Runtime Controls
 - The local Nginx gateway redirects HTTP to HTTPS, terminates local TLS, restricts CORS to local
@@ -14,9 +15,9 @@ T-022 established the shared security baseline before the later T-023 on-prem Ku
 - Production Django settings for every backend service require `DJANGO_SECRET_KEY`,
   `DATABASE_URL`, `DJANGO_ALLOWED_HOSTS`, `CORS_ALLOWED_ORIGINS`, and service-specific secrets.
   Local-only placeholder secret values are rejected by production settings.
-- JWT bearer authentication remains the implemented auth model. CSRF trusted origins and secure
-  CSRF cookies are configured for production, but CSRF enforcement for authenticated API writes is
-  deferred unless `OD-004` selects cookie-based authentication.
+- JWT bearer authentication remains the API auth model. CSRF trusted origins and secure CSRF
+  cookies are configured for production, while generic OIDC is used only as an optional login
+  mechanism that returns the existing JWT token pair.
 
 ## Secrets And Service Accounts
 - Secrets are represented by Kubernetes Secret, SealedSecret, or Vault-managed references. Tracked

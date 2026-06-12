@@ -44,7 +44,8 @@ become key suffixes.
 | Dashboard response cache | `analytics-service` | `ANALYTICS_DASHBOARD_CACHE_TTL_SECONDS`, default `60` | Dashboard aggregate upserts invalidate affected scope; DB fallback |
 
 ## Production Deployment
-`OD-003` is resolved by `T-023` to on-prem Kubernetes. The T-023 runtime chart provides the first
-in-cluster Redis deployment baseline for production. `T-021.07` remains open for a future
-Sentinel/Cluster-specific hardening pass. Local development continues to use the single Redis
-container from `docker-compose.yml`.
+`OD-003` is resolved by `T-023` to on-prem Kubernetes. Production Redis HA uses Redis Sentinel
+with primary/replica pods, Sentinel service `learngrid-redis-sentinel` on `26379`, and master name
+`mymaster`. The shared client uses Sentinel only when `REDIS_SENTINEL_URLS` is set; otherwise it
+falls back to `REDIS_URL`. Local development continues to use the single Redis container from
+`docker-compose.yml`.

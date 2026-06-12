@@ -4,7 +4,7 @@ Source: [../SRD.pdf](../SRD.pdf)
 Related task: [T-008](../tasks/T-008-content-upload-storage-access.md)  
 Related schema: [content_db](../DATABASE_SCHEMA.md#content_db)  
 Resolved decision: [OD-002](../KNOWN_ISSUES.md#od-002-object-storage-selection) selects MinIO.
-Open decisions: [OD-006](../KNOWN_ISSUES.md#od-006-video-delivery-strategy)
+Resolved decision: [OD-006](../KNOWN_ISSUES.md#od-006-video-delivery-strategy)
 
 ## Functional Requirements
 - SPEC-008-FR-001 Instructors shall upload and manage videos, PDFs, documents, images, links, and assignment resources.

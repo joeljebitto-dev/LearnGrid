@@ -2,7 +2,7 @@
 
 Related spec: [SPEC-018](../specs/018-search-reporting-analytics.md)  
 Related schema: [analytics_db](../DATABASE_SCHEMA.md#analytics_db)  
-Open decision: [OD-005](../KNOWN_ISSUES.md#od-005-analytics-storage)
+Resolved decision: [OD-005](../KNOWN_ISSUES.md#od-005-analytics-storage)
 
 - [x] T-018.01 Implement search index record model.
 - [x] T-018.02 Implement search APIs for courses, users, enrollments, assessments, and submissions.

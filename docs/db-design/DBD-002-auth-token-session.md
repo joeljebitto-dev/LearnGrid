@@ -5,7 +5,7 @@ Related spec: [SPEC-002 Token Session Security](../specs/002-token-session-secur
 Canonical schema: [auth_db](../DATABASE_SCHEMA.md#auth_db)
 
 ## Design Summary
-T-002 implemented token and session persistence inside `auth_db`. `auth-service` owns account identity, password credentials, refresh token storage, token blacklist records, and login audit records.
+T-002 implemented token and session persistence inside `auth_db`. `auth-service` owns account identity, password credentials, refresh token storage, token blacklist records, and login audit records. Repository closure adds OIDC external identity links for existing-account SSO.
 
 ## Implemented Tables
 | Table ID | Table | Purpose |
@@ -15,6 +15,7 @@ T-002 implemented token and session persistence inside `auth_db`. `auth-service`
 | `DB-AUTH-003` | `refresh_tokens` | Persisted refresh token JTI, hash, expiry, device, and revocation state |
 | `DB-AUTH-004` | `token_blacklist` | Durable blacklist fallback for revoked access and refresh token JTIs |
 | `DB-AUTH-006` | `login_audit_logs` | Login, logout, refresh, and password reset audit events |
+| `DB-AUTH-012` | `external_identities` | Verified OIDC `issuer + subject` links to existing active accounts |
 
 `DB-AUTH-005 password_reset_tokens` remains documented in the canonical schema for later password reset work, but was not implemented as part of T-002.
 
@@ -23,6 +24,7 @@ T-002 implemented token and session persistence inside `auth_db`. `auth-service`
 - Refresh tokens are stored only as HMAC-SHA-256 hashes in `refresh_tokens.token_hash`.
 - JWTs include account UUID, token type, JTI, issue/expiry timestamps, and password-change timestamp.
 - `credentials.password_changed_at` invalidates older access and refresh tokens after password changes or account-level revocation.
+- OIDC links are stored only after provider signature, issuer, audience, nonce, and verified-email checks pass; no user is auto-provisioned.
 
 ## Indexes And Constraints
 - `accounts.email` is unique; `accounts.phone` is unique when present.

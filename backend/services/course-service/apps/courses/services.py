@@ -531,6 +531,10 @@ def _redis_client():
         decode_responses=True,
         socket_connect_timeout=settings.REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS,
         socket_timeout=settings.REDIS_SOCKET_TIMEOUT_SECONDS,
+        sentinel_urls=settings.REDIS_SENTINEL_URLS,
+        sentinel_master_name=settings.REDIS_SENTINEL_MASTER_NAME,
+        sentinel_password=settings.REDIS_SENTINEL_PASSWORD,
+        password=settings.REDIS_PASSWORD,
     )
 
 

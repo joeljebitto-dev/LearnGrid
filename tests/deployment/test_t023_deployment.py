@@ -83,6 +83,10 @@ def test_runtime_chart_contains_required_observability_stack():
     ]:
         assert token in chart
     assert "barmanObjectStore" in chart
+    assert "redis-sentinel" in chart
+    assert "containerPort: 26379" in chart
+    assert "sentinel monitor" in chart
+    assert "kind: PodDisruptionBudget" in chart
 
 
 def test_grafana_dashboards_are_valid_json_and_cover_required_views():

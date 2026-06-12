@@ -5,7 +5,7 @@ Related spec: [SPEC-002 Token Session Security](../specs/002-token-session-secur
 Related database design: [DBD-002](../db-design/DBD-002-auth-token-session.md)
 
 ## Design Summary
-T-002 implemented JWT access and refresh token APIs in `auth-service`. Access tokens are short lived, refresh tokens rotate, and logout/admin revocation invalidates active tokens.
+T-002 implemented JWT access and refresh token APIs in `auth-service`. Access tokens are short lived, refresh tokens rotate, and logout/admin revocation invalidates active tokens. Repository closure adds optional generic OIDC login that returns the same token response for existing active accounts.
 
 ## Endpoints
 | Method | Path | Auth | Purpose |
@@ -14,6 +14,9 @@ T-002 implemented JWT access and refresh token APIs in `auth-service`. Access to
 | `POST` | `/api/auth/token/refresh/` | Public | Rotate refresh token and issue a new pair |
 | `POST` | `/api/auth/logout/` | Public token payload | Revoke refresh token and optional access token |
 | `GET` | `/api/auth/session/` | Access token | Return current account identity |
+| `GET` | `/api/auth/oidc/config/` | Public | Report whether OIDC SSO is enabled |
+| `POST` | `/api/auth/oidc/authorize/` | Public | Create state/nonce/PKCE values and return provider authorization URL |
+| `POST` | `/api/auth/oidc/callback/` | Public callback payload | Validate provider callback and issue the standard token pair |
 
 ## Request And Response Shapes
 Token issue request:
@@ -72,6 +75,9 @@ Session response:
 - Refresh rotation revokes the previous refresh token.
 - Malformed, expired, revoked, wrong-type, or password-stale tokens are rejected.
 - Redis blacklist checks use database fallback through `token_blacklist`.
+- OIDC callback rejects invalid provider responses, unverified emails when required, unknown email,
+  inactive accounts, reused state, and expired state. OIDC does not create accounts, profiles, or
+  roles.
 
 ## Verification
 T-002 tests cover successful issuance, session access, refresh rotation, logout revocation, malformed and expired tokens, password-change invalidation, admin revocation, Redis blacklist writes/checks, database fallback, and refresh token hash storage.

@@ -7,8 +7,11 @@ import { beforeEach, expect, test, vi } from 'vitest';
 import { App } from './App';
 import { storeTokens } from './api/client';
 import {
+  completeOidcCallback,
+  getOidcConfig,
   getSessionContext,
   login,
+  startOidcAuthorization,
   type SessionContext
 } from './api/auth';
 import {
@@ -22,7 +25,10 @@ vi.mock('./api/auth', async () => {
   const actual = await vi.importActual<typeof import('./api/auth')>('./api/auth');
   return {
     ...actual,
+    completeOidcCallback: vi.fn(),
+    getOidcConfig: vi.fn(),
     login: vi.fn(),
+    startOidcAuthorization: vi.fn(),
     getSessionContext: vi.fn()
   };
 });
@@ -160,7 +166,10 @@ function storeTestTokens() {
 
 beforeEach(() => {
   window.localStorage.clear();
+  vi.mocked(completeOidcCallback).mockReset();
+  vi.mocked(getOidcConfig).mockReset();
   vi.mocked(login).mockReset();
+  vi.mocked(startOidcAuthorization).mockReset();
   vi.mocked(getSessionContext).mockReset();
   vi.mocked(getStudentDashboard).mockReset();
   vi.mocked(getInstructorDashboard).mockReset();
@@ -178,6 +187,12 @@ beforeEach(() => {
     display_name: 'New User',
     profile_type: 'student'
   } as never);
+  vi.mocked(getOidcConfig).mockResolvedValue({
+    enabled: false,
+    provider: 'oidc',
+    provider_label: 'SSO',
+    scopes: ['openid', 'email', 'profile']
+  });
 });
 
 test('unauthenticated users redirect to login', async () => {
@@ -206,6 +221,51 @@ test('login stores tokens and redirects by role', async () => {
 
   expect(await screen.findByRole('heading', { name: /student dashboard/i })).toBeInTheDocument();
   expect(window.localStorage.getItem('learngrid.tokens')).toContain('access-token');
+});
+
+test('OIDC sign in button follows enabled config', async () => {
+  vi.mocked(getOidcConfig).mockResolvedValue({
+    enabled: true,
+    provider: 'oidc',
+    provider_label: 'Campus SSO',
+    scopes: ['openid', 'email', 'profile']
+  });
+
+  renderApp('/login');
+
+  expect(await screen.findByRole('button', { name: /continue with campus sso/i })).toBeInTheDocument();
+});
+
+test('OIDC callback stores tokens and redirects by role', async () => {
+  vi.mocked(completeOidcCallback).mockImplementation(async () => {
+    const tokens = {
+      access: 'oidc-access-token',
+      refresh: 'oidc-refresh-token',
+      access_expires_at: '2026-01-01T00:05:00Z',
+      refresh_expires_at: '2026-01-08T00:00:00Z'
+    };
+    storeTokens(tokens);
+    return tokens;
+  });
+  vi.mocked(getSessionContext).mockResolvedValue(sessionContext('student'));
+
+  renderApp('/auth/oidc/callback?code=auth-code&state=state-token');
+
+  await waitFor(() => expect(completeOidcCallback).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(completeOidcCallback).mock.calls[0][0]).toEqual({
+    code: 'auth-code',
+    state: 'state-token'
+  });
+  expect(await screen.findByRole('heading', { name: /student dashboard/i })).toBeInTheDocument();
+  expect(window.localStorage.getItem('learngrid.tokens')).toContain('oidc-access-token');
+});
+
+test('OIDC callback errors show controlled failure state', async () => {
+  vi.mocked(completeOidcCallback).mockRejectedValueOnce(new Error('invalid state'));
+
+  renderApp('/auth/oidc/callback?code=auth-code&state=state-token');
+
+  expect(await screen.findByRole('alert')).toHaveTextContent('SSO sign in failed.');
 });
 
 test('student portal renders populated dashboard state', async () => {

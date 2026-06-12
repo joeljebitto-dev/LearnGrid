@@ -46,8 +46,8 @@ platform targets approximately 10,000 simultaneous users and production-grade re
 - PostgreSQL, Redis, Kafka, and object storage must be production-grade managed or clustered services.
 - Metrics, logs, traces, and errors are centralized.
 
-## ARCH-006 Open Decisions
-Open platform decisions remain unresolved and are tracked in [KNOWN_ISSUES.md](KNOWN_ISSUES.md):
-[OD-004](KNOWN_ISSUES.md#od-004-authentication-model),
-[OD-005](KNOWN_ISSUES.md#od-005-analytics-storage),
-[OD-006](KNOWN_ISSUES.md#od-006-video-delivery-strategy).
+## ARCH-006 Resolved Decisions
+Tracked platform decisions are recorded in [KNOWN_ISSUES.md](KNOWN_ISSUES.md). The current baseline
+uses Nginx gateway routing, MinIO object storage and signed video URLs, on-prem Kubernetes,
+optional generic existing-account OIDC, PostgreSQL `analytics_db`, Apache Kafka eventing, and Redis
+Sentinel for production Redis HA.
