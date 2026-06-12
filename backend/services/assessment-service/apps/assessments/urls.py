@@ -26,7 +26,11 @@ from .views import (
 
 urlpatterns = [
     path("question-banks/", QuestionBankListCreateView.as_view(), name="question-bank-list-create"),
-    path("question-banks/<uuid:question_bank_id>/", QuestionBankDetailView.as_view(), name="question-bank-detail"),
+    path(
+        "question-banks/<uuid:question_bank_id>/",
+        QuestionBankDetailView.as_view(),
+        name="question-bank-detail",
+    ),
     path(
         "question-banks/<uuid:question_bank_id>/questions/",
         QuestionListCreateView.as_view(),
@@ -38,7 +42,11 @@ urlpatterns = [
         AssignmentSubmissionListCreateView.as_view(),
         name="assignment-submission-list-create",
     ),
-    path("submissions/<uuid:submission_id>/", AssignmentSubmissionDetailView.as_view(), name="assignment-submission-detail"),
+    path(
+        "submissions/<uuid:submission_id>/",
+        AssignmentSubmissionDetailView.as_view(),
+        name="assignment-submission-detail",
+    ),
     path(
         "submissions/<uuid:submission_id>/submit/",
         AssignmentSubmissionSubmitView.as_view(),
@@ -61,13 +69,33 @@ urlpatterns = [
     ),
     path("", AssessmentListCreateView.as_view(), name="assessment-list-create"),
     path("<uuid:assessment_id>/", AssessmentDetailView.as_view(), name="assessment-detail"),
-    path("<uuid:assessment_id>/questions/", AssessmentQuestionReplaceView.as_view(), name="assessment-questions"),
-    path("<uuid:assessment_id>/publish/", AssessmentPublishView.as_view(), name="assessment-publish"),
+    path(
+        "<uuid:assessment_id>/questions/",
+        AssessmentQuestionReplaceView.as_view(),
+        name="assessment-questions",
+    ),
+    path(
+        "<uuid:assessment_id>/publish/", AssessmentPublishView.as_view(), name="assessment-publish"
+    ),
     path("<uuid:assessment_id>/close/", AssessmentCloseView.as_view(), name="assessment-close"),
-    path("<uuid:assessment_id>/attempts/start/", QuizAttemptStartView.as_view(), name="quiz-attempt-start"),
-    path("attempts/<uuid:attempt_id>/", QuizAttemptDetailView.as_view(), name="quiz-attempt-detail"),
-    path("attempts/<uuid:attempt_id>/answers/", QuizAttemptAnswersView.as_view(), name="quiz-attempt-answers"),
-    path("attempts/<uuid:attempt_id>/submit/", QuizAttemptSubmitView.as_view(), name="quiz-attempt-submit"),
+    path(
+        "<uuid:assessment_id>/attempts/start/",
+        QuizAttemptStartView.as_view(),
+        name="quiz-attempt-start",
+    ),
+    path(
+        "attempts/<uuid:attempt_id>/", QuizAttemptDetailView.as_view(), name="quiz-attempt-detail"
+    ),
+    path(
+        "attempts/<uuid:attempt_id>/answers/",
+        QuizAttemptAnswersView.as_view(),
+        name="quiz-attempt-answers",
+    ),
+    path(
+        "attempts/<uuid:attempt_id>/submit/",
+        QuizAttemptSubmitView.as_view(),
+        name="quiz-attempt-submit",
+    ),
     path(
         "attempts/<uuid:attempt_id>/auto-submit/",
         QuizAttemptAutoSubmitView.as_view(),

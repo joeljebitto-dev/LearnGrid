@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import serializers
 
 from .models import (
@@ -144,10 +145,15 @@ class DepartmentUpdateSerializer(serializers.Serializer):
     def validate(self, attrs):
         department = self.context["department"]
         code = attrs.get("code")
-        if code and Department.objects.filter(
-            institution=department.institution,
-            code=code,
-        ).exclude(id=department.id).exists():
+        if (
+            code
+            and Department.objects.filter(
+                institution=department.institution,
+                code=code,
+            )
+            .exclude(id=department.id)
+            .exists()
+        ):
             raise serializers.ValidationError({"code": "Department code already exists."})
         return attrs
 
@@ -220,11 +226,14 @@ class BatchUpdateSerializer(serializers.Serializer):
     def validate(self, attrs):
         batch = self.context["batch"]
         department_id = attrs.get("department_id")
-        if department_id and not Department.objects.filter(
-            id=department_id,
-            institution=batch.institution,
-            deleted_at__isnull=True,
-        ).exists():
+        if (
+            department_id
+            and not Department.objects.filter(
+                id=department_id,
+                institution=batch.institution,
+                deleted_at__isnull=True,
+            ).exists()
+        ):
             raise serializers.ValidationError(
                 {"department_id": "Department does not belong to the institution."}
             )
@@ -252,27 +261,44 @@ class StudentProfilePayloadSerializer(serializers.Serializer):
 
 
 class InstructorProfilePayloadSerializer(serializers.Serializer):
-    employee_number = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=64)
+    employee_number = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, max_length=64
+    )
     department_id = serializers.UUIDField(required=False, allow_null=True)
     title = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=128)
     bio = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 
 class AdminProfilePayloadSerializer(serializers.Serializer):
-    admin_type = serializers.ChoiceField(choices=AdminType.choices, default=AdminType.INSTITUTION_ADMIN)
+    admin_type = serializers.ChoiceField(
+        choices=AdminType.choices, default=AdminType.INSTITUTION_ADMIN
+    )
     department_id = serializers.UUIDField(required=False, allow_null=True)
 
 
 class UserProfileCreateSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    phone = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=32)
-    temporary_password = serializers.CharField(write_only=True, trim_whitespace=False, min_length=8)
+    phone = serializers.RegexField(
+        regex=r"^\+?[1-9][0-9]{7,14}$",
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        max_length=32,
+    )
+    temporary_password = serializers.CharField(
+        write_only=True,
+        trim_whitespace=False,
+        min_length=settings.AUTH_PASSWORD_MIN_LENGTH,
+        max_length=256,
+    )
     profile_type = serializers.ChoiceField(choices=PROFILE_TYPES)
     role_code = serializers.CharField(required=False, allow_blank=True, max_length=64)
     institution_id = serializers.UUIDField(required=False, allow_null=True)
     first_name = serializers.CharField(max_length=128)
     last_name = serializers.CharField(max_length=128)
-    display_name = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=255)
+    display_name = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, max_length=255
+    )
     avatar_url = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     metadata = serializers.JSONField(required=False)
     student = StudentProfilePayloadSerializer(required=False)
@@ -289,7 +315,10 @@ class UserProfileCreateSerializer(serializers.Serializer):
             attrs["admin"] = {"admin_type": AdminType.INSTITUTION_ADMIN}
 
         institution_id = attrs.get("institution_id")
-        if institution_id and not Institution.objects.filter(id=institution_id, deleted_at__isnull=True).exists():
+        if (
+            institution_id
+            and not Institution.objects.filter(id=institution_id, deleted_at__isnull=True).exists()
+        ):
             raise serializers.ValidationError({"institution_id": "Institution was not found."})
         attrs["role_code"] = attrs.get("role_code") or None
         attrs["phone"] = attrs.get("phone") or None
@@ -301,10 +330,18 @@ class UserProfileCreateSerializer(serializers.Serializer):
 
 class UserProfileUpdateSerializer(serializers.Serializer):
     email = serializers.EmailField(required=False)
-    phone = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=32)
+    phone = serializers.RegexField(
+        regex=r"^\+?[1-9][0-9]{7,14}$",
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        max_length=32,
+    )
     first_name = serializers.CharField(required=False, max_length=128)
     last_name = serializers.CharField(required=False, max_length=128)
-    display_name = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=255)
+    display_name = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, max_length=255
+    )
     avatar_url = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     status = serializers.ChoiceField(choices=UserProfileStatus.choices, required=False)
     metadata = serializers.JSONField(required=False)

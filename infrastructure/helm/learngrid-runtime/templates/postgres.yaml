@@ -1,0 +1,53 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.postgres.clusterName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: learngrid
+spec:
+  instances: {{ .Values.postgres.instances }}
+  imageName: {{ .Values.postgres.imageName }}
+  primaryUpdateStrategy: unsupervised
+  storage:
+    size: {{ .Values.postgres.storageSize }}
+  superuserSecret:
+    name: {{ .Values.postgres.credentialsSecret }}
+  bootstrap:
+    initdb:
+      database: learngrid
+      owner: learngrid
+      postInitSQL:
+        {{- range .Values.postgres.databases }}
+        - CREATE DATABASE {{ . }};
+        {{- end }}
+  backup:
+    barmanObjectStore:
+      destinationPath: s3://{{ .Values.postgres.backupBucket }}/
+      endpointURL: {{ .Values.postgres.backupEndpointUrl }}
+      s3Credentials:
+        accessKeyId:
+          name: {{ .Values.postgres.backupCredentialsSecret }}
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: {{ .Values.postgres.backupCredentialsSecret }}
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: learngrid-postgres-daily
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/part-of: learngrid
+spec:
+  schedule: "0 0 2 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: {{ .Values.postgres.clusterName }}

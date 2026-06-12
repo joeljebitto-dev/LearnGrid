@@ -64,6 +64,19 @@ MinIO local defaults:
 | Root password | `learngrid-minio-secret` |
 | Content bucket | `learngrid-content` |
 
+Redis local defaults:
+
+| Item | Value |
+| --- | --- |
+| URL | `redis://localhost:6379/0` |
+| Key prefix | `lg:{REDIS_ENV}:{service}:...`, default `REDIS_ENV=local` |
+| Shared helper package | `backend/shared/learngrid-redis` |
+
+Redis design details, key naming, TTLs, invalidation, and outage behavior are documented in
+[REDIS-021](redis-design/REDIS-021-redis-architecture.md). The T-023 on-prem Kubernetes runtime
+chart provides the first production Redis deployment baseline; Sentinel/Cluster-specific hardening
+remains tracked in T-021.
+
 ## API Gateway
 `T-019` resolves [OD-001](KNOWN_ISSUES.md#od-001-api-gateway-selection) to Nginx.
 `pnpm dev` and `pnpm dev:fast` start the gateway after backend and frontend services are healthy.
@@ -79,7 +92,47 @@ Gateway HTTP redirects to HTTPS. The local HTTPS certificate is self-signed and 
 ignored `infrastructure/docker/nginx/certs/` path. Nginx routes `/api/*` prefixes to backend
 services, rewrites `/api/v1/...` to `/api/...`, and aliases `/api/grades/...` to
 `/api/grading/...`. It also applies request IDs, JSON access logs, local-origin CORS, rate limits,
-and a `20m` request size limit.
+security headers, and a `20m` request size limit.
+
+## Security Baseline
+`T-022` adds shared production security helpers, gateway security headers, stricter validation,
+optional malware scanning, Kubernetes security baseline templates, and backup restore verification.
+
+Production settings for every backend service require:
+
+| Environment variable | Purpose |
+| --- | --- |
+| `DJANGO_SECRET_KEY` | Service-specific Django secret |
+| `DATABASE_URL` | Service database connection |
+| `DJANGO_ALLOWED_HOSTS` | Production host allowlist |
+| `CORS_ALLOWED_ORIGINS` | Browser origin allowlist |
+| `CSRF_TRUSTED_ORIGINS` | Trusted origins if cookie auth is selected later |
+| `AUTH_JWT_SIGNING_KEY` | JWT verification key for auth-aware services |
+| `AUTH_TOKEN_HASH_KEY` | Auth-service token hash key |
+| `CONTENT_MINIO_ACCESS_KEY` / `CONTENT_MINIO_SECRET_KEY` | Content object-storage credentials |
+
+Local `.env.example` values are intentionally local-only. `config.settings.production` rejects
+missing values and obvious local placeholders such as `insecure-local` or `change-me`.
+
+Content upload security options:
+
+| Environment variable | Default | Purpose |
+| --- | --- | --- |
+| `CONTENT_ALLOWED_FILE_EXTENSIONS` | `.mp4,.pdf,.doc,.docx,.png,.jpg,.jpeg,.txt` | File extension allowlist |
+| `CONTENT_MALWARE_SCAN_ENABLED` | `false` | Enable fail-closed malware scanner hook |
+| `CONTENT_MALWARE_SCANNER_COMMAND` | empty | Scanner command invoked with the file path or object key |
+| `CONTENT_MALWARE_SCAN_TIMEOUT_SECONDS` | `10` | Scanner timeout |
+
+Backup restore verification:
+
+```bash
+docker compose up -d postgres
+bash scripts/verify-postgres-backup-restore.sh
+```
+
+Security-only Kubernetes templates live under
+`infrastructure/kubernetes/security-baseline/`. Full production Deployments, Services, HPAs,
+probes, and rollout wiring remain for [T-023](tasks/T-023-ci-cd-deployment-observability.md).
 
 ## Frontend Service
 The frontend service is `SVC-011 frontend-service`.
@@ -97,7 +150,8 @@ Local URL: `http://127.0.0.1:5173`
 
 ## Backend Services
 Each backend service is a Django REST Framework application with split settings and a public
-health endpoint.
+health endpoint. Production containers use Gunicorn and expose `/health/`, `/health/live/`,
+`/health/ready/`, `/metrics/`, `/api/schema/`, and `/api/docs/`.
 
 | Service | Port | Health URL |
 | --- | --- | --- |
@@ -118,10 +172,72 @@ Run checks for a service:
 cd backend/services/auth-service
 poetry install
 poetry run ruff check .
+poetry run ruff format --check .
+poetry run mypy .
 poetry run python manage.py check
+poetry run python manage.py makemigrations --check --dry-run
 poetry run pytest
 poetry run python manage.py runserver 8001
 ```
+
+## Testing And Quality
+Root-level test helpers are installed from `requirements-test.txt`.
+
+```bash
+python -m pip install -r requirements-test.txt
+python -m pytest tests/contracts
+python -m pytest tests/integration
+python -m pytest tests/e2e
+k6 run tests/load/smoke.js
+```
+
+Optional test environment variables:
+
+| Environment variable | Purpose |
+| --- | --- |
+| `CONTRACT_SERVICE_URLS` | Optional live OpenAPI contract targets as JSON or `service=url` pairs |
+| `INTEGRATION_DATABASE_URL` | PostgreSQL URL for Compose-backed integration checks |
+| `INTEGRATION_REDIS_URL` | Redis URL for real helper checks |
+| `INTEGRATION_KAFKA_BOOTSTRAP_SERVERS` | Kafka bootstrap servers for produce/consume checks |
+| `INTEGRATION_MINIO_ENDPOINT` | MinIO endpoint for object storage checks |
+| `E2E_BASE_URL` | Browser E2E target URL; tests skip when unset |
+| `E2E_*_EMAIL` / `E2E_*_PASSWORD` | Optional student, instructor, and admin credentials |
+| `LOAD_BASE_URL` | k6 target URL; smoke script runs offline when unset |
+| `LOAD_*_EMAIL` / `LOAD_*_PASSWORD` | Optional k6 role credentials |
+| `LOAD_VUS` / `LOAD_DURATION` | k6 virtual users and duration |
+
+GitHub Actions runs backend Ruff, format, mypy, Django checks, migration dry-runs, and pytest;
+frontend lint, typecheck, tests, build, and high-severity audit; plus actionlint, shell syntax,
+contract, integration, E2E, k6, gateway, security, deployment, image, and Helm checks.
+
+## Deployment And Observability
+`T-023` resolves [OD-003](KNOWN_ISSUES.md#od-003-deployment-model) to on-prem Kubernetes.
+
+Helm charts live under `infrastructure/helm/`:
+
+| Chart | Purpose |
+| --- | --- |
+| `learngrid-platform` | Namespaces and pod-security labels |
+| `learngrid-runtime` | CloudNativePG PostgreSQL, MinIO, Strimzi Kafka, Redis, Kafka UI, Prometheus, Grafana, Loki, Tempo, Alloy, and exporters |
+| `learngrid-app` | LearnGrid backend, frontend, gateway, ConfigMaps, Secret references, HPAs, probes, migration Jobs, PDBs, Ingress, and NetworkPolicies |
+
+Production runtime variables:
+
+| Environment variable | Purpose |
+| --- | --- |
+| `PORT` | Container listen port, default `8000` for backend images |
+| `GUNICORN_WORKERS` | Backend Gunicorn worker count |
+| `GUNICORN_TIMEOUT_SECONDS` | Backend Gunicorn request timeout |
+| `SENTRY_DSN` / `VITE_SENTRY_DSN` | Backend/frontend error reporting DSNs |
+| `SENTRY_ENVIRONMENT` | Sentry deployment environment |
+| `SENTRY_TRACES_SAMPLE_RATE` | Backend Sentry trace sample rate |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | OTLP HTTP trace endpoint, typically Tempo |
+| `OTEL_SERVICE_NAME` | Service name used for traces |
+
+GitHub Actions builds backend, frontend, and gateway images, scans them with Trivy, pushes GHCR
+tags, deploys staging with `KUBE_CONFIG_STAGING`, and deploys production with
+`KUBE_CONFIG_PRODUCTION` after the GitHub `production` environment approval gate. Final `T-023.06`
+completion requires a successful real staging deployment smoke run.
 
 ## Auth Token Configuration
 `auth-service` implements the JWT baseline for [T-002](tasks/T-002-token-session-security.md).
@@ -133,10 +249,26 @@ poetry run python manage.py runserver 8001
 | `AUTH_JWT_ISSUER` | `learngrid-auth-service` | JWT issuer claim |
 | `AUTH_JWT_SIGNING_KEY` | `DJANGO_SECRET_KEY` | HMAC signing key for access and refresh JWTs |
 | `AUTH_TOKEN_HASH_KEY` | `DJANGO_SECRET_KEY` | HMAC key for stored refresh token hashes |
+| `AUTH_PASSWORD_MIN_LENGTH` | `12` | Minimum temporary/reset password length |
 | `AUTH_PERMISSION_CACHE_TTL_SECONDS` | `300` | RBAC permission check cache TTL |
+| `AUTH_LOGIN_RATE_LIMIT_COUNT` | `5` | Login attempts allowed per Redis fixed window |
+| `AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS` | `900` | Login rate-limit window |
+| `AUTH_PASSWORD_RESET_RATE_LIMIT_COUNT` | `3` | Password reset requests allowed per Redis fixed window |
+| `AUTH_PASSWORD_RESET_TTL_SECONDS` | `900` | Password reset token Redis TTL and DB expiry |
+| `AUTH_OTP_TTL_SECONDS` | `300` | OTP Redis TTL |
+| `AUTH_OTP_MAX_ATTEMPTS` | `5` | OTP verification attempts before the key is removed |
 
 Token blacklist entries are written to Redis with a TTL matching the remaining token lifetime
 and are also stored in `auth_db.token_blacklist` for durable fallback.
+Login and password reset endpoints use Redis-backed fixed-window rate limits. Password reset raw
+tokens are stored only as hashes in PostgreSQL and as hashed Redis keys.
+
+Password reset APIs:
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/auth/password-reset/request/` | Request a reset token; always returns `{"status":"accepted"}` |
+| `POST` | `/api/auth/password-reset/confirm/` | Confirm a reset token and set a new password |
 
 ## RBAC And Object Authorization
 `auth-service` implements the RBAC baseline for [T-003](tasks/T-003-rbac-object-authorization.md).
@@ -269,7 +401,9 @@ failure denies access.
 Published catalog list/detail responses are cached in Redis for
 `COURSE_CATALOG_CACHE_TTL_SECONDS`, default `300`. Management and non-published reads bypass
 cache. Course, category, tag, prerequisite, and learning outcome writes invalidate catalog
-cache keys. Redis failures fall back to database reads.
+cache keys. Catalog cache keys hash raw query parameters, and Redis failures fall back to
+database reads. Course/module/lesson/topic reorder writes use Redis distributed locks with
+`REDIS_LOCK_TTL_SECONDS`, default `30`; lock contention or Redis outage returns `409`.
 
 Course lifecycle emits `CourseCreated`, `CoursePublished`, and `CourseArchived` through the
 shared Kafka-capable event publisher described in [EVT-020](event-design/EVT-020-kafka-eventing.md).
@@ -423,6 +557,9 @@ arbitrary profile IDs. Admin dashboards require `analytics.view` at institution 
 If no dashboard aggregate exists, analytics-service returns `200` with empty arrays and zeroed
 summary values. PostgreSQL `analytics_db` is the current dashboard/report store; [OD-005](KNOWN_ISSUES.md#od-005-analytics-storage)
 remains open for the long-term analytics storage decision.
+Dashboard responses are cached in Redis for `ANALYTICS_DASHBOARD_CACHE_TTL_SECONDS`, default
+`60`. Dashboard aggregate upserts invalidate matching scope cache keys, and Redis failures fall
+back to PostgreSQL reads.
 
 ## Search, Reporting, And Analytics
 `analytics-service` implements [T-018](tasks/T-018-search-reporting-analytics.md) under

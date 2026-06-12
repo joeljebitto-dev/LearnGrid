@@ -1,0 +1,45 @@
+{{- range $name, $service := .Values.backendServices }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-config
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    {{- include "learngrid.labels" $ | nindent 4 }}
+data:
+  SERVICE_ID: {{ $service.serviceId | quote }}
+  SERVICE_NAME: {{ $name | quote }}
+  PORT: {{ $.Values.backendDefaults.port | quote }}
+  GUNICORN_WORKERS: "2"
+  GUNICORN_TIMEOUT_SECONDS: "60"
+  OTEL_SERVICE_NAME: {{ $name | quote }}
+  {{- range $key, $value := $.Values.commonEnv }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- range $key, $value := $service.env }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+---
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-service-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: frontend-service
+    {{- include "learngrid.labels" . | nindent 4 }}
+data:
+  VITE_API_BASE_URL: /api
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: api-gateway
+    {{- include "learngrid.labels" . | nindent 4 }}
+data:
+  GATEWAY_MODE: kubernetes

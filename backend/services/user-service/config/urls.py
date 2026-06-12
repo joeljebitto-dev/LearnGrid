@@ -1,15 +1,14 @@
-from django.conf import settings
 from django.urls import include, path
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-
-
-@api_view(["GET"])
-def health(_request):
-    return Response({"service": settings.SERVICE_NAME, "status": "ok"})
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
+from learngrid_observability.health import health, liveness, readiness
 
 
 urlpatterns = [
     path("health/", health, name="health"),
+    path("health/live/", liveness, name="health-live"),
+    path("health/ready/", readiness, name="health-ready"),
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+    path("", include("django_prometheus.urls")),
     path("api/users/", include("apps.users.urls")),
 ]

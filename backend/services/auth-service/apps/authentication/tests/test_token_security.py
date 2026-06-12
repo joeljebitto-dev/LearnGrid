@@ -229,6 +229,18 @@ def test_redis_blacklist_write_and_check(monkeypatch, api_client, active_account
         def exists(self, key):
             return int(key in writes)
 
+        def incr(self, key):
+            count = int(writes.get(key, (0, "0"))[1]) + 1
+            writes[key] = (None, str(count))
+            return count
+
+        def expire(self, key, ttl):
+            value = writes.get(key, (None, "0"))[1]
+            writes[key] = (ttl, value)
+
+        def ttl(self, key):
+            return writes.get(key, (0, "0"))[0] or 0
+
     monkeypatch.setattr(services, "_redis_client", lambda: FakeRedis())
     body = assert_token_pair_response(issue_tokens(api_client))
 

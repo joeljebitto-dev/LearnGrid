@@ -145,7 +145,9 @@ class CourseListCreateView(APIView):
     def post(self, request):
         serializer = CourseCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        require_course_permission(request, "course.manage", serializer.validated_data["institution_id"])
+        require_course_permission(
+            request, "course.manage", serializer.validated_data["institution_id"]
+        )
         course = create_course(
             validated_data=serializer.validated_data,
             correlation_id=_correlation_id(request),
@@ -183,7 +185,9 @@ class CourseDetailView(APIView):
         serializer.is_valid(raise_exception=True)
         require_course_permission(request, "course.manage", course.institution_id)
         if "institution_id" in serializer.validated_data:
-            require_course_permission(request, "course.manage", serializer.validated_data["institution_id"])
+            require_course_permission(
+                request, "course.manage", serializer.validated_data["institution_id"]
+            )
         course = update_course(course=course, validated_data=serializer.validated_data)
         return Response(CourseSerializer(course).data)
 
@@ -471,7 +475,9 @@ class CategoryListCreateView(APIView):
     def post(self, request):
         serializer = CategoryCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        require_course_permission(request, "course.manage", serializer.validated_data.get("institution_id"))
+        require_course_permission(
+            request, "course.manage", serializer.validated_data.get("institution_id")
+        )
         category = create_category(validated_data=serializer.validated_data)
         return Response(CourseCategorySerializer(category).data, status=status.HTTP_201_CREATED)
 
@@ -512,13 +518,17 @@ class TagListCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         _require_category_tag_read(request, serializer.validated_data.get("institution_id"))
         paginator = self.pagination_class()
-        page = paginator.paginate_queryset(search_tags(serializer.validated_data), request, view=self)
+        page = paginator.paginate_queryset(
+            search_tags(serializer.validated_data), request, view=self
+        )
         return paginator.get_paginated_response(CourseTagSerializer(page, many=True).data)
 
     def post(self, request):
         serializer = TagCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        require_course_permission(request, "course.manage", serializer.validated_data.get("institution_id"))
+        require_course_permission(
+            request, "course.manage", serializer.validated_data.get("institution_id")
+        )
         tag = create_tag(validated_data=serializer.validated_data)
         return Response(CourseTagSerializer(tag).data, status=status.HTTP_201_CREATED)
 

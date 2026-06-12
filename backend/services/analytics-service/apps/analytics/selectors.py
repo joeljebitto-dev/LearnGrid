@@ -4,7 +4,13 @@ from uuid import UUID
 
 from django.db.models import QuerySet
 
-from .models import DashboardAggregate, DashboardScopeType, ReportSnapshot, SearchIndexRecord, UsageMetric
+from .models import (
+    DashboardAggregate,
+    DashboardScopeType,
+    ReportSnapshot,
+    SearchIndexRecord,
+    UsageMetric,
+)
 
 
 PLATFORM_SCOPE_ID = UUID("00000000-0000-0000-0000-000000000000")
@@ -126,7 +132,9 @@ def platform_dashboard_payload(profile: dict | None = None) -> dict:
     )
 
 
-def search_index_records(filters: dict, *, resource_type: str | None = None) -> QuerySet[SearchIndexRecord]:
+def search_index_records(
+    filters: dict, *, resource_type: str | None = None
+) -> QuerySet[SearchIndexRecord]:
     queryset = SearchIndexRecord.objects.order_by("-updated_at", "-id")
     selected_resource_type = resource_type or filters.get("resource_type")
     if selected_resource_type:
@@ -161,7 +169,9 @@ def dashboard_aggregates(filters: dict) -> QuerySet[DashboardAggregate]:
     if scope_id := filters.get("scope_id"):
         queryset = queryset.filter(scope_id=scope_id)
     if institution_id := filters.get("institution_id"):
-        queryset = queryset.filter(scope_type=DashboardScopeType.INSTITUTION, scope_id=institution_id)
+        queryset = queryset.filter(
+            scope_type=DashboardScopeType.INSTITUTION, scope_id=institution_id
+        )
     if metric_date := filters.get("metric_date"):
         queryset = queryset.filter(metric_date=metric_date)
     sort = filters.get("sort") or "-metric_date"

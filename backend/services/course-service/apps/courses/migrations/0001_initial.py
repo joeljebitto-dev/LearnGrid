@@ -6,163 +6,318 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='Course',
+            name="Course",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('institution_id', models.UUIDField()),
-                ('owner_profile_id', models.UUIDField()),
-                ('title', models.CharField(max_length=255)),
-                ('slug', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('difficulty_level', models.CharField(blank=True, choices=[('beginner', 'Beginner'), ('intermediate', 'Intermediate'), ('advanced', 'Advanced')], max_length=32, null=True)),
-                ('thumbnail_asset_id', models.UUIDField(blank=True, null=True)),
-                ('status', models.CharField(choices=[('draft', 'Draft'), ('published', 'Published'), ('archived', 'Archived'), ('deleted', 'Deleted')], default='draft', max_length=24)),
-                ('published_at', models.DateTimeField(blank=True, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('deleted_at', models.DateTimeField(blank=True, null=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                ("institution_id", models.UUIDField()),
+                ("owner_profile_id", models.UUIDField()),
+                ("title", models.CharField(max_length=255)),
+                ("slug", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "difficulty_level",
+                    models.CharField(
+                        blank=True,
+                        choices=[
+                            ("beginner", "Beginner"),
+                            ("intermediate", "Intermediate"),
+                            ("advanced", "Advanced"),
+                        ],
+                        max_length=32,
+                        null=True,
+                    ),
+                ),
+                ("thumbnail_asset_id", models.UUIDField(blank=True, null=True)),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("draft", "Draft"),
+                            ("published", "Published"),
+                            ("archived", "Archived"),
+                            ("deleted", "Deleted"),
+                        ],
+                        default="draft",
+                        max_length=24,
+                    ),
+                ),
+                ("published_at", models.DateTimeField(blank=True, null=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("deleted_at", models.DateTimeField(blank=True, null=True)),
             ],
             options={
-                'db_table': 'courses',
-                'indexes': [models.Index(fields=['institution_id', 'status'], name='idx_courses_inst_status'), models.Index(fields=['owner_profile_id'], name='idx_courses_owner_profile')],
-                'constraints': [models.UniqueConstraint(fields=('institution_id', 'slug'), name='uq_courses_institution_slug')],
+                "db_table": "courses",
+                "indexes": [
+                    models.Index(
+                        fields=["institution_id", "status"], name="idx_courses_inst_status"
+                    ),
+                    models.Index(fields=["owner_profile_id"], name="idx_courses_owner_profile"),
+                ],
+                "constraints": [
+                    models.UniqueConstraint(
+                        fields=("institution_id", "slug"), name="uq_courses_institution_slug"
+                    )
+                ],
             },
         ),
         migrations.CreateModel(
-            name='CourseCategory',
+            name="CourseCategory",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('institution_id', models.UUIDField(blank=True, null=True)),
-                ('name', models.CharField(max_length=128)),
-                ('slug', models.CharField(max_length=128)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('parent_category', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='child_categories', to='courses.coursecategory')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                ("institution_id", models.UUIDField(blank=True, null=True)),
+                ("name", models.CharField(max_length=128)),
+                ("slug", models.CharField(max_length=128)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "parent_category",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="child_categories",
+                        to="courses.coursecategory",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'course_categories',
+                "db_table": "course_categories",
             },
         ),
         migrations.CreateModel(
-            name='CourseCategoryLink',
+            name="CourseCategoryLink",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('category', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='course_links', to='courses.coursecategory')),
-                ('course', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='category_links', to='courses.course')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "category",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="course_links",
+                        to="courses.coursecategory",
+                    ),
+                ),
+                (
+                    "course",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="category_links",
+                        to="courses.course",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'course_category_links',
+                "db_table": "course_category_links",
             },
         ),
         migrations.CreateModel(
-            name='CoursePrerequisite',
+            name="CoursePrerequisite",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('course', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='prerequisites', to='courses.course')),
-                ('prerequisite_course', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='required_by_courses', to='courses.course')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "course",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="prerequisites",
+                        to="courses.course",
+                    ),
+                ),
+                (
+                    "prerequisite_course",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="required_by_courses",
+                        to="courses.course",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'course_prerequisites',
+                "db_table": "course_prerequisites",
             },
         ),
         migrations.CreateModel(
-            name='CourseTag',
+            name="CourseTag",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('institution_id', models.UUIDField(blank=True, null=True)),
-                ('name', models.CharField(max_length=128)),
-                ('slug', models.CharField(max_length=128)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                ("institution_id", models.UUIDField(blank=True, null=True)),
+                ("name", models.CharField(max_length=128)),
+                ("slug", models.CharField(max_length=128)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
             ],
             options={
-                'db_table': 'course_tags',
-                'indexes': [models.Index(fields=['institution_id', 'slug'], name='idx_course_tags_scope_slug')],
-                'constraints': [models.UniqueConstraint(condition=models.Q(('institution_id__isnull', False)), fields=('institution_id', 'slug'), name='uq_course_tags_inst_slug'), models.UniqueConstraint(condition=models.Q(('institution_id__isnull', True)), fields=('slug',), name='uq_course_tags_global_slug')],
+                "db_table": "course_tags",
+                "indexes": [
+                    models.Index(
+                        fields=["institution_id", "slug"], name="idx_course_tags_scope_slug"
+                    )
+                ],
+                "constraints": [
+                    models.UniqueConstraint(
+                        condition=models.Q(("institution_id__isnull", False)),
+                        fields=("institution_id", "slug"),
+                        name="uq_course_tags_inst_slug",
+                    ),
+                    models.UniqueConstraint(
+                        condition=models.Q(("institution_id__isnull", True)),
+                        fields=("slug",),
+                        name="uq_course_tags_global_slug",
+                    ),
+                ],
             },
         ),
         migrations.CreateModel(
-            name='CourseTagLink',
+            name="CourseTagLink",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('course', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='tag_links', to='courses.course')),
-                ('tag', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='course_links', to='courses.coursetag')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "course",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="tag_links",
+                        to="courses.course",
+                    ),
+                ),
+                (
+                    "tag",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="course_links",
+                        to="courses.coursetag",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'course_tag_links',
+                "db_table": "course_tag_links",
             },
         ),
         migrations.CreateModel(
-            name='LearningOutcome',
+            name="LearningOutcome",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('description', models.TextField()),
-                ('position', models.PositiveIntegerField()),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('course', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='learning_outcomes', to='courses.course')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                ("description", models.TextField()),
+                ("position", models.PositiveIntegerField()),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "course",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="learning_outcomes",
+                        to="courses.course",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'learning_outcomes',
-                'ordering': ['position', 'id'],
+                "db_table": "learning_outcomes",
+                "ordering": ["position", "id"],
             },
         ),
         migrations.AddIndex(
-            model_name='coursecategory',
-            index=models.Index(fields=['parent_category'], name='idx_course_cat_parent'),
+            model_name="coursecategory",
+            index=models.Index(fields=["parent_category"], name="idx_course_cat_parent"),
         ),
         migrations.AddIndex(
-            model_name='coursecategory',
-            index=models.Index(fields=['institution_id', 'slug'], name='idx_course_cat_scope_slug'),
+            model_name="coursecategory",
+            index=models.Index(fields=["institution_id", "slug"], name="idx_course_cat_scope_slug"),
         ),
         migrations.AddConstraint(
-            model_name='coursecategory',
-            constraint=models.UniqueConstraint(condition=models.Q(('institution_id__isnull', False)), fields=('institution_id', 'slug'), name='uq_course_cat_inst_slug'),
+            model_name="coursecategory",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("institution_id__isnull", False)),
+                fields=("institution_id", "slug"),
+                name="uq_course_cat_inst_slug",
+            ),
         ),
         migrations.AddConstraint(
-            model_name='coursecategory',
-            constraint=models.UniqueConstraint(condition=models.Q(('institution_id__isnull', True)), fields=('slug',), name='uq_course_cat_global_slug'),
+            model_name="coursecategory",
+            constraint=models.UniqueConstraint(
+                condition=models.Q(("institution_id__isnull", True)),
+                fields=("slug",),
+                name="uq_course_cat_global_slug",
+            ),
         ),
         migrations.AddIndex(
-            model_name='coursecategorylink',
-            index=models.Index(fields=['category'], name='idx_course_cat_links_cat'),
+            model_name="coursecategorylink",
+            index=models.Index(fields=["category"], name="idx_course_cat_links_cat"),
         ),
         migrations.AddConstraint(
-            model_name='coursecategorylink',
-            constraint=models.UniqueConstraint(fields=('course', 'category'), name='uq_course_category_links_course_category'),
+            model_name="coursecategorylink",
+            constraint=models.UniqueConstraint(
+                fields=("course", "category"), name="uq_course_category_links_course_category"
+            ),
         ),
         migrations.AddIndex(
-            model_name='courseprerequisite',
-            index=models.Index(fields=['prerequisite_course'], name='idx_course_prereq_prereq'),
+            model_name="courseprerequisite",
+            index=models.Index(fields=["prerequisite_course"], name="idx_course_prereq_prereq"),
         ),
         migrations.AddConstraint(
-            model_name='courseprerequisite',
-            constraint=models.UniqueConstraint(fields=('course', 'prerequisite_course'), name='uq_course_prereq_course_prereq'),
+            model_name="courseprerequisite",
+            constraint=models.UniqueConstraint(
+                fields=("course", "prerequisite_course"), name="uq_course_prereq_course_prereq"
+            ),
         ),
         migrations.AddIndex(
-            model_name='coursetaglink',
-            index=models.Index(fields=['tag'], name='idx_course_tag_links_tag'),
+            model_name="coursetaglink",
+            index=models.Index(fields=["tag"], name="idx_course_tag_links_tag"),
         ),
         migrations.AddConstraint(
-            model_name='coursetaglink',
-            constraint=models.UniqueConstraint(fields=('course', 'tag'), name='uq_course_tag_links_course_tag'),
+            model_name="coursetaglink",
+            constraint=models.UniqueConstraint(
+                fields=("course", "tag"), name="uq_course_tag_links_course_tag"
+            ),
         ),
         migrations.AddIndex(
-            model_name='learningoutcome',
-            index=models.Index(fields=['course'], name='idx_learning_outcomes_course'),
+            model_name="learningoutcome",
+            index=models.Index(fields=["course"], name="idx_learning_outcomes_course"),
         ),
         migrations.AddConstraint(
-            model_name='learningoutcome',
-            constraint=models.UniqueConstraint(fields=('course', 'position'), name='uq_learning_outcomes_course_position'),
+            model_name="learningoutcome",
+            constraint=models.UniqueConstraint(
+                fields=("course", "position"), name="uq_learning_outcomes_course_position"
+            ),
         ),
     ]

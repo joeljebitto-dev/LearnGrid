@@ -76,7 +76,9 @@ def test_jwt_authentication_accepts_valid_access_token(api_factory):
 
 def test_jwt_authentication_rejects_malformed_and_expired_tokens(api_factory):
     with pytest.raises(AuthenticationFailed):
-        JWTAuthentication().authenticate(api_factory.get("/", HTTP_AUTHORIZATION="Bearer not-a-jwt"))
+        JWTAuthentication().authenticate(
+            api_factory.get("/", HTTP_AUTHORIZATION="Bearer not-a-jwt")
+        )
 
     with pytest.raises(AuthenticationFailed):
         JWTAuthentication().authenticate(
@@ -118,7 +120,9 @@ def test_remote_permission_denies_unauthorized_and_network_failure(monkeypatch, 
     request = authenticated_request(api_factory, token)
     permission = permissions.RemoteAuthorizationPermission()
 
-    monkeypatch.setattr(permissions.urlrequest, "urlopen", lambda _request, timeout: FakeResponse(False))
+    monkeypatch.setattr(
+        permissions.urlrequest, "urlopen", lambda _request, timeout: FakeResponse(False)
+    )
     assert not permission.has_permission(request, CourseView(uuid4()))
 
     def broken_urlopen(_request, timeout):

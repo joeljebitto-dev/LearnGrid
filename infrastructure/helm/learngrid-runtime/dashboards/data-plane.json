@@ -1,0 +1,44 @@
+{
+  "uid": "learngrid-data-plane",
+  "title": "LearnGrid Data Plane",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Kafka consumer lag",
+      "targets": [
+        {
+          "expr": "sum(kafka_consumergroup_lag) by (consumergroup, topic)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "PostgreSQL up",
+      "targets": [
+        {
+          "expr": "pg_up"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Redis commands",
+      "targets": [
+        {
+          "expr": "sum(rate(redis_commands_processed_total[5m]))"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Kubernetes pod restarts",
+      "targets": [
+        {
+          "expr": "sum(increase(kube_pod_container_status_restarts_total[15m])) by (pod)"
+        }
+      ]
+    }
+  ]
+}

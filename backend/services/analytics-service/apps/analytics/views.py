@@ -9,8 +9,6 @@ from rest_framework.exceptions import ValidationError
 from .models import DashboardScopeType, SearchResourceType
 from .selectors import (
     dashboard_aggregates,
-    dashboard_payload,
-    platform_dashboard_payload,
     report_snapshots,
     search_index_records,
     usage_metrics,
@@ -35,6 +33,8 @@ from .serializers import (
 from .services import (
     allowed_search_resource_types,
     auth_token,
+    cached_dashboard_payload,
+    cached_platform_dashboard_payload,
     create_usage_metric,
     create_report_snapshot,
     current_profile,
@@ -68,7 +68,7 @@ class StudentDashboardView(APIView):
         require_profile_view(token=token, institution_id=profile.get("institution_id"))
         scope_type, scope_id = dashboard_scope_for_profile(profile)
         return Response(
-            dashboard_payload(
+            cached_dashboard_payload(
                 portal="student",
                 scope_type=scope_type,
                 scope_id=scope_id,
@@ -88,7 +88,7 @@ class InstructorDashboardView(APIView):
         require_analytics_view(token=token, institution_id=profile.get("institution_id"))
         scope_type, scope_id = dashboard_scope_for_profile(profile)
         return Response(
-            dashboard_payload(
+            cached_dashboard_payload(
                 portal="instructor",
                 scope_type=scope_type,
                 scope_id=scope_id,
@@ -107,7 +107,7 @@ class AdminInstitutionDashboardView(APIView):
             raise ValidationError({"institution_id": "institution_id query parameter is required."})
         require_analytics_view(token=auth_token(request), institution_id=institution_id)
         return Response(
-            dashboard_payload(
+            cached_dashboard_payload(
                 portal="admin",
                 scope_type=DashboardScopeType.INSTITUTION,
                 scope_id=institution_id,
@@ -126,7 +126,7 @@ class AdminSystemDashboardView(APIView):
             profile = current_profile(token=token)
         except Exception:
             profile = None
-        return Response(platform_dashboard_payload(profile=profile))
+        return Response(cached_platform_dashboard_payload(profile=profile))
 
 
 class EventIngestView(APIView):

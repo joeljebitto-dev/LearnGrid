@@ -7,7 +7,11 @@ from django.conf import settings
 
 from learngrid_events.adapters import FakeKafkaAdapter
 from learngrid_events.consumer import DuplicateEvent, consume_event
-from learngrid_events.envelope import EventValidationError, create_event_envelope, validate_event_envelope
+from learngrid_events.envelope import (
+    EventValidationError,
+    create_event_envelope,
+    validate_event_envelope,
+)
 from learngrid_events.producer import publish_event
 from learngrid_events.topics import BASE_TOPICS, DEAD_LETTER_TOPICS, RETRY_TOPICS, TopicName
 

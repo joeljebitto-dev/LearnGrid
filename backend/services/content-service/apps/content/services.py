@@ -3,8 +3,12 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import os
 import re
 import secrets
+import shlex
+import subprocess
+import tempfile
 import uuid
 from datetime import timedelta
 from io import BytesIO
@@ -42,24 +46,39 @@ UPLOAD_STATUS_COMPLETE = "complete"
 UPLOAD_STATUS_PENDING = "pending"
 
 
-def validate_file_metadata(*, mime_type: str, file_size_bytes: int) -> None:
+def validate_file_metadata(
+    *,
+    mime_type: str,
+    file_size_bytes: int,
+    file_name: str | None = None,
+    object_key: str | None = None,
+) -> None:
     if mime_type not in settings.CONTENT_ALLOWED_MIME_TYPES:
         raise ValidationError({"mime_type": "File type is not allowed."})
     if file_size_bytes <= 0:
         raise ValidationError({"file_size_bytes": "File size must be greater than zero."})
     if file_size_bytes > settings.CONTENT_MAX_UPLOAD_SIZE_BYTES:
         raise ValidationError({"file_size_bytes": "File size exceeds the configured limit."})
+    if file_name:
+        validate_file_name(file_name)
+    if object_key:
+        validate_object_key(object_key)
 
 
-def create_asset(*, validated_data: dict[str, Any], correlation_id: str | None = None) -> ContentAsset:
+def create_asset(
+    *, validated_data: dict[str, Any], correlation_id: str | None = None
+) -> ContentAsset:
     file_data = validated_data.pop("file", None)
     if file_data:
         provider = validate_minio_provider(file_data)
         validate_file_metadata(
             mime_type=file_data["mime_type"],
             file_size_bytes=file_data["file_size_bytes"],
+            file_name=file_data["file_name"],
+            object_key=file_data["object_key"],
         )
         verify_storage_object_matches(file_data)
+        scan_stored_object(file_data)
     with transaction.atomic():
         metadata = with_upload_metadata(
             validated_data.get("metadata"),
@@ -100,6 +119,7 @@ def create_presigned_upload(
     validate_file_metadata(
         mime_type=validated_data["mime_type"],
         file_size_bytes=validated_data["file_size_bytes"],
+        file_name=validated_data["file_name"],
     )
     asset_id = uuid.uuid4()
     object_key = build_object_key(
@@ -159,6 +179,13 @@ def complete_presigned_upload(
         "file_size_bytes": file_metadata.file_size_bytes,
     }
     verify_storage_object_matches(expected)
+    scan_stored_object(
+        {
+            **expected,
+            "bucket_name": file_metadata.bucket_name,
+            "file_name": file_metadata.file_name,
+        }
+    )
     if checksum_sha256:
         file_metadata.checksum_sha256 = checksum_sha256
         file_metadata.save(update_fields=["checksum_sha256"])
@@ -192,7 +219,11 @@ def proxy_upload_asset(
     uploaded_file = validated_data.pop("file")
     file_size = uploaded_file.size
     mime_type = uploaded_file.content_type or "application/octet-stream"
-    validate_file_metadata(mime_type=mime_type, file_size_bytes=file_size)
+    validate_file_metadata(
+        mime_type=mime_type,
+        file_size_bytes=file_size,
+        file_name=uploaded_file.name,
+    )
     asset_id = uuid.uuid4()
     object_key = build_object_key(
         institution_id=validated_data["institution_id"],
@@ -200,6 +231,16 @@ def proxy_upload_asset(
         file_name=uploaded_file.name,
     )
     data, checksum_sha256 = read_uploaded_file(uploaded_file)
+    scan_uploaded_file_data(
+        data,
+        metadata={
+            "object_key": object_key,
+            "file_name": uploaded_file.name,
+            "mime_type": mime_type,
+            "file_size_bytes": file_size,
+            "bucket_name": storage_bucket(),
+        },
+    )
     upload_storage_object(
         object_key=object_key,
         data=data,
@@ -291,9 +332,9 @@ def create_content_version(
     change_note: str | None = None,
 ) -> ContentVersion:
     version_number = (
-        ContentVersion.objects.filter(content_asset=asset).aggregate(max_version=Max("version_number"))[
-            "max_version"
-        ]
+        ContentVersion.objects.filter(content_asset=asset).aggregate(
+            max_version=Max("version_number")
+        )["max_version"]
         or 0
     ) + 1
     return ContentVersion.objects.create(
@@ -308,7 +349,9 @@ def create_content_version(
 def grant_signed_access(*, asset: ContentAsset, requested_by_profile_id, request) -> dict[str, Any]:
     if asset.status == ContentAssetStatus.DELETED or not asset_is_uploaded(asset):
         raise PermissionDenied("Content is not available for download.")
-    if not has_asset_grant(asset=asset, profile_id=requested_by_profile_id, required_permission="download"):
+    if not has_asset_grant(
+        asset=asset, profile_id=requested_by_profile_id, required_permission="download"
+    ):
         if str(asset.owner_profile_id) != str(requested_by_profile_id):
             raise PermissionDenied("Content download is not allowed.")
     token = secrets.token_urlsafe(32)
@@ -371,18 +414,23 @@ def has_asset_grant(*, asset: ContentAsset, profile_id, required_permission: str
     if required_permission == "download":
         allowed.append(ContentPermissionValue.DOWNLOAD)
     now = timezone.now()
-    return ContentPermission.objects.filter(
-        content_asset=asset,
-        grantee_type="profile",
-        grantee_id=profile_id,
-        permission__in=allowed,
-    ).filter(expires_at__isnull=True).exists() or ContentPermission.objects.filter(
-        content_asset=asset,
-        grantee_type="profile",
-        grantee_id=profile_id,
-        permission__in=allowed,
-        expires_at__gt=now,
-    ).exists()
+    return (
+        ContentPermission.objects.filter(
+            content_asset=asset,
+            grantee_type="profile",
+            grantee_id=profile_id,
+            permission__in=allowed,
+        )
+        .filter(expires_at__isnull=True)
+        .exists()
+        or ContentPermission.objects.filter(
+            content_asset=asset,
+            grantee_type="profile",
+            grantee_id=profile_id,
+            permission__in=allowed,
+            expires_at__gt=now,
+        ).exists()
+    )
 
 
 def _asset_file_metadata(asset: ContentAsset) -> FileMetadata | None:
@@ -407,6 +455,7 @@ def validate_minio_provider(file_data: dict[str, Any]) -> str:
 
 
 def verify_storage_object_matches(file_data: dict[str, Any]) -> None:
+    validate_object_key(file_data["object_key"])
     stat = stat_storage_object(file_data["object_key"])
     if stat.size != file_data["file_size_bytes"]:
         raise ValidationError({"file_size_bytes": "Stored object size does not match metadata."})
@@ -442,7 +491,36 @@ def build_upload_headers(*, mime_type: str, checksum_sha256: str | None = None) 
     return headers
 
 
+def validate_file_name(file_name: str) -> None:
+    if not file_name or "\x00" in file_name or "/" in file_name or "\\" in file_name:
+        raise ValidationError({"file_name": "File name is invalid."})
+    extension = PurePath(file_name).suffix.lower()
+    if not extension or extension not in allowed_file_extensions():
+        raise ValidationError({"file_name": "File extension is not allowed."})
+
+
+def validate_object_key(object_key: str) -> None:
+    if (
+        not object_key
+        or "\x00" in object_key
+        or "\\" in object_key
+        or object_key.startswith("/")
+        or object_key.strip() != object_key
+    ):
+        raise ValidationError({"object_key": "Object key is invalid."})
+    if any(part in {"", ".", ".."} for part in object_key.split("/")):
+        raise ValidationError({"object_key": "Object key contains an unsafe path segment."})
+
+
+def allowed_file_extensions() -> set[str]:
+    return {
+        extension if extension.startswith(".") else f".{extension}"
+        for extension in settings.CONTENT_ALLOWED_FILE_EXTENSIONS
+    }
+
+
 def build_object_key(*, institution_id, asset_id, file_name: str) -> str:
+    validate_file_name(file_name)
     base_name = PurePath(file_name).name
     safe_name = re.sub(r"[^A-Za-z0-9._-]+", "-", base_name).strip("-") or "upload.bin"
     return f"institutions/{institution_id}/assets/{asset_id}/{uuid.uuid4()}-{safe_name}"
@@ -458,8 +536,73 @@ def read_uploaded_file(uploaded_file) -> tuple[BytesIO, str]:
     return buffer, digest.hexdigest()
 
 
+def scan_uploaded_file_data(data: BytesIO, *, metadata: dict[str, Any]) -> None:
+    if not settings.CONTENT_MALWARE_SCAN_ENABLED:
+        return
+    original_position = data.tell()
+    try:
+        data.seek(0)
+        with tempfile.NamedTemporaryFile(prefix="learngrid-upload-", suffix=".scan") as temporary:
+            temporary.write(data.read())
+            temporary.flush()
+            run_malware_scan(temporary.name, metadata=metadata)
+    finally:
+        data.seek(original_position)
+
+
+def scan_stored_object(file_data: dict[str, Any]) -> None:
+    if not settings.CONTENT_MALWARE_SCAN_ENABLED:
+        return
+    run_malware_scan(
+        file_data["object_key"],
+        metadata={
+            "object_key": file_data["object_key"],
+            "file_name": file_data.get("file_name"),
+            "mime_type": file_data.get("mime_type"),
+            "file_size_bytes": file_data.get("file_size_bytes"),
+            "bucket_name": file_data.get("bucket_name") or storage_bucket(),
+        },
+    )
+
+
+def run_malware_scan(target: str, *, metadata: dict[str, Any]) -> None:
+    command = settings.CONTENT_MALWARE_SCANNER_COMMAND.strip()
+    if not command:
+        raise ValidationError({"file": "Malware scanning is enabled but no scanner is configured."})
+
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "LG_SCAN_TARGET": target,
+            "LG_SCAN_OBJECT_KEY": str(metadata.get("object_key") or ""),
+            "LG_SCAN_BUCKET": str(metadata.get("bucket_name") or ""),
+            "LG_SCAN_FILE_NAME": str(metadata.get("file_name") or ""),
+            "LG_SCAN_MIME_TYPE": str(metadata.get("mime_type") or ""),
+            "LG_SCAN_FILE_SIZE_BYTES": str(metadata.get("file_size_bytes") or ""),
+        }
+    )
+    try:
+        result = subprocess.run(
+            [*shlex.split(command), target],
+            check=False,
+            env=environment,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=settings.CONTENT_MALWARE_SCAN_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ValidationError({"file": "Malware scan timed out."}) from exc
+    except (OSError, ValueError) as exc:
+        raise ValidationError({"file": "Malware scanner could not be executed."}) from exc
+
+    if result.returncode != 0:
+        raise ValidationError({"file": "Uploaded file did not pass malware scanning."})
+
+
 def hash_access_token(token: str) -> str:
-    return hmac.new(settings.SECRET_KEY.encode("utf-8"), token.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.new(
+        settings.SECRET_KEY.encode("utf-8"), token.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
 
 
 def publish_content_event(

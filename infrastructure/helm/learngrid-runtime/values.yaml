@@ -1,0 +1,40 @@
+namespace: learngrid
+
+postgres:
+  clusterName: learngrid-postgres
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:16
+  storageSize: 50Gi
+  backupBucket: learngrid-postgres-backups
+  backupEndpointUrl: http://minio:9000
+  credentialsSecret: postgres-superuser
+  backupCredentialsSecret: postgres-backup-s3
+  databases:
+    - auth_db
+    - user_db
+    - course_db
+    - content_db
+    - enrollment_db
+    - progress_db
+    - assessment_db
+    - grading_db
+    - notification_db
+    - analytics_db
+
+minio:
+  tenantName: minio
+  credentialsSecret: minio-root
+  storageSize: 100Gi
+
+kafka:
+  clusterName: learngrid-kafka
+  replicas: 3
+  storageSize: 50Gi
+
+redis:
+  replicas: 3
+  storageSize: 10Gi
+
+observability:
+  retention: 15d
+  grafanaAdminSecret: grafana-admin

@@ -1,8 +1,9 @@
+from django.conf import settings
 from django.shortcuts import get_object_or_404
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.exceptions import PermissionDenied
 
 from .models import Account, AssignmentScopeType, Permission, Role, RoleAssignment
 from .permissions import CanManageRbac
@@ -13,6 +14,8 @@ from .serializers import (
     AccountUpdateSerializer,
     AuthorizationCheckSerializer,
     LogoutSerializer,
+    PasswordResetConfirmSerializer,
+    PasswordResetRequestSerializer,
     PermissionSerializer,
     RoleAssignmentCreateSerializer,
     RoleAssignmentSerializer,
@@ -22,12 +25,14 @@ from .serializers import (
 )
 from .services import (
     assign_role,
+    confirm_password_reset,
     create_managed_account,
     deactivate_managed_account,
     has_active_role,
     has_permission,
     issue_token_pair_for_credentials,
     logout_tokens,
+    request_password_reset,
     refresh_token_pair,
     require_permission,
     revoke_role_assignment,
@@ -77,16 +82,49 @@ class LogoutView(APIView):
         return Response({"status": "revoked"})
 
 
+class PasswordResetRequestView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        serializer = PasswordResetRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        raw_token = request_password_reset(
+            email=serializer.validated_data["email"],
+            request=request,
+        )
+        response = {"status": "accepted"}
+        if settings.AUTH_PASSWORD_RESET_DEBUG_RETURN_TOKEN and raw_token:
+            response["token"] = raw_token
+        return Response(response)
+
+
+class PasswordResetConfirmView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        serializer = PasswordResetConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        confirm_password_reset(
+            token=serializer.validated_data["token"],
+            new_password=serializer.validated_data["new_password"],
+        )
+        return Response({"status": "reset"})
+
+
 class SessionView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         account = request.user
         assignments = list(
-            RoleAssignment.objects.select_related("role").filter(
+            RoleAssignment.objects.select_related("role")
+            .filter(
                 account=account,
                 revoked_at__isnull=True,
-            ).order_by("assigned_at", "id")
+            )
+            .order_by("assigned_at", "id")
         )
         role_precedence = [
             "super_admin",
@@ -199,7 +237,9 @@ def _require_account_scope_permission(request, scope_type, scope_id) -> None:
         scope_type=scope_type,
         scope_id=scope_id,
     )
-    if scope_type == AssignmentScopeType.PLATFORM and not has_active_role(request.user, "super_admin"):
+    if scope_type == AssignmentScopeType.PLATFORM and not has_active_role(
+        request.user, "super_admin"
+    ):
         raise PermissionDenied("Only Super Admin users can perform platform account operations.")
 
 
@@ -245,6 +285,10 @@ class AccountDetailView(APIView):
         account = update_managed_account(
             account,
             **update_kwargs,
+            actor_account=request.user,
+            request=request,
+            scope_type=scope_type,
+            scope_id=scope_id,
         )
         return Response(AccountSerializer(account).data)
 
@@ -260,5 +304,11 @@ class AccountDeactivateView(APIView):
         _require_account_scope_permission(request, scope_type, scope_id)
 
         account = get_object_or_404(Account.objects.select_related("credential"), id=account_id)
-        account = deactivate_managed_account(account)
+        account = deactivate_managed_account(
+            account,
+            actor_account=request.user,
+            request=request,
+            scope_type=scope_type,
+            scope_id=scope_id,
+        )
         return Response(AccountSerializer(account).data)

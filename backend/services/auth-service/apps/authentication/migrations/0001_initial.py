@@ -15,7 +15,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Account",
             fields=[
-                ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
                 ("email", models.EmailField(max_length=254, unique=True)),
                 ("phone", models.CharField(blank=True, max_length=32, null=True, unique=True)),
                 (
@@ -49,7 +54,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Credential",
             fields=[
-                ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
                 ("password_hash", models.TextField()),
                 ("password_changed_at", models.DateTimeField(default=django.utils.timezone.now)),
                 ("must_change_password", models.BooleanField(default=False)),
@@ -68,13 +78,20 @@ class Migration(migrations.Migration):
             ],
             options={
                 "db_table": "credentials",
-                "indexes": [models.Index(fields=["locked_until"], name="idx_credentials_locked_until")],
+                "indexes": [
+                    models.Index(fields=["locked_until"], name="idx_credentials_locked_until")
+                ],
             },
         ),
         migrations.CreateModel(
             name="LoginAuditLog",
             fields=[
-                ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
                 ("email_attempted", models.EmailField(blank=True, max_length=254, null=True)),
                 (
                     "event_type",
@@ -107,7 +124,9 @@ class Migration(migrations.Migration):
             options={
                 "db_table": "login_audit_logs",
                 "indexes": [
-                    models.Index(fields=["account", "created_at"], name="idx_login_audit_account_ts"),
+                    models.Index(
+                        fields=["account", "created_at"], name="idx_login_audit_account_ts"
+                    ),
                     models.Index(fields=["event_type"], name="idx_login_audit_event_type"),
                     models.Index(fields=["email_attempted"], name="idx_login_audit_email"),
                 ],
@@ -116,7 +135,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="RefreshToken",
             fields=[
-                ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
                 ("token_jti", models.UUIDField(unique=True)),
                 ("token_hash", models.TextField()),
                 ("issued_at", models.DateTimeField(default=django.utils.timezone.now)),
@@ -145,7 +169,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="TokenBlacklist",
             fields=[
-                ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
                 ("token_jti", models.UUIDField(unique=True)),
                 (
                     "reason",
@@ -176,7 +205,9 @@ class Migration(migrations.Migration):
             ],
             options={
                 "db_table": "token_blacklist",
-                "indexes": [models.Index(fields=["expires_at"], name="idx_token_blacklist_expires_at")],
+                "indexes": [
+                    models.Index(fields=["expires_at"], name="idx_token_blacklist_expires_at")
+                ],
             },
         ),
     ]

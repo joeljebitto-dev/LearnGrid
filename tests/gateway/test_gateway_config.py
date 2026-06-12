@@ -34,4 +34,13 @@ def test_nginx_config_has_gateway_controls():
     assert "limit_req_zone" in config
     assert "client_max_body_size 20m" in config
     assert "Access-Control-Allow-Origin" in config
+    assert 'default ""' in config
+    assert 'add_header Vary "Origin" always' in config
+    assert "Strict-Transport-Security" in config
+    assert "X-Content-Type-Options" in config
+    assert "X-Frame-Options" in config
+    assert "Referrer-Policy" in config
+    assert "Permissions-Policy" in config
+    assert "Content-Security-Policy" in config
+    assert "frame-ancestors 'none'" in config
     assert "learngrid_json" in config

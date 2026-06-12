@@ -41,7 +41,9 @@ class Command(BaseCommand):
                 if str(message.value.get("event_id")) != options["event_id"]:
                     continue
                 headers = decode_headers(message.headers)
-                original_topic = headers.get("x-original-topic") or options["topic"].removesuffix(".dlq")
+                original_topic = headers.get("x-original-topic") or options["topic"].removesuffix(
+                    ".dlq"
+                )
                 producer.send(
                     retry_topic(original_topic),
                     message.value,

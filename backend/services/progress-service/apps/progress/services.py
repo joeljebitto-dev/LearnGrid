@@ -99,7 +99,9 @@ def update_assessment_progress(*, validated_data: dict[str, Any]) -> AssessmentP
     return progress
 
 
-def recalculate_course_progress(*, student_profile_id, course_id, total_lessons=None, total_assessments=None) -> CourseProgress:
+def recalculate_course_progress(
+    *, student_profile_id, course_id, total_lessons=None, total_assessments=None
+) -> CourseProgress:
     lessons_completed = LessonProgress.objects.filter(
         student_profile_id=student_profile_id,
         course_id=course_id,
@@ -136,7 +138,10 @@ def recalculate_course_progress(*, student_profile_id, course_id, total_lessons=
         progress.completed_at = None
     progress.save()
     publish_progress_event(
-        event_type="CourseCompleted" if progress.status == CourseProgressStatus.COMPLETED and previous_status != CourseProgressStatus.COMPLETED else "CourseProgressUpdated",
+        event_type="CourseCompleted"
+        if progress.status == CourseProgressStatus.COMPLETED
+        and previous_status != CourseProgressStatus.COMPLETED
+        else "CourseProgressUpdated",
         aggregate_id=progress.id,
         payload={
             "student_profile_id": str(student_profile_id),
@@ -148,7 +153,9 @@ def recalculate_course_progress(*, student_profile_id, course_id, total_lessons=
     return progress
 
 
-def process_progress_event(*, event_id, event_type: str, aggregate_id, payload: dict[str, Any]) -> dict[str, Any]:
+def process_progress_event(
+    *, event_id, event_type: str, aggregate_id, payload: dict[str, Any]
+) -> dict[str, Any]:
     if ProgressEvent.objects.filter(event_id=event_id).exists():
         return {"status": "duplicate", "event_id": str(event_id)}
     ProgressEvent.objects.create(
@@ -158,15 +165,21 @@ def process_progress_event(*, event_id, event_type: str, aggregate_id, payload: 
         payload=payload,
     )
     if event_type == "LessonViewed":
-        update_lesson_progress(validated_data={**payload, "status": LessonProgressStatus.IN_PROGRESS})
+        update_lesson_progress(
+            validated_data={**payload, "status": LessonProgressStatus.IN_PROGRESS}
+        )
     elif event_type == "VideoCompleted":
         update_video_progress(validated_data={**payload, "percent_complete": 100})
     elif event_type in {"QuizSubmitted", "AssignmentSubmitted"}:
-        update_assessment_progress(validated_data={**payload, "status": AssessmentProgressStatus.SUBMITTED})
+        update_assessment_progress(
+            validated_data={**payload, "status": AssessmentProgressStatus.SUBMITTED}
+        )
     return {"status": "processed", "event_id": str(event_id)}
 
 
-def publish_progress_event(*, event_type: str, aggregate_id, payload: dict[str, Any]) -> dict[str, Any]:
+def publish_progress_event(
+    *, event_type: str, aggregate_id, payload: dict[str, Any]
+) -> dict[str, Any]:
     event = publish_kafka_event(
         event_type=event_type,
         aggregate_id=aggregate_id,
@@ -178,7 +191,12 @@ def publish_progress_event(*, event_type: str, aggregate_id, payload: dict[str, 
 
 
 def handle_kafka_progress_event(event: dict[str, Any]) -> dict[str, Any]:
-    if event["event_type"] not in {"LessonViewed", "VideoCompleted", "QuizSubmitted", "AssignmentSubmitted"}:
+    if event["event_type"] not in {
+        "LessonViewed",
+        "VideoCompleted",
+        "QuizSubmitted",
+        "AssignmentSubmitted",
+    }:
         return {"status": "skipped", "event_id": event["event_id"]}
     result = process_progress_event(
         event_id=event["event_id"],

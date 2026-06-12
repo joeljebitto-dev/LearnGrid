@@ -9,6 +9,7 @@ from apps.authentication.models import (
     Account,
     AccountStatus,
     AssignmentScopeType,
+    AuthorizationAuditLog,
     Credential,
     RefreshToken,
     Role,
@@ -78,6 +79,34 @@ def test_admin_can_create_account_with_temporary_password_and_role(api_client):
         scope_id=institution_id,
         revoked_at__isnull=True,
     ).exists()
+    assert AuthorizationAuditLog.objects.filter(
+        actor_account=admin,
+        target_account=account,
+        event_type=services.AUTH_ACCOUNT_CREATED_AUDIT_EVENT,
+        scope_type=AssignmentScopeType.INSTITUTION,
+        scope_id=institution_id,
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_account_creation_rejects_weak_password(api_client):
+    admin = make_super_admin()
+    access = issue_access_token(admin)
+
+    response = api_client.post(
+        "/api/auth/accounts/",
+        {
+            "email": "weak@example.com",
+            "temporary_password": "short",
+            "scope_type": "platform",
+        },
+        HTTP_AUTHORIZATION=f"Bearer {access}",
+        format="json",
+    )
+
+    assert response.status_code == 400
+    assert "temporary_password" in response.json()
+    assert not Account.objects.filter(email="weak@example.com").exists()
 
 
 @pytest.mark.django_db
@@ -121,6 +150,12 @@ def test_account_update_changes_email_and_phone_without_password_data(api_client
     target.refresh_from_db()
     assert target.email == "new@example.com"
     assert target.phone == "+15550000002"
+    assert AuthorizationAuditLog.objects.filter(
+        actor_account=admin,
+        target_account=target,
+        event_type=services.AUTH_ACCOUNT_UPDATED_AUDIT_EVENT,
+        scope_type=AssignmentScopeType.PLATFORM,
+    ).exists()
 
 
 @pytest.mark.django_db
@@ -141,7 +176,15 @@ def test_deactivation_changes_status_and_invalidates_tokens(api_client):
     target.refresh_from_db()
     assert target.status == AccountStatus.DEACTIVATED
     assert target.deleted_at is not None
-    assert RefreshToken.objects.get(token_hash=services.hash_token(target_tokens.refresh)).revoked_at
+    assert RefreshToken.objects.get(
+        token_hash=services.hash_token(target_tokens.refresh)
+    ).revoked_at
+    assert AuthorizationAuditLog.objects.filter(
+        actor_account=admin,
+        target_account=target,
+        event_type=services.AUTH_ACCOUNT_DEACTIVATED_AUDIT_EVENT,
+        scope_type=AssignmentScopeType.PLATFORM,
+    ).exists()
 
     response = api_client.get(
         "/api/auth/session/",

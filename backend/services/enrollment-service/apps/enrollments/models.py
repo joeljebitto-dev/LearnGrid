@@ -155,6 +155,8 @@ class AccessGrant(models.Model):
             ),
         ]
         indexes = [
-            models.Index(fields=["student_profile_id", "course_id"], name="idx_access_student_course"),
+            models.Index(
+                fields=["student_profile_id", "course_id"], name="idx_access_student_course"
+            ),
             models.Index(fields=["course_id", "access_status"], name="idx_access_course_status"),
         ]

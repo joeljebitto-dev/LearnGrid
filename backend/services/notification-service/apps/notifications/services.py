@@ -123,7 +123,9 @@ def update_notification_template(
     return template
 
 
-def upsert_user_notification_preference(*, validated_data: dict[str, Any]) -> UserNotificationPreference:
+def upsert_user_notification_preference(
+    *, validated_data: dict[str, Any]
+) -> UserNotificationPreference:
     preference, _created = UserNotificationPreference.objects.update_or_create(
         profile_id=validated_data["profile_id"],
         event_type=validated_data["event_type"],
@@ -135,7 +137,9 @@ def upsert_user_notification_preference(*, validated_data: dict[str, Any]) -> Us
 
 @transaction.atomic
 def ingest_notification_event(*, event: dict[str, Any]) -> dict[str, Any]:
-    recipients = recipient_profile_ids_for_event(event_type=event["event_type"], payload=event["payload"])
+    recipients = recipient_profile_ids_for_event(
+        event_type=event["event_type"], payload=event["payload"]
+    )
     notifications = []
     duplicate_count = 0
     skipped_count = 0
@@ -228,7 +232,9 @@ def recipient_profile_ids_for_event(*, event_type: str, payload: dict[str, Any])
     return [str(payload[field])]
 
 
-def find_existing_notification(*, recipient_profile_id, event_type: str, event_id) -> Notification | None:
+def find_existing_notification(
+    *, recipient_profile_id, event_type: str, event_id
+) -> Notification | None:
     return (
         Notification.objects.filter(
             recipient_profile_id=recipient_profile_id,
@@ -272,11 +278,15 @@ def active_template_for_event(event_type: str) -> NotificationTemplate:
 
 
 def render_template(template: str, payload: dict[str, Any]) -> str:
-    safe_payload = defaultdict(str, {key: "" if value is None else str(value) for key, value in payload.items()})
+    safe_payload = defaultdict(
+        str, {key: "" if value is None else str(value) for key, value in payload.items()}
+    )
     return Formatter().vformat(template, (), safe_payload)
 
 
-def create_delivery_attempt(*, notification: Notification, payload: dict[str, Any]) -> DeliveryAttempt:
+def create_delivery_attempt(
+    *, notification: Notification, payload: dict[str, Any]
+) -> DeliveryAttempt:
     if payload.get("force_delivery_failure") is True:
         return DeliveryAttempt.objects.create(
             notification=notification,
@@ -292,7 +302,9 @@ def create_delivery_attempt(*, notification: Notification, payload: dict[str, An
     )
 
 
-def publish_notification_event(*, event_type: str, aggregate_id, payload: dict[str, Any]) -> dict[str, Any]:
+def publish_notification_event(
+    *, event_type: str, aggregate_id, payload: dict[str, Any]
+) -> dict[str, Any]:
     return publish_kafka_event(
         event_type=event_type,
         aggregate_id=aggregate_id,

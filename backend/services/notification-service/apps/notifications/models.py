@@ -69,8 +69,12 @@ class Notification(models.Model):
     class Meta:
         db_table = "notifications"
         indexes = [
-            models.Index(fields=["recipient_profile_id", "-created_at"], name="idx_notify_recipient_created"),
-            models.Index(fields=["recipient_profile_id", "read_at"], name="idx_notify_recipient_unread"),
+            models.Index(
+                fields=["recipient_profile_id", "-created_at"], name="idx_notify_recipient_created"
+            ),
+            models.Index(
+                fields=["recipient_profile_id", "read_at"], name="idx_notify_recipient_unread"
+            ),
             models.Index(fields=["event_type"], name="idx_notifications_event_type"),
         ]
 

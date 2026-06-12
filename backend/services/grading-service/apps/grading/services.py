@@ -139,7 +139,9 @@ def fetch_grading_source(*, token: str, submission_type: str, submission_id) -> 
     )
 
 
-def mark_assignment_submission_graded(*, token: str, submission_id, grade_record_id) -> dict[str, Any]:
+def mark_assignment_submission_graded(
+    *, token: str, submission_id, grade_record_id
+) -> dict[str, Any]:
     return _json_request(
         base_url=settings.ASSESSMENT_SERVICE_BASE_URL,
         path=f"/api/assessments/submissions/{submission_id}/mark-graded/",
@@ -196,7 +198,9 @@ def calculate_grade_from_quiz(
     correlation_id: str | None = None,
 ) -> GradeRecord:
     if source["submission_type"] != "quiz_attempt":
-        raise ValidationError({"submission_type": "Automated calculation only supports quiz attempts."})
+        raise ValidationError(
+            {"submission_type": "Automated calculation only supports quiz attempts."}
+        )
     grade_record = upsert_grade_record(
         source=source,
         score=Decimal(str(source.get("score") or "0")),
@@ -254,7 +258,9 @@ def complete_manual_review(*, review: ManualReview, score, feedback: str | None)
 
 
 @transaction.atomic
-def override_grade(*, grade_record: GradeRecord, score, max_score=None, changed_by_profile_id, reason: str) -> GradeRecord:
+def override_grade(
+    *, grade_record: GradeRecord, score, max_score=None, changed_by_profile_id, reason: str
+) -> GradeRecord:
     if not reason.strip():
         raise ValidationError({"change_reason": "Override reason is required."})
     previous_score = grade_record.score
@@ -329,7 +335,9 @@ def evaluate_certificate_eligibility(
         validate_content_asset(token=token, asset_id=certificate_asset_id)
 
     threshold = certificate_pass_threshold(course_id=course_id)
-    progress = fetch_course_progress(token=token, student_profile_id=student_profile_id, course_id=course_id)
+    progress = fetch_course_progress(
+        token=token, student_profile_id=student_profile_id, course_id=course_id
+    )
     grade_percent = None
     eligible = False
     reason = "course_progress_missing"
@@ -338,7 +346,9 @@ def evaluate_certificate_eligibility(
         if not course_progress_complete(progress):
             reason = "course_incomplete"
         else:
-            grade_percent = published_grade_percent(student_profile_id=student_profile_id, course_id=course_id)
+            grade_percent = published_grade_percent(
+                student_profile_id=student_profile_id, course_id=course_id
+            )
             if grade_percent is None:
                 reason = "published_results_missing"
             elif grade_percent < threshold:
@@ -382,7 +392,9 @@ def evaluate_certificate_eligibility(
 
 
 def certificate_pass_threshold(*, course_id) -> Decimal:
-    for rule in GradingRule.objects.filter(course_id=course_id, assessment_id__isnull=True).order_by(
+    for rule in GradingRule.objects.filter(
+        course_id=course_id, assessment_id__isnull=True
+    ).order_by(
         "-updated_at",
         "-created_at",
     ):
@@ -414,10 +426,14 @@ def published_grade_percent(*, student_profile_id, course_id) -> Decimal | None:
     total_max = sum((result.grade_record.max_score for result in results), Decimal("0"))
     if total_max <= 0:
         return None
-    return ((total_score / total_max) * Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    return ((total_score / total_max) * Decimal("100")).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
 
 
-def upsert_certificate_eligibility(*, student_profile_id, course_id, eligible: bool, reason: str) -> CertificateEligibility:
+def upsert_certificate_eligibility(
+    *, student_profile_id, course_id, eligible: bool, reason: str
+) -> CertificateEligibility:
     eligibility, _created = CertificateEligibility.objects.update_or_create(
         student_profile_id=student_profile_id,
         course_id=course_id,
@@ -426,7 +442,9 @@ def upsert_certificate_eligibility(*, student_profile_id, course_id, eligible: b
     return eligibility
 
 
-def issue_certificate(*, eligibility: CertificateEligibility, certificate_asset_id=None) -> Certificate:
+def issue_certificate(
+    *, eligibility: CertificateEligibility, certificate_asset_id=None
+) -> Certificate:
     certificate, created = Certificate.objects.get_or_create(
         certificate_eligibility=eligibility,
         defaults={
@@ -436,13 +454,19 @@ def issue_certificate(*, eligibility: CertificateEligibility, certificate_asset_
             "certificate_asset_id": certificate_asset_id,
         },
     )
-    if not created and certificate_asset_id and certificate.certificate_asset_id != certificate_asset_id:
+    if (
+        not created
+        and certificate_asset_id
+        and certificate.certificate_asset_id != certificate_asset_id
+    ):
         certificate.certificate_asset_id = certificate_asset_id
         certificate.save(update_fields=["certificate_asset_id"])
     return certificate
 
 
-def update_certificate_asset(*, token: str, certificate: Certificate, certificate_asset_id) -> Certificate:
+def update_certificate_asset(
+    *, token: str, certificate: Certificate, certificate_asset_id
+) -> Certificate:
     if certificate_asset_id:
         validate_content_asset(token=token, asset_id=certificate_asset_id)
     certificate.certificate_asset_id = certificate_asset_id

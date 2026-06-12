@@ -50,7 +50,9 @@ class RemoteAuthorizationPermission(BasePermission):
             return str(explicit_scope_id)
 
         lookup_key = f"{scope_type}_id"
-        kwargs = getattr(view, "kwargs", {}) or getattr(request, "parser_context", {}).get("kwargs", {})
+        kwargs = getattr(view, "kwargs", {}) or getattr(request, "parser_context", {}).get(
+            "kwargs", {}
+        )
         if lookup_key in kwargs:
             return str(kwargs[lookup_key])
         if "scope_id" in kwargs:

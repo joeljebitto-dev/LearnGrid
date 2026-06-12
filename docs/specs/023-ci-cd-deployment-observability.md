@@ -2,7 +2,7 @@
 
 Source: [../SRD.pdf](../SRD.pdf)  
 Related task: [T-023](../tasks/T-023-ci-cd-deployment-observability.md)  
-Open decision: [OD-003 Deployment Model](../KNOWN_ISSUES.md#od-003-deployment-model)
+Resolved decision: [OD-003 Deployment Model](../KNOWN_ISSUES.md#od-003-deployment-model)
 
 ## Functional Requirements
 - SPEC-023-FR-001 Production shall use Docker containers and Kubernetes.

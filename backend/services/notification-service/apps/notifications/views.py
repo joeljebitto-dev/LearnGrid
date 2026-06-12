@@ -85,14 +85,18 @@ class NotificationTemplateListCreateView(APIView):
             request,
             view=self,
         )
-        return paginator.get_paginated_response(NotificationTemplateSerializer(page, many=True).data)
+        return paginator.get_paginated_response(
+            NotificationTemplateSerializer(page, many=True).data
+        )
 
     def post(self, request):
         require_notification_permission(request, "notification.manage")
         serializer = NotificationTemplateCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         template = create_notification_template(validated_data=serializer.validated_data)
-        return Response(NotificationTemplateSerializer(template).data, status=status.HTTP_201_CREATED)
+        return Response(
+            NotificationTemplateSerializer(template).data, status=status.HTTP_201_CREATED
+        )
 
 
 class NotificationTemplateDetailView(APIView):
@@ -108,7 +112,9 @@ class NotificationTemplateDetailView(APIView):
         template = get_object_or_404(notification_template_queryset(), id=template_id)
         serializer = NotificationTemplateUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        template = update_notification_template(template=template, validated_data=serializer.validated_data)
+        template = update_notification_template(
+            template=template, validated_data=serializer.validated_data
+        )
         return Response(NotificationTemplateSerializer(template).data)
 
 
@@ -138,7 +144,9 @@ class NotificationDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, notification_id):
-        notification = get_object_or_404(notification_queryset(), id=notification_id, deleted_at__isnull=True)
+        notification = get_object_or_404(
+            notification_queryset(), id=notification_id, deleted_at__isnull=True
+        )
         _require_owner_or_view(request, notification.recipient_profile_id)
         return Response(NotificationSerializer(notification).data)
 
@@ -147,7 +155,9 @@ class NotificationReadView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, notification_id):
-        notification = get_object_or_404(notification_queryset(), id=notification_id, deleted_at__isnull=True)
+        notification = get_object_or_404(
+            notification_queryset(), id=notification_id, deleted_at__isnull=True
+        )
         _require_owner_or_view(request, notification.recipient_profile_id)
         notification = mark_notification_read(notification=notification)
         return Response(NotificationSerializer(notification).data)
@@ -157,7 +167,9 @@ class NotificationUnreadView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, notification_id):
-        notification = get_object_or_404(notification_queryset(), id=notification_id, deleted_at__isnull=True)
+        notification = get_object_or_404(
+            notification_queryset(), id=notification_id, deleted_at__isnull=True
+        )
         _require_owner_or_view(request, notification.recipient_profile_id)
         notification = mark_notification_unread(notification=notification)
         return Response(NotificationSerializer(notification).data)
@@ -182,7 +194,9 @@ class NotificationPreferenceListCreateView(APIView):
         filters = serializer.validated_data
         profile = _current_profile(request)
         if filters.get("profile_id"):
-            if str(filters["profile_id"]) != str(profile.get("id")) and not _can_manage_notifications(request):
+            if str(filters["profile_id"]) != str(
+                profile.get("id")
+            ) and not _can_manage_notifications(request):
                 raise PermissionDenied("Preference belongs to another profile.")
         else:
             filters["profile_id"] = profile.get("id")
@@ -192,7 +206,9 @@ class NotificationPreferenceListCreateView(APIView):
             request,
             view=self,
         )
-        return paginator.get_paginated_response(UserNotificationPreferenceSerializer(page, many=True).data)
+        return paginator.get_paginated_response(
+            UserNotificationPreferenceSerializer(page, many=True).data
+        )
 
     def post(self, request):
         serializer = UserNotificationPreferenceUpsertSerializer(data=request.data)
@@ -200,12 +216,16 @@ class NotificationPreferenceListCreateView(APIView):
         profile = _current_profile(request)
         data = dict(serializer.validated_data)
         if data.get("profile_id"):
-            if str(data["profile_id"]) != str(profile.get("id")) and not _can_manage_notifications(request):
+            if str(data["profile_id"]) != str(profile.get("id")) and not _can_manage_notifications(
+                request
+            ):
                 raise PermissionDenied("Preference belongs to another profile.")
         else:
             data["profile_id"] = profile.get("id")
         preference = upsert_user_notification_preference(validated_data=data)
-        return Response(UserNotificationPreferenceSerializer(preference).data, status=status.HTTP_200_OK)
+        return Response(
+            UserNotificationPreferenceSerializer(preference).data, status=status.HTTP_200_OK
+        )
 
 
 class DeliveryAttemptListView(APIView):

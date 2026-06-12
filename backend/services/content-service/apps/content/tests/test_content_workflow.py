@@ -8,6 +8,7 @@ import jwt
 import pytest
 from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -235,6 +236,56 @@ def test_invalid_upload_and_permission_failure(api_client, access_token, monkeyp
 
 
 @pytest.mark.django_db
+def test_upload_rejects_disallowed_extension_and_unsafe_object_key(
+    api_client,
+    access_token,
+    monkeypatch,
+):
+    institution_id = uuid4()
+    allow_content(monkeypatch, institution_id)
+
+    response = api_client.post(
+        "/api/content/assets/",
+        {
+            "institution_id": str(institution_id),
+            "owner_profile_id": str(uuid4()),
+            "asset_type": "document",
+            "title": "Extension mismatch",
+            "file": {
+                "object_key": "uploads/notes.exe",
+                "file_name": "notes.exe",
+                "mime_type": "text/plain",
+                "file_size_bytes": 200,
+            },
+        },
+        **auth_headers(access_token),
+        format="json",
+    )
+    assert response.status_code == 400
+    assert "file_name" in response.json()
+
+    response = api_client.post(
+        "/api/content/assets/",
+        {
+            "institution_id": str(institution_id),
+            "owner_profile_id": str(uuid4()),
+            "asset_type": "document",
+            "title": "Unsafe key",
+            "file": {
+                "object_key": "../notes.txt",
+                "file_name": "notes.txt",
+                "mime_type": "text/plain",
+                "file_size_bytes": 200,
+            },
+        },
+        **auth_headers(access_token),
+        format="json",
+    )
+    assert response.status_code == 400
+    assert "object_key" in response.json()
+
+
+@pytest.mark.django_db
 def test_presigned_upload_initiation_and_completion(api_client, access_token, monkeypatch):
     institution_id = uuid4()
     allow_content(monkeypatch, institution_id)
@@ -288,7 +339,9 @@ def test_presigned_upload_initiation_and_completion(api_client, access_token, mo
 def test_presigned_completion_rejects_mismatched_object(api_client, access_token, monkeypatch):
     institution_id = uuid4()
     allow_content(monkeypatch, institution_id)
-    monkeypatch.setattr(services, "generate_presigned_upload_url", lambda **_kwargs: "http://upload")
+    monkeypatch.setattr(
+        services, "generate_presigned_upload_url", lambda **_kwargs: "http://upload"
+    )
     monkeypatch.setattr(
         services,
         "stat_storage_object",
@@ -355,3 +408,130 @@ def test_proxy_upload_stores_object_and_records_checksum(api_client, access_toke
     metadata = FileMetadata.objects.get(content_asset_id=response.json()["id"])
     assert metadata.storage_provider == "minio"
     assert metadata.checksum_sha256
+
+
+@pytest.mark.django_db
+def test_proxy_upload_runs_malware_scanner_when_enabled(api_client, access_token, monkeypatch):
+    institution_id = uuid4()
+    allow_content(monkeypatch, institution_id)
+    uploads = []
+    scans = []
+    monkeypatch.setattr(services, "upload_storage_object", lambda **kwargs: uploads.append(kwargs))
+
+    def scanner(command, **_kwargs):
+        scans.append(command)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(services.subprocess, "run", scanner)
+
+    with override_settings(
+        CONTENT_MALWARE_SCAN_ENABLED=True,
+        CONTENT_MALWARE_SCANNER_COMMAND="scanner",
+    ):
+        response = api_client.post(
+            "/api/content/assets/uploads/proxy/",
+            {
+                "institution_id": str(institution_id),
+                "owner_profile_id": str(uuid4()),
+                "asset_type": "pdf",
+                "title": "Scanned PDF",
+                "file": SimpleUploadedFile(
+                    "scanned.pdf",
+                    b"%PDF-1.4 scanned",
+                    content_type="application/pdf",
+                ),
+            },
+            **auth_headers(access_token),
+            format="multipart",
+        )
+
+    assert response.status_code == 201
+    assert scans
+    assert scans[0][0] == "scanner"
+    assert uploads
+
+
+@pytest.mark.django_db
+def test_malware_scanner_failure_blocks_upload(api_client, access_token, monkeypatch):
+    institution_id = uuid4()
+    allow_content(monkeypatch, institution_id)
+    uploads = []
+    monkeypatch.setattr(services, "upload_storage_object", lambda **kwargs: uploads.append(kwargs))
+    monkeypatch.setattr(
+        services.subprocess, "run", lambda *_args, **_kwargs: SimpleNamespace(returncode=1)
+    )
+
+    with override_settings(
+        CONTENT_MALWARE_SCAN_ENABLED=True,
+        CONTENT_MALWARE_SCANNER_COMMAND="scanner",
+    ):
+        response = api_client.post(
+            "/api/content/assets/uploads/proxy/",
+            {
+                "institution_id": str(institution_id),
+                "owner_profile_id": str(uuid4()),
+                "asset_type": "pdf",
+                "title": "Blocked PDF",
+                "file": SimpleUploadedFile(
+                    "blocked.pdf",
+                    b"%PDF-1.4 blocked",
+                    content_type="application/pdf",
+                ),
+            },
+            **auth_headers(access_token),
+            format="multipart",
+        )
+
+    assert response.status_code == 400
+    assert "file" in response.json()
+    assert not uploads
+    assert not ContentAsset.objects.filter(title="Blocked PDF").exists()
+
+
+@pytest.mark.django_db
+def test_malware_scanner_outage_blocks_presigned_completion(api_client, access_token, monkeypatch):
+    institution_id = uuid4()
+    allow_content(monkeypatch, institution_id)
+    monkeypatch.setattr(
+        services, "generate_presigned_upload_url", lambda **_kwargs: "http://upload"
+    )
+    monkeypatch.setattr(
+        services,
+        "stat_storage_object",
+        lambda _object_key: stored_object(size=128, content_type="text/plain"),
+    )
+    monkeypatch.setattr(
+        services.subprocess,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("scanner down")),
+    )
+
+    response = api_client.post(
+        "/api/content/assets/uploads/presigned/",
+        {
+            "institution_id": str(institution_id),
+            "owner_profile_id": str(uuid4()),
+            "asset_type": "document",
+            "title": "Scanner outage",
+            "file_name": "outage.txt",
+            "mime_type": "text/plain",
+            "file_size_bytes": 128,
+        },
+        **auth_headers(access_token),
+        format="json",
+    )
+    assert response.status_code == 201
+
+    with override_settings(
+        CONTENT_MALWARE_SCAN_ENABLED=True,
+        CONTENT_MALWARE_SCANNER_COMMAND="scanner",
+    ):
+        response = api_client.post(
+            f"/api/content/assets/{response.json()['asset']['id']}/uploads/complete/",
+            {},
+            **auth_headers(access_token),
+            format="json",
+        )
+
+    assert response.status_code == 400
+    assert "file" in response.json()

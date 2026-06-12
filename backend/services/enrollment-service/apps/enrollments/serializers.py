@@ -10,7 +10,14 @@ from .models import (
 )
 
 
-ENROLLMENT_SORT_CHOICES = ["created_at", "-created_at", "updated_at", "-updated_at", "status", "-status"]
+ENROLLMENT_SORT_CHOICES = [
+    "created_at",
+    "-created_at",
+    "updated_at",
+    "-updated_at",
+    "status",
+    "-status",
+]
 
 
 class EnrollmentSerializer(serializers.ModelSerializer):
@@ -50,7 +57,9 @@ class EnrollmentSearchSerializer(serializers.Serializer):
     course_id = serializers.UUIDField(required=False)
     institution_id = serializers.UUIDField(required=False)
     status = serializers.ChoiceField(choices=EnrollmentStatus.choices, required=False)
-    sort = serializers.ChoiceField(choices=ENROLLMENT_SORT_CHOICES, default="-created_at", required=False)
+    sort = serializers.ChoiceField(
+        choices=ENROLLMENT_SORT_CHOICES, default="-created_at", required=False
+    )
 
 
 class EnrollmentHistorySerializer(serializers.ModelSerializer):
@@ -95,13 +104,31 @@ class AccessCheckSerializer(serializers.Serializer):
 class BatchEnrollmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = BatchEnrollment
-        fields = ["id", "batch_id", "course_id", "requested_by_profile_id", "status", "summary", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "batch_id",
+            "course_id",
+            "requested_by_profile_id",
+            "status",
+            "summary",
+            "created_at",
+            "updated_at",
+        ]
 
 
 class CohortEnrollmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = CohortEnrollment
-        fields = ["id", "cohort_id", "course_id", "requested_by_profile_id", "status", "summary", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "cohort_id",
+            "course_id",
+            "requested_by_profile_id",
+            "status",
+            "summary",
+            "created_at",
+            "updated_at",
+        ]
 
 
 class BatchEnrollmentCreateSerializer(serializers.Serializer):

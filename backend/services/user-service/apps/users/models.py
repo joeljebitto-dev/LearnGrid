@@ -252,7 +252,9 @@ class AdminProfile(models.Model):
 
 class UserImportJob(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    institution = models.ForeignKey(Institution, on_delete=models.CASCADE, related_name="import_jobs")
+    institution = models.ForeignKey(
+        Institution, on_delete=models.CASCADE, related_name="import_jobs"
+    )
     requested_by_profile = models.ForeignKey(
         UserProfile,
         on_delete=models.CASCADE,

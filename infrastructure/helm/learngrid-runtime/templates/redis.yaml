@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: learngrid-redis
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: learngrid
+spec:
+  serviceName: learngrid-redis
+  replicas: {{ .Values.redis.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: redis
+        app.kubernetes.io/part-of: learngrid
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9121"
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args: ["redis-server", "--appendonly", "yes"]
+          ports:
+            - name: redis
+              containerPort: 6379
+          volumeMounts:
+            - name: data
+              mountPath: /data
+        - name: redis-exporter
+          image: oliver006/redis_exporter:v1.67.0
+          env:
+            - name: REDIS_ADDR
+              value: redis://127.0.0.1:6379
+          ports:
+            - name: metrics
+              containerPort: 9121
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.redis.storageSize }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: learngrid-redis
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: learngrid
+spec:
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+  selector:
+    app.kubernetes.io/name: redis

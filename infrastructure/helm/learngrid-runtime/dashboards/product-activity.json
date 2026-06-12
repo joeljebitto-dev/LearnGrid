@@ -1,0 +1,26 @@
+{
+  "uid": "learngrid-product-activity",
+  "title": "LearnGrid User Activity And Assessments",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "User activity events",
+      "targets": [
+        {
+          "expr": "sum(rate(learngrid_user_activity_events_total[5m])) by (event_type)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Assessment submissions",
+      "targets": [
+        {
+          "expr": "sum(rate(learngrid_assessment_submissions_total[5m])) by (submission_type)"
+        }
+      ]
+    }
+  ]
+}

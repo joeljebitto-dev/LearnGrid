@@ -51,7 +51,9 @@ class RemoteAuthorizationPermission(BasePermission):
             return str(explicit_scope_id)
 
         lookup_key = f"{scope_type}_id"
-        kwargs = getattr(view, "kwargs", {}) or getattr(request, "parser_context", {}).get("kwargs", {})
+        kwargs = getattr(view, "kwargs", {}) or getattr(request, "parser_context", {}).get(
+            "kwargs", {}
+        )
         if lookup_key in kwargs:
             return str(kwargs[lookup_key])
         if "scope_id" in kwargs:
@@ -108,7 +110,9 @@ def has_grade_permission(request, permission: str, *, course_id=None, institutio
     )
 
 
-def require_grade_permission(request, permission: str, *, course_id=None, institution_id=None) -> None:
+def require_grade_permission(
+    request, permission: str, *, course_id=None, institution_id=None
+) -> None:
     if not has_grade_permission(
         request,
         permission,

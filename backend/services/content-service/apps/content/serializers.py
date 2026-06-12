@@ -65,7 +65,7 @@ class ContentAssetSerializer(serializers.ModelSerializer):
 class FileMetadataPayloadSerializer(serializers.Serializer):
     storage_provider = serializers.CharField(required=False, allow_blank=True, max_length=32)
     bucket_name = serializers.CharField(required=False, allow_blank=True, max_length=255)
-    object_key = serializers.CharField()
+    object_key = serializers.CharField(max_length=1024)
     file_name = serializers.CharField(max_length=255)
     mime_type = serializers.CharField(max_length=128)
     file_size_bytes = serializers.IntegerField(min_value=1)
@@ -87,7 +87,9 @@ class ContentAssetCreateSerializer(serializers.Serializer):
     def validate(self, attrs):
         attrs["metadata"] = attrs.get("metadata") or {}
         if attrs["asset_type"] != ContentAssetType.LINK and "file" not in attrs:
-            raise serializers.ValidationError({"file": "File metadata is required for uploaded assets."})
+            raise serializers.ValidationError(
+                {"file": "File metadata is required for uploaded assets."}
+            )
         return attrs
 
 
@@ -108,7 +110,9 @@ class PresignedUploadCreateSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         if attrs["asset_type"] == ContentAssetType.LINK:
-            raise serializers.ValidationError({"asset_type": "Link assets do not use object uploads."})
+            raise serializers.ValidationError(
+                {"asset_type": "Link assets do not use object uploads."}
+            )
         attrs["metadata"] = attrs.get("metadata") or {}
         return attrs
 
@@ -131,7 +135,9 @@ class ProxyUploadCreateSerializer(serializers.Serializer):
 
     def validate(self, attrs):
         if attrs["asset_type"] == ContentAssetType.LINK:
-            raise serializers.ValidationError({"asset_type": "Link assets do not use object uploads."})
+            raise serializers.ValidationError(
+                {"asset_type": "Link assets do not use object uploads."}
+            )
         attrs["metadata"] = attrs.get("metadata") or {}
         return attrs
 
@@ -148,7 +154,9 @@ class ContentAssetSearchSerializer(serializers.Serializer):
     asset_type = serializers.ChoiceField(choices=ContentAssetType.choices, required=False)
     status = serializers.ChoiceField(choices=ContentAssetStatus.choices, required=False)
     q = serializers.CharField(required=False, allow_blank=True, max_length=255)
-    sort = serializers.ChoiceField(choices=ASSET_SORT_CHOICES, default="-created_at", required=False)
+    sort = serializers.ChoiceField(
+        choices=ASSET_SORT_CHOICES, default="-created_at", required=False
+    )
 
 
 class ContentPermissionSerializer(serializers.ModelSerializer):

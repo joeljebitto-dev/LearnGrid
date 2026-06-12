@@ -68,7 +68,9 @@ class QuestionBank(models.Model):
     class Meta:
         db_table = "question_banks"
         indexes = [
-            models.Index(fields=["institution_id", "owner_profile_id"], name="idx_qbanks_inst_owner"),
+            models.Index(
+                fields=["institution_id", "owner_profile_id"], name="idx_qbanks_inst_owner"
+            ),
             models.Index(fields=["institution_id", "title"], name="idx_qbanks_inst_title"),
         ]
 
@@ -175,8 +177,12 @@ class QuizQuestion(models.Model):
     class Meta:
         db_table = "quiz_questions"
         constraints = [
-            models.UniqueConstraint(fields=["quiz", "position"], name="uq_qquestions_quiz_position"),
-            models.UniqueConstraint(fields=["quiz", "question"], name="uq_qquestions_quiz_question"),
+            models.UniqueConstraint(
+                fields=["quiz", "position"], name="uq_qquestions_quiz_position"
+            ),
+            models.UniqueConstraint(
+                fields=["quiz", "question"], name="uq_qquestions_quiz_question"
+            ),
         ]
         indexes = [
             models.Index(fields=["question"], name="idx_quiz_questions_question"),
@@ -209,7 +215,9 @@ class QuizAttempt(models.Model):
             ),
         ]
         indexes = [
-            models.Index(fields=["student_profile_id", "status"], name="idx_qattempts_student_status"),
+            models.Index(
+                fields=["student_profile_id", "status"], name="idx_qattempts_student_status"
+            ),
             models.Index(fields=["quiz", "status"], name="idx_qattempts_quiz_status"),
         ]
 
@@ -319,6 +327,8 @@ class SubmissionAuditLog(models.Model):
     class Meta:
         db_table = "submission_audit_logs"
         indexes = [
-            models.Index(fields=["submission_type", "submission_id"], name="idx_submit_audit_submission"),
+            models.Index(
+                fields=["submission_type", "submission_id"], name="idx_submit_audit_submission"
+            ),
             models.Index(fields=["event_type"], name="idx_submit_audit_event"),
         ]

@@ -67,9 +67,7 @@ def search_profiles(filters: dict) -> QuerySet[UserProfile]:
         queryset = queryset.filter(status=status)
     if q := (filters.get("q") or "").strip():
         queryset = queryset.filter(
-            Q(first_name__icontains=q)
-            | Q(last_name__icontains=q)
-            | Q(display_name__icontains=q)
+            Q(first_name__icontains=q) | Q(last_name__icontains=q) | Q(display_name__icontains=q)
         )
 
     if profile_type := filters.get("profile_type"):

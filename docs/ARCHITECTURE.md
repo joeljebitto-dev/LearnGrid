@@ -48,7 +48,6 @@ platform targets approximately 10,000 simultaneous users and production-grade re
 
 ## ARCH-006 Open Decisions
 Open platform decisions remain unresolved and are tracked in [KNOWN_ISSUES.md](KNOWN_ISSUES.md):
-[OD-003](KNOWN_ISSUES.md#od-003-deployment-model),
 [OD-004](KNOWN_ISSUES.md#od-004-authentication-model),
 [OD-005](KNOWN_ISSUES.md#od-005-analytics-storage),
 [OD-006](KNOWN_ISSUES.md#od-006-video-delivery-strategy).

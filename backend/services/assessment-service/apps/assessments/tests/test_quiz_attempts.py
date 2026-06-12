@@ -147,11 +147,7 @@ def test_student_can_start_answer_and_submit_quiz_attempt(
 
     answer_response = api_client.put(
         f"/api/assessments/attempts/{attempt_id}/answers/",
-        {
-            "answers": [
-                {"question_id": str(questions[0].id), "answer_payload": {"choice_id": "b"}}
-            ]
-        },
+        {"answers": [{"question_id": str(questions[0].id), "answer_payload": {"choice_id": "b"}}]},
         **auth_headers(access_token),
         format="json",
     )
@@ -231,16 +227,16 @@ def test_availability_window_and_auto_submit_are_enforced(api_client, access_tok
         time_limit_seconds=1,
         auto_submit=True,
     )
-    attempt = QuizAttempt.objects.create(quiz=quiz, student_profile_id=student_profile_id, attempt_number=1)
-    QuizAttempt.objects.filter(id=attempt.id).update(started_at=timezone.now() - timedelta(seconds=5))
+    attempt = QuizAttempt.objects.create(
+        quiz=quiz, student_profile_id=student_profile_id, attempt_number=1
+    )
+    QuizAttempt.objects.filter(id=attempt.id).update(
+        started_at=timezone.now() - timedelta(seconds=5)
+    )
 
     answer_response = api_client.put(
         f"/api/assessments/attempts/{attempt.id}/answers/",
-        {
-            "answers": [
-                {"question_id": str(questions[0].id), "answer_payload": {"choice_id": "b"}}
-            ]
-        },
+        {"answers": [{"question_id": str(questions[0].id), "answer_payload": {"choice_id": "b"}}]},
         **auth_headers(access_token),
         format="json",
     )
@@ -292,7 +288,9 @@ def test_auto_submit_endpoint_closes_attempt(api_client, access_token, monkeypat
         institution_id=institution_id,
         course_id=course_id,
     )
-    attempt = QuizAttempt.objects.create(quiz=quiz, student_profile_id=student_profile_id, attempt_number=1)
+    attempt = QuizAttempt.objects.create(
+        quiz=quiz, student_profile_id=student_profile_id, attempt_number=1
+    )
 
     response = api_client.post(
         f"/api/assessments/attempts/{attempt.id}/auto-submit/",

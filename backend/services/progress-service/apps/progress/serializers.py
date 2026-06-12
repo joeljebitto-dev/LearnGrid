@@ -59,7 +59,9 @@ class VideoProgressUpdateSerializer(serializers.Serializer):
     course_id = serializers.UUIDField()
     last_position_seconds = serializers.IntegerField(required=False, min_value=0, default=0)
     duration_seconds = serializers.IntegerField(required=False, min_value=1)
-    percent_complete = serializers.DecimalField(required=False, max_digits=5, decimal_places=2, min_value=0, max_value=100)
+    percent_complete = serializers.DecimalField(
+        required=False, max_digits=5, decimal_places=2, min_value=0, max_value=100
+    )
     total_lessons = serializers.IntegerField(required=False, min_value=0)
     total_assessments = serializers.IntegerField(required=False, min_value=0)
 

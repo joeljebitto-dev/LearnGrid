@@ -178,7 +178,9 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="eventfact",
-            index=models.Index(fields=["event_type", "occurred_at"], name="idx_event_facts_type_time"),
+            index=models.Index(
+                fields=["event_type", "occurred_at"], name="idx_event_facts_type_time"
+            ),
         ),
         migrations.AddIndex(
             model_name="eventfact",

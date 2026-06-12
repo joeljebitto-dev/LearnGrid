@@ -209,20 +209,28 @@ class QuestionBankDetailView(APIView):
 
     def get(self, request, question_bank_id):
         question_bank = get_object_or_404(question_bank_queryset(), id=question_bank_id)
-        require_assessment_permission(request, "assessment.view", institution_id=question_bank.institution_id)
+        require_assessment_permission(
+            request, "assessment.view", institution_id=question_bank.institution_id
+        )
         return Response(QuestionBankSerializer(question_bank).data)
 
     def patch(self, request, question_bank_id):
         question_bank = get_object_or_404(question_bank_queryset(), id=question_bank_id)
-        require_assessment_permission(request, "assessment.manage", institution_id=question_bank.institution_id)
+        require_assessment_permission(
+            request, "assessment.manage", institution_id=question_bank.institution_id
+        )
         serializer = QuestionBankUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        question_bank = update_question_bank(question_bank=question_bank, validated_data=serializer.validated_data)
+        question_bank = update_question_bank(
+            question_bank=question_bank, validated_data=serializer.validated_data
+        )
         return Response(QuestionBankSerializer(question_bank).data)
 
     def delete(self, request, question_bank_id):
         question_bank = get_object_or_404(question_bank_queryset(), id=question_bank_id)
-        require_assessment_permission(request, "assessment.manage", institution_id=question_bank.institution_id)
+        require_assessment_permission(
+            request, "assessment.manage", institution_id=question_bank.institution_id
+        )
         question_bank = archive_question_bank(question_bank=question_bank)
         return Response(QuestionBankSerializer(question_bank).data)
 
@@ -233,7 +241,9 @@ class QuestionListCreateView(APIView):
 
     def get(self, request, question_bank_id):
         question_bank = get_object_or_404(question_bank_queryset(), id=question_bank_id)
-        require_assessment_permission(request, "assessment.view", institution_id=question_bank.institution_id)
+        require_assessment_permission(
+            request, "assessment.view", institution_id=question_bank.institution_id
+        )
         serializer = QuestionSearchSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         paginator = self.pagination_class()
@@ -246,10 +256,14 @@ class QuestionListCreateView(APIView):
 
     def post(self, request, question_bank_id):
         question_bank = get_object_or_404(question_bank_queryset(), id=question_bank_id)
-        require_assessment_permission(request, "assessment.manage", institution_id=question_bank.institution_id)
+        require_assessment_permission(
+            request, "assessment.manage", institution_id=question_bank.institution_id
+        )
         serializer = QuestionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        question = create_question(question_bank=question_bank, validated_data=serializer.validated_data)
+        question = create_question(
+            question_bank=question_bank, validated_data=serializer.validated_data
+        )
         return Response(QuestionSerializer(question).data, status=status.HTTP_201_CREATED)
 
 
@@ -258,12 +272,16 @@ class QuestionDetailView(APIView):
 
     def get(self, request, question_id):
         question = get_object_or_404(question_queryset(), id=question_id)
-        require_assessment_permission(request, "assessment.view", institution_id=question.question_bank.institution_id)
+        require_assessment_permission(
+            request, "assessment.view", institution_id=question.question_bank.institution_id
+        )
         return Response(QuestionSerializer(question).data)
 
     def patch(self, request, question_id):
         question = get_object_or_404(question_queryset(), id=question_id)
-        require_assessment_permission(request, "assessment.manage", institution_id=question.question_bank.institution_id)
+        require_assessment_permission(
+            request, "assessment.manage", institution_id=question.question_bank.institution_id
+        )
         serializer = QuestionUpdateSerializer(
             data=request.data,
             partial=True,
@@ -275,7 +293,9 @@ class QuestionDetailView(APIView):
 
     def delete(self, request, question_id):
         question = get_object_or_404(question_queryset(), id=question_id)
-        require_assessment_permission(request, "assessment.manage", institution_id=question.question_bank.institution_id)
+        require_assessment_permission(
+            request, "assessment.manage", institution_id=question.question_bank.institution_id
+        )
         question = archive_question(question=question)
         return Response(QuestionSerializer(question).data)
 
@@ -375,7 +395,9 @@ class AssessmentDetailView(APIView):
                 course_id=serializer.validated_data["course_id"],
                 institution_id=course["institution_id"],
             )
-        assessment = update_assessment(assessment=assessment, validated_data=serializer.validated_data)
+        assessment = update_assessment(
+            assessment=assessment, validated_data=serializer.validated_data
+        )
         return Response(AssessmentSerializer(assessment).data)
 
     def delete(self, request, assessment_id):
@@ -393,7 +415,9 @@ class AssessmentQuestionReplaceView(APIView):
         _require_assessment_manage(request, assessment)
         serializer = QuizQuestionReplaceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        replace_quiz_questions(assessment=assessment, question_payloads=serializer.validated_data["questions"])
+        replace_quiz_questions(
+            assessment=assessment, question_payloads=serializer.validated_data["questions"]
+        )
         assessment = get_object_or_404(assessment_queryset(), id=assessment_id)
         return Response(AssessmentSerializer(assessment).data)
 
@@ -404,7 +428,9 @@ class AssessmentPublishView(APIView):
     def post(self, request, assessment_id):
         assessment = get_object_or_404(assessment_queryset(), id=assessment_id)
         _require_assessment_manage(request, assessment)
-        assessment = publish_assessment(assessment=assessment, correlation_id=_correlation_id(request))
+        assessment = publish_assessment(
+            assessment=assessment, correlation_id=_correlation_id(request)
+        )
         return Response(AssessmentSerializer(assessment).data)
 
 
@@ -414,7 +440,9 @@ class AssessmentCloseView(APIView):
     def post(self, request, assessment_id):
         assessment = get_object_or_404(assessment_queryset(), id=assessment_id)
         _require_assessment_manage(request, assessment)
-        assessment = close_assessment(assessment=assessment, correlation_id=_correlation_id(request))
+        assessment = close_assessment(
+            assessment=assessment, correlation_id=_correlation_id(request)
+        )
         return Response(AssessmentSerializer(assessment).data)
 
 
@@ -486,7 +514,9 @@ class QuizAttemptAnswersView(APIView):
         )
         serializer = QuizAnswersUpsertSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        attempt = save_attempt_answers(attempt=attempt, answers=serializer.validated_data["answers"])
+        attempt = save_attempt_answers(
+            attempt=attempt, answers=serializer.validated_data["answers"]
+        )
         attempt = get_object_or_404(quiz_attempt_queryset(), id=attempt.id)
         return Response(_assessment_attempt_payload(attempt))
 
@@ -543,7 +573,9 @@ class AssignmentSubmissionListCreateView(APIView):
     def get(self, request, assignment_id):
         from .models import Assignment
 
-        assignment = get_object_or_404(Assignment.objects.select_related("assessment"), id=assignment_id)
+        assignment = get_object_or_404(
+            Assignment.objects.select_related("assessment"), id=assignment_id
+        )
         management, course = _assignment_submission_manage_allowed(request, assignment)
         serializer = AssignmentSubmissionSearchSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
@@ -561,7 +593,9 @@ class AssignmentSubmissionListCreateView(APIView):
             if profile.get("profile_type") != "student":
                 from rest_framework.exceptions import PermissionDenied
 
-                raise PermissionDenied("Submission list requires a student profile or manager access.")
+                raise PermissionDenied(
+                    "Submission list requires a student profile or manager access."
+                )
             filters["student_profile_id"] = profile["id"]
             if not has_enrollment_access(
                 token=auth_token(request),
@@ -577,12 +611,16 @@ class AssignmentSubmissionListCreateView(APIView):
             request,
             view=self,
         )
-        return paginator.get_paginated_response(AssignmentSubmissionSerializer(page, many=True).data)
+        return paginator.get_paginated_response(
+            AssignmentSubmissionSerializer(page, many=True).data
+        )
 
     def post(self, request, assignment_id):
         from .models import Assignment
 
-        assignment = get_object_or_404(Assignment.objects.select_related("assessment"), id=assignment_id)
+        assignment = get_object_or_404(
+            Assignment.objects.select_related("assessment"), id=assignment_id
+        )
         _require_submission_scope(request, "submission.manage", assignment)
         profile = current_profile(token=auth_token(request))
         if profile.get("profile_type") != "student":
@@ -607,7 +645,9 @@ class AssignmentSubmissionListCreateView(APIView):
             submit=serializer.validated_data.get("submit", False),
             correlation_id=_correlation_id(request),
         )
-        return Response(AssignmentSubmissionSerializer(submission).data, status=status.HTTP_201_CREATED)
+        return Response(
+            AssignmentSubmissionSerializer(submission).data, status=status.HTTP_201_CREATED
+        )
 
 
 class AssignmentSubmissionDetailView(APIView):
@@ -705,7 +745,9 @@ class QuizAttemptGradingSourceView(APIView):
             institution_id=course["institution_id"],
             message="You do not have permission to grade this attempt.",
         )
-        return Response(QuizAttemptGradingSourceSerializer(quiz_attempt_grading_source(attempt)).data)
+        return Response(
+            QuizAttemptGradingSourceSerializer(quiz_attempt_grading_source(attempt)).data
+        )
 
 
 class AssignmentSubmissionGradingSourceView(APIView):

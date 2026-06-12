@@ -51,7 +51,9 @@ class RemoteAuthorizationPermission(BasePermission):
             return str(explicit_scope_id)
 
         lookup_key = f"{scope_type}_id"
-        kwargs = getattr(view, "kwargs", {}) or getattr(request, "parser_context", {}).get("kwargs", {})
+        kwargs = getattr(view, "kwargs", {}) or getattr(request, "parser_context", {}).get(
+            "kwargs", {}
+        )
         if lookup_key in kwargs:
             return str(kwargs[lookup_key])
         if "scope_id" in kwargs:
@@ -117,7 +119,9 @@ def require_institution_manage_permission(request, institution_id=None) -> None:
 
 class ProfileViewPermission(BasePermission):
     def has_permission(self, request, _view) -> bool:
-        institution_id = request.query_params.get("institution_id") or request.data.get("institution_id")
+        institution_id = request.query_params.get("institution_id") or request.data.get(
+            "institution_id"
+        )
         try:
             require_profile_permission(request, "profile.view", institution_id)
         except PermissionDenied:
@@ -127,7 +131,9 @@ class ProfileViewPermission(BasePermission):
 
 class ProfileManagePermission(BasePermission):
     def has_permission(self, request, _view) -> bool:
-        institution_id = request.query_params.get("institution_id") or request.data.get("institution_id")
+        institution_id = request.query_params.get("institution_id") or request.data.get(
+            "institution_id"
+        )
         try:
             require_profile_permission(request, "profile.manage", institution_id)
         except PermissionDenied:

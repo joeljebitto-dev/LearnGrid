@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import serializers
 
 from .models import Account, AccountStatus, AssignmentScopeType, Permission, Role, RoleAssignment
@@ -5,17 +6,36 @@ from .models import Account, AccountStatus, AssignmentScopeType, Permission, Rol
 
 class TokenIssueSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    password = serializers.CharField(trim_whitespace=False, write_only=True)
+    password = serializers.CharField(trim_whitespace=False, write_only=True, max_length=256)
     device_label = serializers.CharField(required=False, allow_blank=True, max_length=128)
 
 
 class TokenRefreshSerializer(serializers.Serializer):
-    refresh = serializers.CharField(trim_whitespace=False)
+    refresh = serializers.CharField(trim_whitespace=False, max_length=4096)
 
 
 class LogoutSerializer(serializers.Serializer):
-    refresh = serializers.CharField(trim_whitespace=False)
-    access = serializers.CharField(required=False, allow_blank=True, trim_whitespace=False)
+    refresh = serializers.CharField(trim_whitespace=False, max_length=4096)
+    access = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        trim_whitespace=False,
+        max_length=4096,
+    )
+
+
+class PasswordResetRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class PasswordResetConfirmSerializer(serializers.Serializer):
+    token = serializers.CharField(trim_whitespace=False, max_length=256)
+    new_password = serializers.CharField(
+        trim_whitespace=False,
+        write_only=True,
+        min_length=settings.AUTH_PASSWORD_MIN_LENGTH,
+        max_length=256,
+    )
 
 
 class RoleSerializer(serializers.ModelSerializer):
@@ -61,7 +81,9 @@ class RoleAssignmentCreateSerializer(serializers.Serializer):
         if scope_type == AssignmentScopeType.PLATFORM:
             attrs["scope_id"] = None
         elif scope_id is None:
-            raise serializers.ValidationError({"scope_id": "scope_id is required for scoped roles."})
+            raise serializers.ValidationError(
+                {"scope_id": "scope_id is required for scoped roles."}
+            )
         return attrs
 
 
@@ -79,12 +101,16 @@ class AuthorizationCheckSerializer(serializers.Serializer):
         if scope_type == AssignmentScopeType.PLATFORM:
             attrs["scope_id"] = None
         elif scope_id is None:
-            raise serializers.ValidationError({"scope_id": "scope_id is required for scoped checks."})
+            raise serializers.ValidationError(
+                {"scope_id": "scope_id is required for scoped checks."}
+            )
         return attrs
 
 
 class AccountSerializer(serializers.ModelSerializer):
-    must_change_password = serializers.BooleanField(source="credential.must_change_password", read_only=True)
+    must_change_password = serializers.BooleanField(
+        source="credential.must_change_password", read_only=True
+    )
 
     class Meta:
         model = Account
@@ -102,8 +128,18 @@ class AccountSerializer(serializers.ModelSerializer):
 
 class AccountCreateSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    phone = serializers.CharField(required=False, allow_blank=True, max_length=32)
-    temporary_password = serializers.CharField(write_only=True, trim_whitespace=False, min_length=8)
+    phone = serializers.RegexField(
+        regex=r"^\+?[1-9][0-9]{7,14}$",
+        required=False,
+        allow_blank=True,
+        max_length=32,
+    )
+    temporary_password = serializers.CharField(
+        write_only=True,
+        trim_whitespace=False,
+        min_length=settings.AUTH_PASSWORD_MIN_LENGTH,
+        max_length=256,
+    )
     role_code = serializers.CharField(required=False, allow_blank=True, max_length=64)
     scope_type = serializers.ChoiceField(
         choices=AssignmentScopeType.choices,
@@ -118,7 +154,9 @@ class AccountCreateSerializer(serializers.Serializer):
         if scope_type == AssignmentScopeType.PLATFORM:
             attrs["scope_id"] = None
         elif scope_id is None:
-            raise serializers.ValidationError({"scope_id": "scope_id is required for scoped accounts."})
+            raise serializers.ValidationError(
+                {"scope_id": "scope_id is required for scoped accounts."}
+            )
         if role_code and not Role.objects.filter(code=role_code).exists():
             raise serializers.ValidationError({"role_code": "Role was not found."})
         attrs["role_code"] = role_code or None
@@ -128,7 +166,13 @@ class AccountCreateSerializer(serializers.Serializer):
 
 class AccountUpdateSerializer(serializers.Serializer):
     email = serializers.EmailField(required=False)
-    phone = serializers.CharField(required=False, allow_blank=True, allow_null=True, max_length=32)
+    phone = serializers.RegexField(
+        regex=r"^\+?[1-9][0-9]{7,14}$",
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+        max_length=32,
+    )
     status = serializers.ChoiceField(choices=AccountStatus.choices, required=False)
     scope_type = serializers.ChoiceField(
         choices=AssignmentScopeType.choices,
@@ -142,7 +186,9 @@ class AccountUpdateSerializer(serializers.Serializer):
         if scope_type == AssignmentScopeType.PLATFORM:
             attrs["scope_id"] = None
         elif scope_id is None:
-            raise serializers.ValidationError({"scope_id": "scope_id is required for scoped accounts."})
+            raise serializers.ValidationError(
+                {"scope_id": "scope_id is required for scoped accounts."}
+            )
         return attrs
 
 
@@ -159,5 +205,7 @@ class AccountDeactivateSerializer(serializers.Serializer):
         if scope_type == AssignmentScopeType.PLATFORM:
             attrs["scope_id"] = None
         elif scope_id is None:
-            raise serializers.ValidationError({"scope_id": "scope_id is required for scoped accounts."})
+            raise serializers.ValidationError(
+                {"scope_id": "scope_id is required for scoped accounts."}
+            )
         return attrs

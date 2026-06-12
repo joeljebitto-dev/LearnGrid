@@ -117,6 +117,39 @@ class TokenBlacklist(models.Model):
         indexes = [models.Index(fields=["expires_at"], name="idx_token_blacklist_expires_at")]
 
 
+class PasswordResetStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    USED = "used", "Used"
+    EXPIRED = "expired", "Expired"
+    REVOKED = "revoked", "Revoked"
+
+
+class PasswordResetToken(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    account = models.ForeignKey(
+        Account,
+        on_delete=models.CASCADE,
+        related_name="password_reset_tokens",
+    )
+    token_hash = models.TextField()
+    status = models.CharField(
+        max_length=24,
+        choices=PasswordResetStatus.choices,
+        default=PasswordResetStatus.PENDING,
+    )
+    requested_ip = models.GenericIPAddressField(null=True, blank=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "password_reset_tokens"
+        indexes = [
+            models.Index(fields=["account"], name="idx_password_reset_account_id"),
+            models.Index(fields=["status", "expires_at"], name="idx_password_reset_status_exp"),
+        ]
+
+
 class LoginAuditEvent(models.TextChoices):
     LOGIN_SUCCESS = "login_success", "Login success"
     LOGIN_FAILURE = "login_failure", "Login failure"
@@ -307,7 +340,9 @@ class AuthorizationAuditLog(models.Model):
     class Meta:
         db_table = "authorization_audit_logs"
         indexes = [
-            models.Index(fields=["actor_account", "created_at"], name="idx_auth_audit_actor_created"),
+            models.Index(
+                fields=["actor_account", "created_at"], name="idx_auth_audit_actor_created"
+            ),
             models.Index(fields=["target_account"], name="idx_auth_audit_target"),
             models.Index(fields=["event_type"], name="idx_auth_audit_event_type"),
         ]

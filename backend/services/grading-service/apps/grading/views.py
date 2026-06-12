@@ -208,7 +208,9 @@ class ManualReviewCreateView(APIView):
         )
         _require_grade_scope(request, "grade.manage", source["course_id"])
         profile = current_profile(token=token)
-        reviewer_profile_id = serializer.validated_data.get("reviewer_profile_id") or profile.get("id")
+        reviewer_profile_id = serializer.validated_data.get("reviewer_profile_id") or profile.get(
+            "id"
+        )
         review = create_manual_review(source=source, reviewer_profile_id=reviewer_profile_id)
         return Response(ManualReviewSerializer(review).data, status=status.HTTP_201_CREATED)
 
@@ -277,7 +279,11 @@ class PublishedResultListView(APIView):
         filters = serializer.validated_data
         profile = current_profile(token=auth_token(request))
         course_id = filters.get("course_id")
-        manager = has_grade_permission(request, "grade.view", course_id=course_id) if course_id else has_grade_permission(request, "grade.view")
+        manager = (
+            has_grade_permission(request, "grade.view", course_id=course_id)
+            if course_id
+            else has_grade_permission(request, "grade.view")
+        )
         if not manager:
             filters["student_profile_id"] = profile.get("id")
         paginator = self.pagination_class()
@@ -322,7 +328,9 @@ class CertificateEligibilityListView(APIView):
             request,
             view=self,
         )
-        return paginator.get_paginated_response(CertificateEligibilitySerializer(page, many=True).data)
+        return paginator.get_paginated_response(
+            CertificateEligibilitySerializer(page, many=True).data
+        )
 
 
 class CertificateEligibilityDetailView(APIView):
@@ -400,7 +408,10 @@ class CertificateDetailView(APIView):
     def get(self, request, certificate_id):
         certificate = get_object_or_404(certificate_queryset(), id=certificate_id)
         profile = current_profile(token=auth_token(request))
-        if str(profile.get("id")) == str(certificate.student_profile_id) and certificate.revoked_at is None:
+        if (
+            str(profile.get("id")) == str(certificate.student_profile_id)
+            and certificate.revoked_at is None
+        ):
             return Response(CertificateSerializer(certificate).data)
         manager = _has_certificate_view_scope(request, certificate.course_id)
         if not manager:

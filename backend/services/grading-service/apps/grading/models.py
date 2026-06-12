@@ -68,7 +68,9 @@ class GradeRecord(models.Model):
     class Meta:
         db_table = "grade_records"
         indexes = [
-            models.Index(fields=["student_profile_id", "course_id"], name="idx_grade_student_course"),
+            models.Index(
+                fields=["student_profile_id", "course_id"], name="idx_grade_student_course"
+            ),
             models.Index(fields=["assessment_id", "status"], name="idx_grade_assess_status"),
             models.Index(fields=["course_id", "status"], name="idx_grade_course_status"),
             models.Index(fields=["submission_id"], name="idx_grade_submission_id"),
@@ -100,7 +102,9 @@ class ManualReview(models.Model):
         db_table = "manual_reviews"
         indexes = [
             models.Index(fields=["grade_record"], name="idx_reviews_grade_record"),
-            models.Index(fields=["reviewer_profile_id", "status"], name="idx_reviews_reviewer_status"),
+            models.Index(
+                fields=["reviewer_profile_id", "status"], name="idx_reviews_reviewer_status"
+            ),
         ]
 
 
@@ -144,7 +148,9 @@ class PublishedResult(models.Model):
             models.UniqueConstraint(fields=["grade_record"], name="uq_pub_results_grade_record"),
         ]
         indexes = [
-            models.Index(fields=["student_profile_id", "course_id"], name="idx_pub_results_student_course"),
+            models.Index(
+                fields=["student_profile_id", "course_id"], name="idx_pub_results_student_course"
+            ),
         ]
 
 
@@ -194,5 +200,7 @@ class Certificate(models.Model):
             ),
         ]
         indexes = [
-            models.Index(fields=["student_profile_id", "course_id"], name="idx_certs_student_course"),
+            models.Index(
+                fields=["student_profile_id", "course_id"], name="idx_certs_student_course"
+            ),
         ]

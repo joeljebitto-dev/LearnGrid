@@ -32,7 +32,9 @@ class LessonProgressUpdateView(APIView):
     def post(self, request):
         serializer = LessonProgressUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        require_progress_permission(request, "progress.manage", serializer.validated_data["course_id"])
+        require_progress_permission(
+            request, "progress.manage", serializer.validated_data["course_id"]
+        )
         progress = update_lesson_progress(validated_data=serializer.validated_data)
         return Response(LessonProgressSerializer(progress).data, status=status.HTTP_200_OK)
 
@@ -43,7 +45,9 @@ class VideoProgressUpdateView(APIView):
     def post(self, request):
         serializer = VideoProgressUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        require_progress_permission(request, "progress.manage", serializer.validated_data["course_id"])
+        require_progress_permission(
+            request, "progress.manage", serializer.validated_data["course_id"]
+        )
         progress = update_video_progress(validated_data=serializer.validated_data)
         return Response(VideoProgressSerializer(progress).data, status=status.HTTP_200_OK)
 
@@ -54,7 +58,9 @@ class AssessmentProgressUpdateView(APIView):
     def post(self, request):
         serializer = AssessmentProgressUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        require_progress_permission(request, "progress.manage", serializer.validated_data["course_id"])
+        require_progress_permission(
+            request, "progress.manage", serializer.validated_data["course_id"]
+        )
         progress = update_assessment_progress(validated_data=serializer.validated_data)
         return Response(AssessmentProgressSerializer(progress).data, status=status.HTTP_200_OK)
 
@@ -71,7 +77,9 @@ class CourseProgressListView(APIView):
         for field in ["student_profile_id", "course_id", "status"]:
             if value := serializer.validated_data.get(field):
                 queryset = queryset.filter(**{field: value})
-        return Response(CourseProgressSerializer(queryset.order_by("-updated_at", "id"), many=True).data)
+        return Response(
+            CourseProgressSerializer(queryset.order_by("-updated_at", "id"), many=True).data
+        )
 
 
 class CourseProgressDetailView(APIView):

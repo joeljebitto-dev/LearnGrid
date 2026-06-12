@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import jwt
 import pytest
+import redis
 from django.conf import settings
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -125,6 +126,94 @@ def test_student_dashboard_uses_current_profile_and_latest_aggregate(
     assert body["profile"]["id"] == str(profile_id)
     assert body["active_courses"] == [{"title": "Algebra"}]
     assert body["summary"]["active_course_count"] == 1
+
+
+@pytest.mark.django_db
+def test_student_dashboard_uses_redis_response_cache(
+    api_client,
+    access_token,
+    monkeypatch,
+    fake_redis,
+):
+    profile_id = uuid4()
+    profile = profile_payload(profile_type="student", profile_id=profile_id)
+    monkeypatch.setattr(views, "current_profile", lambda **_kwargs: profile)
+    DashboardAggregate.objects.create(
+        scope_type=DashboardScopeType.STUDENT,
+        scope_id=profile_id,
+        metric_date=date.today(),
+        metrics={"summary": {"active_course_count": 7}},
+    )
+
+    first_response = api_client.get(
+        "/api/analytics/dashboards/student/",
+        **auth_headers(access_token),
+    )
+    monkeypatch.setattr(
+        services,
+        "dashboard_payload",
+        lambda **_kwargs: pytest.fail("dashboard cache was not used"),
+    )
+    second_response = api_client.get(
+        "/api/analytics/dashboards/student/",
+        **auth_headers(access_token),
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert second_response.json()["summary"]["active_course_count"] == 7
+    assert fake_redis.set_count == 1
+
+
+@pytest.mark.django_db
+def test_dashboard_cache_invalidates_after_aggregate_upsert(fake_redis):
+    institution_id = uuid4()
+    services.cached_dashboard_payload(
+        portal="admin",
+        scope_type=DashboardScopeType.INSTITUTION,
+        scope_id=institution_id,
+        institution_id=institution_id,
+    )
+
+    services.upsert_dashboard_aggregate(
+        {
+            "scope_type": DashboardScopeType.INSTITUTION,
+            "scope_id": institution_id,
+            "metric_date": date.today(),
+            "metrics": {"summary": {"active_user_count": 3}},
+        }
+    )
+
+    assert fake_redis.delete_count >= 1
+
+
+@pytest.mark.django_db
+def test_dashboard_cache_outage_falls_back_to_database(api_client, access_token, monkeypatch):
+    class BrokenRedis:
+        def get(self, _key):
+            raise redis.RedisError("redis unavailable")
+
+        def setex(self, *_args):
+            raise redis.RedisError("redis unavailable")
+
+    profile_id = uuid4()
+    profile = profile_payload(profile_type="student", profile_id=profile_id)
+    monkeypatch.setattr(views, "current_profile", lambda **_kwargs: profile)
+    DashboardAggregate.objects.create(
+        scope_type=DashboardScopeType.STUDENT,
+        scope_id=profile_id,
+        metric_date=date.today(),
+        metrics={"summary": {"active_course_count": 2}},
+    )
+    monkeypatch.setattr(services, "_redis_client", lambda: BrokenRedis())
+
+    response = api_client.get(
+        "/api/analytics/dashboards/student/",
+        **auth_headers(access_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["summary"]["active_course_count"] == 2
 
 
 @pytest.mark.django_db

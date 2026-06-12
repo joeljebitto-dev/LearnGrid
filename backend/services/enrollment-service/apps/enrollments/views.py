@@ -67,7 +67,9 @@ class EnrollmentListCreateView(APIView):
     def post(self, request):
         serializer = EnrollmentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        require_enrollment_permission(request, "enrollment.manage", serializer.validated_data["institution_id"])
+        require_enrollment_permission(
+            request, "enrollment.manage", serializer.validated_data["institution_id"]
+        )
         enrollment = create_enrollment(
             validated_data=serializer.validated_data,
             correlation_id=_correlation_id(request),
@@ -133,7 +135,9 @@ class BatchEnrollmentListCreateView(APIView):
     def post(self, request):
         serializer = BatchEnrollmentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        require_enrollment_permission(request, "enrollment.manage", serializer.validated_data["institution_id"])
+        require_enrollment_permission(
+            request, "enrollment.manage", serializer.validated_data["institution_id"]
+        )
         job = create_batch_enrollment_job(validated_data=serializer.validated_data)
         return Response(BatchEnrollmentSerializer(job).data, status=status.HTTP_201_CREATED)
 
@@ -148,6 +152,8 @@ class CohortEnrollmentListCreateView(APIView):
     def post(self, request):
         serializer = CohortEnrollmentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        require_enrollment_permission(request, "enrollment.manage", serializer.validated_data["institution_id"])
+        require_enrollment_permission(
+            request, "enrollment.manage", serializer.validated_data["institution_id"]
+        )
         job = create_cohort_enrollment_job(validated_data=serializer.validated_data)
         return Response(CohortEnrollmentSerializer(job).data, status=status.HTTP_201_CREATED)

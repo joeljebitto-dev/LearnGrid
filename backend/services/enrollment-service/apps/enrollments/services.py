@@ -24,7 +24,9 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 
-def create_enrollment(*, validated_data: dict[str, Any], correlation_id: str | None = None) -> Enrollment:
+def create_enrollment(
+    *, validated_data: dict[str, Any], correlation_id: str | None = None
+) -> Enrollment:
     try:
         with transaction.atomic():
             enrollment = Enrollment.objects.create(**validated_data)
@@ -37,7 +39,9 @@ def create_enrollment(*, validated_data: dict[str, Any], correlation_id: str | N
             )
             sync_access_grant(enrollment)
     except IntegrityError as exc:
-        raise ValidationError({"student_profile_id": "Student is already enrolled in this course."}) from exc
+        raise ValidationError(
+            {"student_profile_id": "Student is already enrolled in this course."}
+        ) from exc
     publish_enrollment_event(
         event_type="StudentEnrolled",
         aggregate_id=enrollment.id,
@@ -116,16 +120,21 @@ def sync_access_grant(enrollment: Enrollment) -> None:
 
 def has_active_access(*, student_profile_id, course_id) -> bool:
     now = timezone.now()
-    return AccessGrant.objects.filter(
-        student_profile_id=student_profile_id,
-        course_id=course_id,
-        access_status=AccessGrantStatus.ACTIVE,
-    ).filter(valid_until__isnull=True).exists() or AccessGrant.objects.filter(
-        student_profile_id=student_profile_id,
-        course_id=course_id,
-        access_status=AccessGrantStatus.ACTIVE,
-        valid_until__gt=now,
-    ).exists()
+    return (
+        AccessGrant.objects.filter(
+            student_profile_id=student_profile_id,
+            course_id=course_id,
+            access_status=AccessGrantStatus.ACTIVE,
+        )
+        .filter(valid_until__isnull=True)
+        .exists()
+        or AccessGrant.objects.filter(
+            student_profile_id=student_profile_id,
+            course_id=course_id,
+            access_status=AccessGrantStatus.ACTIVE,
+            valid_until__gt=now,
+        ).exists()
+    )
 
 
 def create_batch_enrollment_job(*, validated_data: dict[str, Any]) -> BatchEnrollment:
@@ -138,7 +147,9 @@ def create_batch_enrollment_job(*, validated_data: dict[str, Any]) -> BatchEnrol
         institution_id=institution_id,
         requested_by_profile_id=job.requested_by_profile_id,
     )
-    job.status = EnrollmentJobStatus.COMPLETED if summary["failed"] == 0 else EnrollmentJobStatus.FAILED
+    job.status = (
+        EnrollmentJobStatus.COMPLETED if summary["failed"] == 0 else EnrollmentJobStatus.FAILED
+    )
     job.summary = summary
     job.save()
     return job
@@ -154,13 +165,17 @@ def create_cohort_enrollment_job(*, validated_data: dict[str, Any]) -> CohortEnr
         institution_id=institution_id,
         requested_by_profile_id=job.requested_by_profile_id,
     )
-    job.status = EnrollmentJobStatus.COMPLETED if summary["failed"] == 0 else EnrollmentJobStatus.FAILED
+    job.status = (
+        EnrollmentJobStatus.COMPLETED if summary["failed"] == 0 else EnrollmentJobStatus.FAILED
+    )
     job.summary = summary
     job.save()
     return job
 
 
-def _create_many_enrollments(*, student_profile_ids, course_id, institution_id, requested_by_profile_id) -> dict:
+def _create_many_enrollments(
+    *, student_profile_ids, course_id, institution_id, requested_by_profile_id
+) -> dict:
     created = 0
     failures = []
     for student_profile_id in student_profile_ids:
@@ -175,8 +190,15 @@ def _create_many_enrollments(*, student_profile_ids, course_id, institution_id, 
             )
             created += 1
         except ValidationError as exc:
-            failures.append({"student_profile_id": str(student_profile_id), "error": str(exc.detail)})
-    return {"requested": len(student_profile_ids), "created": created, "failed": len(failures), "failures": failures}
+            failures.append(
+                {"student_profile_id": str(student_profile_id), "error": str(exc.detail)}
+            )
+    return {
+        "requested": len(student_profile_ids),
+        "created": created,
+        "failed": len(failures),
+        "failures": failures,
+    }
 
 
 def publish_enrollment_event(

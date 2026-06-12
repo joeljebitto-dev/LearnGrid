@@ -5,7 +5,10 @@ import { BrowserRouter } from 'react-router-dom';
 
 import { queryClient } from './app/queryClient';
 import { App } from './App';
+import { initFrontendObservability } from './observability';
 import './styles.css';
+
+initFrontendObservability();
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>

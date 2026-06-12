@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from contextlib import contextmanager
 from typing import Any
 
 import redis
@@ -10,7 +11,15 @@ from django.db import transaction
 from django.db.models import Max
 from django.utils import timezone
 from django.utils.text import slugify
+from learngrid_redis import RedisKeyBuilder
+from learngrid_redis import RedisLockNotAcquired
+from learngrid_redis import digest_json
+from learngrid_redis import get_json_cache
+from learngrid_redis import redis_client
+from learngrid_redis import redis_lock
+from learngrid_redis import set_json_cache
 from learngrid_events import publish_event as publish_kafka_event
+from rest_framework.exceptions import APIException
 from rest_framework.exceptions import ValidationError
 
 from .models import (
@@ -31,7 +40,12 @@ from .models import (
 
 
 logger = logging.getLogger(__name__)
-CATALOG_CACHE_PREFIX = "course-service:catalog"
+
+
+class CourseStructureLockUnavailable(APIException):
+    status_code = 409
+    default_code = "course_structure_lock_unavailable"
+    default_detail = "Course structure is currently being updated. Try again."
 
 
 def normalize_slug(value: str) -> str:
@@ -216,18 +230,23 @@ def update_module(*, module: CourseModule, validated_data: dict[str, Any]) -> Co
 def archive_module(*, module: CourseModule) -> CourseModule:
     module.status = StructureStatus.ARCHIVED
     module.deleted_at = timezone.now()
-    module.position = _next_position_excluding(CourseModule, exclude_id=module.id, course=module.course)
+    module.position = _next_position_excluding(
+        CourseModule,
+        exclude_id=module.id,
+        course=module.course,
+    )
     module.save(update_fields=["status", "position", "deleted_at", "updated_at"])
     invalidate_catalog_cache()
     return module
 
 
 def reorder_modules(*, course: Course, module_ids: list) -> list[CourseModule]:
-    modules = list(CourseModule.objects.filter(course=course, deleted_at__isnull=True))
-    ordered = _ordered_by_ids(items=modules, ordered_ids=module_ids, field_name="module_ids")
-    with transaction.atomic():
-        temp_base = _max_position(CourseModule, course=course)
-        _assign_ordered_positions(ordered, temp_base=temp_base)
+    with _redis_structure_lock("course", course.id):
+        modules = list(CourseModule.objects.filter(course=course, deleted_at__isnull=True))
+        ordered = _ordered_by_ids(items=modules, ordered_ids=module_ids, field_name="module_ids")
+        with transaction.atomic():
+            temp_base = _max_position(CourseModule, course=course)
+            _assign_ordered_positions(ordered, temp_base=temp_base)
     invalidate_catalog_cache()
     return ordered
 
@@ -239,7 +258,9 @@ def create_lesson(*, module: CourseModule, validated_data: dict[str, Any]) -> Le
         position,
         "position",
     )
-    published_at = timezone.now() if validated_data.get("status") == StructureStatus.PUBLISHED else None
+    published_at = (
+        timezone.now() if validated_data.get("status") == StructureStatus.PUBLISHED else None
+    )
     lesson = Lesson.objects.create(
         course=module.course,
         module=module,
@@ -262,7 +283,9 @@ def update_lesson(*, lesson: Lesson, validated_data: dict[str, Any]) -> Lesson:
         except CourseModule.DoesNotExist as exc:
             raise ValidationError({"module_id": "Module was not found."}) from exc
         if target_module.course_id != lesson.course_id:
-            raise ValidationError({"module_id": "Lesson cannot move to a module in another course."})
+            raise ValidationError(
+                {"module_id": "Lesson cannot move to a module in another course."}
+            )
         if "position" not in validated_data:
             validated_data["position"] = _next_position(Lesson, module=target_module)
 
@@ -317,11 +340,12 @@ def archive_lesson(*, lesson: Lesson) -> Lesson:
 
 
 def reorder_lessons(*, module: CourseModule, lesson_ids: list) -> list[Lesson]:
-    lessons = list(Lesson.objects.filter(module=module, deleted_at__isnull=True))
-    ordered = _ordered_by_ids(items=lessons, ordered_ids=lesson_ids, field_name="lesson_ids")
-    with transaction.atomic():
-        temp_base = _max_position(Lesson, module=module)
-        _assign_ordered_positions(ordered, temp_base=temp_base)
+    with _redis_structure_lock("module", module.id):
+        lessons = list(Lesson.objects.filter(module=module, deleted_at__isnull=True))
+        ordered = _ordered_by_ids(items=lessons, ordered_ids=lesson_ids, field_name="lesson_ids")
+        with transaction.atomic():
+            temp_base = _max_position(Lesson, module=module)
+            _assign_ordered_positions(ordered, temp_base=temp_base)
     invalidate_catalog_cache()
     return ordered
 
@@ -365,11 +389,12 @@ def delete_topic(*, topic: Topic) -> None:
 
 
 def reorder_topics(*, lesson: Lesson, topic_ids: list) -> list[Topic]:
-    topics = list(Topic.objects.filter(lesson=lesson))
-    ordered = _ordered_by_ids(items=topics, ordered_ids=topic_ids, field_name="topic_ids")
-    with transaction.atomic():
-        temp_base = _max_position(Topic, lesson=lesson)
-        _assign_ordered_positions(ordered, temp_base=temp_base)
+    with _redis_structure_lock("lesson", lesson.id):
+        topics = list(Topic.objects.filter(lesson=lesson))
+        ordered = _ordered_by_ids(items=topics, ordered_ids=topic_ids, field_name="topic_ids")
+        with transaction.atomic():
+            temp_base = _max_position(Topic, lesson=lesson)
+            _assign_ordered_positions(ordered, temp_base=temp_base)
     invalidate_catalog_cache()
     return ordered
 
@@ -462,38 +487,21 @@ def replace_course_metadata(*, course: Course, metadata: dict[str, Any]) -> None
 
 
 def get_catalog_cache(key: str) -> Any | None:
-    try:
-        cached = _redis_client().get(key)
-    except (redis.RedisError, OSError):
-        return None
-    if not cached:
-        return None
-    try:
-        return json.loads(cached)
-    except (TypeError, ValueError):
-        return None
+    return get_json_cache(_redis_client(), key)
 
 
 def set_catalog_cache(key: str, value: Any) -> None:
-    try:
-        _redis_client().setex(
-            key,
-            settings.COURSE_CATALOG_CACHE_TTL_SECONDS,
-            json.dumps(value),
-        )
-    except (redis.RedisError, OSError, TypeError, ValueError):
-        return
+    set_json_cache(_redis_client(), key, value, settings.COURSE_CATALOG_CACHE_TTL_SECONDS)
 
 
 def catalog_cache_key(kind: str, params: dict[str, Any]) -> str:
-    normalized = json.dumps(params, sort_keys=True, default=str)
-    return f"{CATALOG_CACHE_PREFIX}:{kind}:{normalized}"
+    return _key_builder().key("cache", "catalog", [kind, digest_json(params)])
 
 
 def invalidate_catalog_cache() -> None:
     try:
         client = _redis_client()
-        for key in client.scan_iter(f"{CATALOG_CACHE_PREFIX}:*"):
+        for key in client.scan_iter(f"{_key_builder().prefix_for('cache', 'catalog')}*"):
             client.delete(key)
     except (redis.RedisError, OSError):
         return
@@ -518,7 +526,26 @@ def publish_course_event(
 
 
 def _redis_client():
-    return redis.from_url(settings.REDIS_URL, decode_responses=True)
+    return redis_client(
+        settings.REDIS_URL,
+        decode_responses=True,
+        socket_connect_timeout=settings.REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS,
+        socket_timeout=settings.REDIS_SOCKET_TIMEOUT_SECONDS,
+    )
+
+
+def _key_builder() -> RedisKeyBuilder:
+    return RedisKeyBuilder(service=settings.SERVICE_NAME, env=settings.REDIS_ENV)
+
+
+@contextmanager
+def _redis_structure_lock(kind: str, object_id):
+    key = _key_builder().key("lock", f"{kind}-structure", str(object_id))
+    try:
+        with redis_lock(_redis_client(), key, settings.REDIS_LOCK_TTL_SECONDS):
+            yield
+    except RedisLockNotAcquired as exc:
+        raise CourseStructureLockUnavailable() from exc
 
 
 def _clear_prefetched_metadata(course: Course) -> None:
@@ -582,7 +609,9 @@ def _replace_prerequisites(course: Course, prerequisite_course_ids: list) -> Non
         )
     )
     if len(prerequisites) != len(normalized_ids):
-        raise ValidationError({"prerequisite_course_ids": "One or more prerequisite courses were not found."})
+        raise ValidationError(
+            {"prerequisite_course_ids": "One or more prerequisite courses were not found."}
+        )
     if any(prerequisite.institution_id != course.institution_id for prerequisite in prerequisites):
         raise ValidationError(
             {"prerequisite_course_ids": "Prerequisites must belong to the same institution."}
@@ -646,7 +675,9 @@ def _next_position_excluding(model, *, exclude_id, **filters) -> int:
 
 
 def _max_position(model, **filters) -> int:
-    return model.objects.filter(**filters).aggregate(max_position=Max("position"))["max_position"] or 0
+    return (
+        model.objects.filter(**filters).aggregate(max_position=Max("position"))["max_position"] or 0
+    )
 
 
 def _ensure_position_available(queryset, position: int, field_name: str, exclude_id=None) -> None:

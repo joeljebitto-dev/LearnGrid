@@ -1,0 +1,42 @@
+apiVersion: minio.min.io/v2
+kind: Tenant
+metadata:
+  name: {{ .Values.minio.tenantName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/part-of: learngrid
+spec:
+  credsSecret:
+    name: {{ .Values.minio.credentialsSecret }}
+  pools:
+    - servers: 4
+      name: pool-0
+      volumesPerServer: 1
+      volumeClaimTemplate:
+        metadata:
+          name: data
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: {{ .Values.minio.storageSize }}
+  buckets:
+    - name: learngrid-content
+    - name: {{ .Values.postgres.backupBucket }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: minio
+    app.kubernetes.io/part-of: learngrid
+spec:
+  ports:
+    - name: http
+      port: 9000
+      targetPort: 9000
+  selector:
+    v1.min.io/tenant: {{ .Values.minio.tenantName }}

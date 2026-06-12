@@ -1,0 +1,49 @@
+{{- range $name, $_ := .Values.backendServices }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    {{- include "learngrid.labels" $ | nindent 4 }}
+spec:
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: {{ $name }}
+---
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: frontend-service
+    {{- include "learngrid.labels" . | nindent 4 }}
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: frontend-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: api-gateway
+    {{- include "learngrid.labels" . | nindent 4 }}
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: api-gateway

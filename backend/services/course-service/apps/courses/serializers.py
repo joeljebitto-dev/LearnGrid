@@ -247,7 +247,9 @@ class CourseCreateSerializer(serializers.Serializer):
             institution_id=attrs["institution_id"],
             slug=attrs["slug"],
         ).exists():
-            raise serializers.ValidationError({"slug": "Course slug already exists for this institution."})
+            raise serializers.ValidationError(
+                {"slug": "Course slug already exists for this institution."}
+            )
         return _validate_learning_outcome_positions(attrs)
 
 
@@ -290,8 +292,14 @@ class CourseUpdateSerializer(serializers.Serializer):
             attrs["slug"] = normalize_slug(attrs.get("slug") or attrs.get("title") or course.title)
         institution_id = attrs.get("institution_id", course.institution_id)
         slug = attrs.get("slug", course.slug)
-        if Course.objects.filter(institution_id=institution_id, slug=slug).exclude(id=course.id).exists():
-            raise serializers.ValidationError({"slug": "Course slug already exists for this institution."})
+        if (
+            Course.objects.filter(institution_id=institution_id, slug=slug)
+            .exclude(id=course.id)
+            .exists()
+        ):
+            raise serializers.ValidationError(
+                {"slug": "Course slug already exists for this institution."}
+            )
         return _validate_learning_outcome_positions(attrs)
 
 
@@ -303,7 +311,9 @@ class CourseSearchSerializer(serializers.Serializer):
     category_id = serializers.UUIDField(required=False)
     tag_id = serializers.UUIDField(required=False)
     q = serializers.CharField(required=False, allow_blank=True, max_length=255)
-    sort = serializers.ChoiceField(choices=COURSE_SORT_CHOICES, default="-created_at", required=False)
+    sort = serializers.ChoiceField(
+        choices=COURSE_SORT_CHOICES, default="-created_at", required=False
+    )
 
 
 class ModuleCreateSerializer(serializers.Serializer):
@@ -411,7 +421,9 @@ class CategoryCreateSerializer(serializers.Serializer):
             institution_id=attrs["institution_id"],
             slug=attrs["slug"],
         ).exists():
-            raise serializers.ValidationError({"slug": "Category slug already exists for this scope."})
+            raise serializers.ValidationError(
+                {"slug": "Category slug already exists for this scope."}
+            )
         return attrs
 
 
@@ -427,11 +439,17 @@ class CategoryUpdateSerializer(serializers.Serializer):
         attrs["institution_id"] = category.institution_id
         _validate_category_scope(attrs, category=category)
         slug = attrs.get("slug", category.slug)
-        if CourseCategory.objects.filter(
-            institution_id=category.institution_id,
-            slug=slug,
-        ).exclude(id=category.id).exists():
-            raise serializers.ValidationError({"slug": "Category slug already exists for this scope."})
+        if (
+            CourseCategory.objects.filter(
+                institution_id=category.institution_id,
+                slug=slug,
+            )
+            .exclude(id=category.id)
+            .exists()
+        ):
+            raise serializers.ValidationError(
+                {"slug": "Category slug already exists for this scope."}
+            )
         return attrs
 
 
@@ -443,7 +461,9 @@ class TagCreateSerializer(serializers.Serializer):
     def validate(self, attrs):
         attrs["institution_id"] = attrs.get("institution_id")
         attrs["slug"] = normalize_slug(attrs.get("slug") or attrs["name"])
-        if CourseTag.objects.filter(institution_id=attrs["institution_id"], slug=attrs["slug"]).exists():
+        if CourseTag.objects.filter(
+            institution_id=attrs["institution_id"], slug=attrs["slug"]
+        ).exists():
             raise serializers.ValidationError({"slug": "Tag slug already exists for this scope."})
         return attrs
 
@@ -457,7 +477,11 @@ class TagUpdateSerializer(serializers.Serializer):
         if "slug" in attrs or ("name" in attrs and not tag.slug):
             attrs["slug"] = normalize_slug(attrs.get("slug") or attrs.get("name") or tag.name)
         slug = attrs.get("slug", tag.slug)
-        if CourseTag.objects.filter(institution_id=tag.institution_id, slug=slug).exclude(id=tag.id).exists():
+        if (
+            CourseTag.objects.filter(institution_id=tag.institution_id, slug=slug)
+            .exclude(id=tag.id)
+            .exists()
+        ):
             raise serializers.ValidationError({"slug": "Tag slug already exists for this scope."})
         return attrs
 
@@ -497,9 +521,13 @@ def _validate_category_scope(attrs: dict, category: CourseCategory | None = None
     try:
         parent = CourseCategory.objects.get(id=parent_category_id)
     except CourseCategory.DoesNotExist as exc:
-        raise serializers.ValidationError({"parent_category_id": "Parent category was not found."}) from exc
+        raise serializers.ValidationError(
+            {"parent_category_id": "Parent category was not found."}
+        ) from exc
     if category and parent.id == category.id:
-        raise serializers.ValidationError({"parent_category_id": "Category cannot be its own parent."})
+        raise serializers.ValidationError(
+            {"parent_category_id": "Category cannot be its own parent."}
+        )
     if parent.institution_id != attrs.get("institution_id"):
         raise serializers.ValidationError(
             {"parent_category_id": "Parent category must be in the same scope."}

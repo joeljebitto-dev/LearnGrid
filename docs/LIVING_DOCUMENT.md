@@ -13,14 +13,18 @@ learning progress tracking, completed `T-011` dashboards/portals, completed `T-0
 assessment authoring, completed `T-013` quiz attempts/exams, completed `T-014`
 assignment submissions, completed `T-015` grading/results/audit, completed `T-016`
 certificates, completed `T-017` notifications, completed `T-018` search/reporting/analytics,
-completed `T-019` API gateway, and completed `T-020` Kafka eventing.
+completed `T-019` API gateway, completed `T-020` Kafka eventing, completed `T-021`
+Redis architecture, completed `T-022` security baseline, the repository implementation portion
+of `T-023` CI/CD, deployment, and observability, and the repository implementation portion of
+`T-024` testing and quality.
 The scaffold includes the React `frontend-service`, Django REST Framework baselines for `SVC-001`
 through `SVC-010`, local PostgreSQL and Redis Compose configuration, health endpoints, lockfiles,
 basic tests, and GitHub Actions CI. Auth-service now includes JWT access and refresh token APIs,
 refresh rotation, logout revocation, Redis-backed blacklist checks with durable database fallback,
 and token invalidation after password changes or account-level revocation. Auth-service also owns
 RBAC roles, permissions, scoped role assignments, authorization checks, Redis permission caching,
-and authorization audit logs. Non-auth backend services can validate access JWTs and call auth-service
+authorization audit logs, Redis-backed login/reset rate limiting, password reset token state, and
+OTP helpers. Non-auth backend services can validate access JWTs and call auth-service
 for remote permission checks. User-service now owns institution support models, base user profiles,
 student/instructor/admin profile tables, user import job records, and profile create, search, update,
 and deactivate APIs that coordinate account lifecycle through auth-service. User-service also exposes
@@ -39,8 +43,19 @@ APIs, and the local Nginx API Gateway are also implemented.
 Shared Kafka eventing with Apache Kafka local infrastructure, base/retry/DLQ topics, producer
 helpers, consumer helpers, idempotent service handlers, and lag commands is implemented for
 `T-020`.
-Kubernetes manifests and remaining
-non-auth feature APIs remain for later tasks.
+Shared Redis helpers, standardized key naming, course catalog cache keys, course structure locks,
+and analytics dashboard response caching are implemented for `T-021`.
+Shared production security helpers, hardened gateway headers, production secret validation,
+Kubernetes security baseline templates, optional upload malware scanning, and backup restore
+verification are implemented for `T-022`. `OD-003` is resolved to on-prem Kubernetes. Backend,
+frontend, and gateway production images, Helm deployment charts, liveness/readiness/metrics
+endpoints, Grafana-stack observability manifests, GHCR image CI, and deployment workflow gates are
+implemented for `T-023`; final task closure still requires a real staging deployment smoke run.
+All backend services expose OpenAPI schema/docs endpoints; service schema smoke tests, repo-level
+OpenAPI/Kafka contract tests, Compose-backed integration tests, Selenium page-object journey tests,
+k6 load scripts, and expanded CI quality gates are implemented for `T-024`. Final T-024 closure
+still requires a real staging/on-prem performance and autoscaling run.
+Remaining non-auth feature APIs remain for later tasks.
 
 ## LD-002 Source Of Truth
 - Product and architecture requirements come from [SRD.pdf](SRD.pdf).
@@ -52,6 +67,9 @@ non-auth feature APIs remain for later tasks.
 - Implemented database design notes: [db-design/](db-design/README.md).
 - Implemented API design notes: [api-design/](api-design/README.md).
 - Implemented event design notes: [event-design/](event-design/README.md).
+- Implemented security design notes: [security-design/](security-design/README.md).
+- Implemented deployment design notes: [deployment-design/](deployment-design/README.md).
+- Implemented observability design notes: [observability-design/](observability-design/README.md).
 
 ## LD-003 Update Rules
 - Add or revise a spec before implementing a new feature.
@@ -66,7 +84,6 @@ non-auth feature APIs remain for later tasks.
 
 ## LD-004 Open Decision Register
 The following decisions remain open:
-- [OD-003 Deployment Model](KNOWN_ISSUES.md#od-003-deployment-model)
 - [OD-004 Authentication Model](KNOWN_ISSUES.md#od-004-authentication-model)
 - [OD-005 Analytics Storage](KNOWN_ISSUES.md#od-005-analytics-storage)
 - [OD-006 Video Delivery Strategy](KNOWN_ISSUES.md#od-006-video-delivery-strategy)

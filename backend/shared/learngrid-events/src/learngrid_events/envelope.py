@@ -38,9 +38,7 @@ def create_event_envelope(
 ) -> EventEnvelope:
     raw_timestamp = timestamp or datetime.now(UTC)
     timestamp_value = (
-        raw_timestamp.isoformat()
-        if isinstance(raw_timestamp, datetime)
-        else str(raw_timestamp)
+        raw_timestamp.isoformat() if isinstance(raw_timestamp, datetime) else str(raw_timestamp)
     )
     envelope = EventEnvelope(
         event_id=str(event_id or uuid.uuid4()),

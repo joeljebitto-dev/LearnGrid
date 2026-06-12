@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 
-def consumer_lag_report(*, bootstrap_servers: str, group_id: str, topics: list[str] | None = None) -> dict[str, Any]:
+def consumer_lag_report(
+    *, bootstrap_servers: str, group_id: str, topics: list[str] | None = None
+) -> dict[str, Any]:
     from kafka import KafkaAdminClient, KafkaConsumer, TopicPartition
 
     consumer = KafkaConsumer(
@@ -21,7 +23,9 @@ def consumer_lag_report(*, bootstrap_servers: str, group_id: str, topics: list[s
         end_offsets = consumer.end_offsets(partitions) if partitions else {}
         group_offsets = {
             topic_partition: offset_metadata.offset
-            for topic_partition, offset_metadata in admin.list_consumer_group_offsets(group_id).items()
+            for topic_partition, offset_metadata in admin.list_consumer_group_offsets(
+                group_id
+            ).items()
         }
         rows = []
         total_lag = 0

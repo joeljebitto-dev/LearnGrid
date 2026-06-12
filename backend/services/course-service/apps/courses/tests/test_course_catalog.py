@@ -50,7 +50,7 @@ def access_token():
 
 @pytest.fixture(autouse=True)
 def disable_external_redis(monkeypatch):
-    monkeypatch.setattr(services, "_redis_client", lambda: BrokenRedis())
+    monkeypatch.setattr(services, "_redis_client", lambda: FakeRedis())
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -120,6 +120,7 @@ def create_course(institution_id, **overrides) -> Course:
 class FakeRedis:
     def __init__(self):
         self.data: dict[str, str] = {}
+        self.ttls: dict[str, int] = {}
         self.set_count = 0
         self.delete_count = 0
 
@@ -129,6 +130,14 @@ class FakeRedis:
     def setex(self, key, _ttl, value):
         self.set_count += 1
         self.data[key] = value
+        self.ttls[key] = _ttl
+
+    def set(self, key, value, nx=False, ex=None):
+        if nx and key in self.data:
+            return False
+        self.data[key] = value
+        self.ttls[key] = ex
+        return True
 
     def scan_iter(self, pattern):
         prefix = pattern.removesuffix("*")
@@ -137,6 +146,13 @@ class FakeRedis:
     def delete(self, key):
         self.delete_count += 1
         self.data.pop(key, None)
+        self.ttls.pop(key, None)
+
+    def eval(self, _script, _count, key, token):
+        if self.data.get(key) == token:
+            self.delete(key)
+            return 1
+        return 0
 
 
 class BrokenRedis:
@@ -148,6 +164,20 @@ class BrokenRedis:
 
     def scan_iter(self, _pattern):
         raise redis.RedisError("redis unavailable")
+
+    def set(self, *_args, **_kwargs):
+        raise redis.RedisError("redis unavailable")
+
+
+def test_catalog_cache_key_hashes_raw_query_parameters():
+    key = services.catalog_cache_key(
+        "course-list",
+        {"institution_id": "11111111-1111-1111-1111-111111111111", "q": "Private Search"},
+    )
+
+    assert key.startswith("lg:local:course-service:cache:catalog:course-list:")
+    assert "Private Search" not in key
+    assert "11111111-1111-1111-1111-111111111111" not in key
 
 
 @pytest.mark.django_db
@@ -355,8 +385,12 @@ def test_course_update_replaces_metadata_and_validates_prerequisites(
         name="New Category",
         slug="new-category",
     )
-    old_tag = CourseTag.objects.create(institution_id=institution_id, name="Old Tag", slug="old-tag")
-    new_tag = CourseTag.objects.create(institution_id=institution_id, name="New Tag", slug="new-tag")
+    old_tag = CourseTag.objects.create(
+        institution_id=institution_id, name="Old Tag", slug="old-tag"
+    )
+    new_tag = CourseTag.objects.create(
+        institution_id=institution_id, name="New Tag", slug="new-tag"
+    )
     old_prerequisite = create_course(institution_id, title="Old Prereq", slug="old-prereq")
     new_prerequisite = create_course(institution_id, title="New Prereq", slug="new-prereq")
     other_prerequisite = create_course(

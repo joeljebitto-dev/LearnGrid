@@ -6,124 +6,247 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='ContentAsset',
+            name="ContentAsset",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('institution_id', models.UUIDField()),
-                ('owner_profile_id', models.UUIDField()),
-                ('asset_type', models.CharField(choices=[('video', 'Video'), ('pdf', 'PDF'), ('document', 'Document'), ('image', 'Image'), ('link', 'Link'), ('assignment_resource', 'Assignment Resource')], max_length=32)),
-                ('title', models.CharField(max_length=255)),
-                ('status', models.CharField(choices=[('draft', 'Draft'), ('published', 'Published'), ('deleted', 'Deleted'), ('quarantined', 'Quarantined')], default='draft', max_length=24)),
-                ('metadata', models.JSONField(blank=True, default=dict)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('deleted_at', models.DateTimeField(blank=True, null=True)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                ("institution_id", models.UUIDField()),
+                ("owner_profile_id", models.UUIDField()),
+                (
+                    "asset_type",
+                    models.CharField(
+                        choices=[
+                            ("video", "Video"),
+                            ("pdf", "PDF"),
+                            ("document", "Document"),
+                            ("image", "Image"),
+                            ("link", "Link"),
+                            ("assignment_resource", "Assignment Resource"),
+                        ],
+                        max_length=32,
+                    ),
+                ),
+                ("title", models.CharField(max_length=255)),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("draft", "Draft"),
+                            ("published", "Published"),
+                            ("deleted", "Deleted"),
+                            ("quarantined", "Quarantined"),
+                        ],
+                        default="draft",
+                        max_length=24,
+                    ),
+                ),
+                ("metadata", models.JSONField(blank=True, default=dict)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                ("deleted_at", models.DateTimeField(blank=True, null=True)),
             ],
             options={
-                'db_table': 'content_assets',
-                'indexes': [models.Index(fields=['institution_id', 'status'], name='idx_content_assets_inst_status'), models.Index(fields=['owner_profile_id'], name='idx_content_assets_owner'), models.Index(fields=['asset_type'], name='idx_content_assets_asset_type')],
+                "db_table": "content_assets",
+                "indexes": [
+                    models.Index(
+                        fields=["institution_id", "status"], name="idx_content_assets_inst_status"
+                    ),
+                    models.Index(fields=["owner_profile_id"], name="idx_content_assets_owner"),
+                    models.Index(fields=["asset_type"], name="idx_content_assets_asset_type"),
+                ],
             },
         ),
         migrations.CreateModel(
-            name='FileMetadata',
+            name="FileMetadata",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('storage_provider', models.CharField(max_length=32)),
-                ('bucket_name', models.CharField(max_length=255)),
-                ('object_key', models.TextField()),
-                ('file_name', models.CharField(max_length=255)),
-                ('mime_type', models.CharField(max_length=128)),
-                ('file_size_bytes', models.BigIntegerField()),
-                ('checksum_sha256', models.CharField(blank=True, max_length=64, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('content_asset', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='file_metadata', to='content.contentasset')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                ("storage_provider", models.CharField(max_length=32)),
+                ("bucket_name", models.CharField(max_length=255)),
+                ("object_key", models.TextField()),
+                ("file_name", models.CharField(max_length=255)),
+                ("mime_type", models.CharField(max_length=128)),
+                ("file_size_bytes", models.BigIntegerField()),
+                ("checksum_sha256", models.CharField(blank=True, max_length=64, null=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "content_asset",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="file_metadata",
+                        to="content.contentasset",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'file_metadata',
+                "db_table": "file_metadata",
             },
         ),
         migrations.CreateModel(
-            name='ContentVersion',
+            name="ContentVersion",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('version_number', models.PositiveIntegerField()),
-                ('change_note', models.TextField(blank=True, null=True)),
-                ('created_by_profile_id', models.UUIDField()),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('content_asset', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='versions', to='content.contentasset')),
-                ('file_metadata', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='content_versions', to='content.filemetadata')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                ("version_number", models.PositiveIntegerField()),
+                ("change_note", models.TextField(blank=True, null=True)),
+                ("created_by_profile_id", models.UUIDField()),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "content_asset",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="versions",
+                        to="content.contentasset",
+                    ),
+                ),
+                (
+                    "file_metadata",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="content_versions",
+                        to="content.filemetadata",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'content_versions',
-                'ordering': ['-version_number', 'id'],
+                "db_table": "content_versions",
+                "ordering": ["-version_number", "id"],
             },
         ),
         migrations.CreateModel(
-            name='SignedAccessRecord',
+            name="SignedAccessRecord",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('requested_by_profile_id', models.UUIDField()),
-                ('access_token_hash', models.TextField()),
-                ('expires_at', models.DateTimeField()),
-                ('used_at', models.DateTimeField(blank=True, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('content_asset', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='signed_access_records', to='content.contentasset')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                ("requested_by_profile_id", models.UUIDField()),
+                ("access_token_hash", models.TextField()),
+                ("expires_at", models.DateTimeField()),
+                ("used_at", models.DateTimeField(blank=True, null=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "content_asset",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="signed_access_records",
+                        to="content.contentasset",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'signed_access_records',
+                "db_table": "signed_access_records",
             },
         ),
         migrations.CreateModel(
-            name='ContentPermission',
+            name="ContentPermission",
             fields=[
-                ('id', models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
-                ('grantee_type', models.CharField(choices=[('profile', 'Profile'), ('course', 'Course'), ('institution', 'Institution'), ('role', 'Role')], max_length=32)),
-                ('grantee_id', models.UUIDField()),
-                ('permission', models.CharField(choices=[('view', 'View'), ('download', 'Download'), ('manage', 'Manage')], default='view', max_length=32)),
-                ('expires_at', models.DateTimeField(blank=True, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('content_asset', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='permissions', to='content.contentasset')),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
+                (
+                    "grantee_type",
+                    models.CharField(
+                        choices=[
+                            ("profile", "Profile"),
+                            ("course", "Course"),
+                            ("institution", "Institution"),
+                            ("role", "Role"),
+                        ],
+                        max_length=32,
+                    ),
+                ),
+                ("grantee_id", models.UUIDField()),
+                (
+                    "permission",
+                    models.CharField(
+                        choices=[("view", "View"), ("download", "Download"), ("manage", "Manage")],
+                        default="view",
+                        max_length=32,
+                    ),
+                ),
+                ("expires_at", models.DateTimeField(blank=True, null=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "content_asset",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="permissions",
+                        to="content.contentasset",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'content_permissions',
-                'indexes': [models.Index(fields=['content_asset'], name='idx_content_permissions_asset'), models.Index(fields=['grantee_type', 'grantee_id'], name='idx_content_perms_grantee')],
-                'constraints': [models.UniqueConstraint(fields=('content_asset', 'grantee_type', 'grantee_id', 'permission'), name='uq_content_permissions_grant')],
+                "db_table": "content_permissions",
+                "indexes": [
+                    models.Index(fields=["content_asset"], name="idx_content_permissions_asset"),
+                    models.Index(
+                        fields=["grantee_type", "grantee_id"], name="idx_content_perms_grantee"
+                    ),
+                ],
+                "constraints": [
+                    models.UniqueConstraint(
+                        fields=("content_asset", "grantee_type", "grantee_id", "permission"),
+                        name="uq_content_permissions_grant",
+                    )
+                ],
             },
         ),
         migrations.AddIndex(
-            model_name='filemetadata',
-            index=models.Index(fields=['mime_type'], name='idx_file_metadata_mime_type'),
+            model_name="filemetadata",
+            index=models.Index(fields=["mime_type"], name="idx_file_metadata_mime_type"),
         ),
         migrations.AddIndex(
-            model_name='filemetadata',
-            index=models.Index(fields=['object_key'], name='idx_file_metadata_object_key'),
+            model_name="filemetadata",
+            index=models.Index(fields=["object_key"], name="idx_file_metadata_object_key"),
         ),
         migrations.AddIndex(
-            model_name='contentversion',
-            index=models.Index(fields=['content_asset'], name='idx_content_versions_asset'),
+            model_name="contentversion",
+            index=models.Index(fields=["content_asset"], name="idx_content_versions_asset"),
         ),
         migrations.AddConstraint(
-            model_name='contentversion',
-            constraint=models.UniqueConstraint(fields=('content_asset', 'version_number'), name='uq_content_versions_asset_version'),
+            model_name="contentversion",
+            constraint=models.UniqueConstraint(
+                fields=("content_asset", "version_number"), name="uq_content_versions_asset_version"
+            ),
         ),
         migrations.AddIndex(
-            model_name='signedaccessrecord',
-            index=models.Index(fields=['content_asset'], name='idx_signed_access_asset'),
+            model_name="signedaccessrecord",
+            index=models.Index(fields=["content_asset"], name="idx_signed_access_asset"),
         ),
         migrations.AddIndex(
-            model_name='signedaccessrecord',
-            index=models.Index(fields=['requested_by_profile_id'], name='idx_signed_access_profile'),
+            model_name="signedaccessrecord",
+            index=models.Index(
+                fields=["requested_by_profile_id"], name="idx_signed_access_profile"
+            ),
         ),
         migrations.AddIndex(
-            model_name='signedaccessrecord',
-            index=models.Index(fields=['expires_at'], name='idx_signed_access_expires'),
+            model_name="signedaccessrecord",
+            index=models.Index(fields=["expires_at"], name="idx_signed_access_expires"),
         ),
     ]

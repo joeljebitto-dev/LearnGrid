@@ -1,8 +1,8 @@
 # LearnGrid LMS API Structure
 
-Source of truth: [api-design/](api-design/README.md)
+Source of truth: [api-design/](api-design/README.md), [redis-design/](redis-design/README.md)
 Related implementation docs: [DEVELOPMENT.md](DEVELOPMENT.md), [TASKS.md](TASKS.md)
-Related implemented designs: [API-001](api-design/API-001-service-health-and-dev-stack.md) through [API-019](api-design/API-019-api-gateway.md)
+Related implemented designs: [API-001](api-design/API-001-service-health-and-dev-stack.md) through [API-019](api-design/API-019-api-gateway.md), plus [REDIS-021](redis-design/REDIS-021-redis-architecture.md)
 
 This file is the overall API structure reference for implemented LearnGrid LMS APIs. Future task APIs are intentionally not expanded here until implementation provides stable request and response contracts.
 
@@ -87,7 +87,8 @@ Response fields:
 | `access_expires_at` | ISO datetime | Access token expiry |
 | `refresh_expires_at` | ISO datetime | Refresh token expiry |
 
-Status behavior: `200` on success; authentication failure rejects invalid credentials or inactive accounts.
+Status behavior: `200` on success; authentication failure rejects invalid credentials or inactive
+accounts. Redis-backed login rate limits return `429` when exceeded or unavailable.
 
 ### API-002-002 Refresh Token Pair
 Purpose: Rotate a refresh token and issue a new access/refresh pair.
@@ -137,7 +138,52 @@ Response fields:
 
 Status behavior: `200` on successful revocation; invalid token payloads are rejected.
 
-### API-002-004 Session
+### API-002-004 Password Reset Request
+Purpose: Request a password reset token without exposing account existence.
+
+| Item | Value |
+| --- | --- |
+| Service | `auth-service` |
+| Method | `POST` |
+| Path | `/api/auth/password-reset/request/` |
+| Auth | Public |
+| Path parameters | None |
+| Query parameters | None |
+
+Request body parameters:
+
+| Parameter | Required | Type | Purpose |
+| --- | --- | --- | --- |
+| `email` | Yes | string/email | Account email to reset |
+
+Response fields: `status`, currently `accepted`. Raw reset tokens are not returned outside
+debug/test settings.
+
+Status behavior: `200` for accepted requests; Redis-backed reset rate limits return `429`.
+
+### API-002-005 Password Reset Confirm
+Purpose: Confirm a reset token and set a new password.
+
+| Item | Value |
+| --- | --- |
+| Service | `auth-service` |
+| Method | `POST` |
+| Path | `/api/auth/password-reset/confirm/` |
+| Auth | Public with reset token payload |
+| Path parameters | None |
+| Query parameters | None |
+
+Request body parameters:
+
+| Parameter | Required | Type | Purpose |
+| --- | --- | --- | --- |
+| `token` | Yes | string | Raw reset token delivered out of band |
+| `new_password` | Yes | string | Replacement password |
+
+Response fields: `status`, currently `reset`.
+Status behavior: `200` on success; invalid, expired, or reused reset tokens return validation errors.
+
+### API-002-006 Session
 Purpose: Return identity for the current access token.
 
 | Item | Value |
@@ -1661,6 +1707,7 @@ optional `metadata`.
 
 Generated report types: `active_users`, `enrollments`, `completion_rates`, `assessment_results`,
 and `system_usage`. Report responses are `report_snapshots` records with `result_payload.summary`.
+Dashboard response payloads are Redis-cached for a short TTL and invalidated after aggregate upserts.
 
 ## API-019 API Gateway
 
@@ -1684,8 +1731,10 @@ Related design: [API-019 API Gateway](api-design/API-019-api-gateway.md)
 | `/api/analytics/` | Routes to analytics-service |
 | `/api/v1/...` | Rewrites to current `/api/...` paths |
 
-Nginx terminates TLS, emits JSON request logs, forwards request IDs, applies local-origin CORS,
-rate limits API traffic, and rejects oversized requests above `20m`.
+Nginx terminates TLS, redirects HTTP to HTTPS, emits JSON request logs, forwards request IDs,
+applies local-origin CORS, rate limits API traffic, rejects oversized requests above `20m`, and
+returns security headers including HSTS, `X-Content-Type-Options`, `X-Frame-Options`,
+`Referrer-Policy`, `Permissions-Policy`, CSP, and `Vary: Origin`.
 
 ## API-020 Kafka Eventing Interfaces
 
@@ -1706,5 +1755,71 @@ Implemented base topics are `audit.events`, `user.events`, `course.events`, `con
 `notification.events`, and `analytics.events`. Each base topic also has `.retry` and `.dlq`
 topics.
 
+## API-021 Redis Architecture Interfaces
+
+Related design: [REDIS-021 Redis Architecture](redis-design/REDIS-021-redis-architecture.md)
+
+Redis is not a public HTTP API, but implemented services use the shared
+`backend/shared/learngrid-redis` package for standardized keys, JSON caches, fixed-window rate
+limits, and distributed locks.
+
+| Interface | Purpose |
+| --- | --- |
+| `lg:{REDIS_ENV}:{service}:{workload}:{name}:{suffix}` | Standard Redis key format |
+| `auth-service` password reset APIs | Redis TTL key plus durable `password_reset_tokens` state |
+| `auth-service` rate limits | Redis-backed login and password-reset fixed windows |
+| `course-service` catalog cache | Hashed Redis keys for published catalog list/detail/structure responses |
+| `course-service` structure locks | Redis locks around reorder writes; contention returns `409` |
+| `analytics-service` dashboard cache | Short-lived response cache invalidated after aggregate upserts |
+
+The T-023 on-prem Kubernetes runtime chart provides the first production Redis deployment baseline;
+Sentinel/Cluster-specific hardening remains tracked in T-021.
+
+## API-022 Security Baseline Interfaces
+
+Related design: [SEC-022 Security Baseline](security-design/SEC-022-security.md)
+
+T-022 does not add public product APIs. It adds operational interfaces:
+
+| Interface | Purpose |
+| --- | --- |
+| `backend/shared/learngrid-security` | Shared production env validation and secure Django defaults |
+| `infrastructure/kubernetes/security-baseline/` | Security-only Kubernetes templates for future deployment work |
+| `scripts/verify-postgres-backup-restore.sh` | Local/CI PostgreSQL dump and restore verification |
+| Content malware scanner command | Optional fail-closed upload scanning hook when enabled |
+
+JWT bearer authentication remains the current auth model. CSRF enforcement for authenticated API
+writes remains deferred until [OD-004](KNOWN_ISSUES.md#od-004-authentication-model) selects a
+cookie-based model.
+
+## API-023 Deployment Health And Metrics
+
+Related design: [DEPLOY-023 CI/CD, Deployment, And Observability](deployment-design/DEPLOY-023-ci-cd-deployment-observability.md)
+
+| Path | Owner | Purpose |
+| --- | --- | --- |
+| `/health/` | Every backend service | Backward-compatible service health response |
+| `/health/live/` | Every backend service | Kubernetes liveness probe |
+| `/health/ready/` | Every backend service | Kubernetes readiness probe with PostgreSQL connectivity check |
+| `/metrics/` | Every backend service | Prometheus metrics endpoint for in-cluster scraping |
+| `/api/schema/` | Every backend service | OpenAPI 3 JSON schema generated by `drf-spectacular` |
+| `/api/docs/` | Every backend service | Swagger UI backed by the service schema |
+| `/healthz` | `frontend-service` | Nginx static frontend probe |
+| `/gateway/health` | `api-gateway` | Gateway liveness/readiness probe |
+
+## API-024 Testing And Quality Interfaces
+
+Related strategy: [TESTING_STRATEGY.md](TESTING_STRATEGY.md)
+
+| Interface | Purpose |
+| --- | --- |
+| `GET /api/schema/` | Service-local OpenAPI JSON for contract checks and client discovery |
+| `GET /api/docs/` | Service-local Swagger UI for manual API exploration |
+| `python -m pytest tests/contracts` | OpenAPI and Kafka contract checks |
+| `python -m pytest tests/integration` | Compose-backed PostgreSQL, Redis, Kafka, and MinIO checks |
+| `python -m pytest tests/e2e` | Selenium journey smoke tests; skipped unless `E2E_BASE_URL` and credentials are set |
+| `k6 run tests/load/smoke.js` | Offline-safe CI load smoke |
+| `k6 run tests/load/staging.js` | Staging load profile with p95, error-rate, and throughput thresholds |
+
 ## Future APIs Not Implemented
-Redis architecture operations, deployment, and broader security APIs remain future task scope unless explicitly listed above.
+Broader product APIs remain future task scope unless explicitly listed above.

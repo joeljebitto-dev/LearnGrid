@@ -4,6 +4,14 @@ on:
   push:
     branches: ["main"]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
 
 jobs:
   frontend:
@@ -41,6 +49,9 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Audit
+        run: pnpm audit --audit-level high
 
   backend:
     name: Backend
@@ -80,11 +91,83 @@ jobs:
       - name: Lint
         run: poetry run ruff check .
 
+      - name: Format check
+        run: poetry run ruff format --check .
+
+      - name: Typecheck
+        run: poetry run mypy .
+
       - name: Django check
         run: poetry run python manage.py check
 
+      - name: Migration dry-run
+        run: poetry run python manage.py makemigrations --check --dry-run
+
       - name: Test
         run: poetry run pytest
+
+  shared:
+    name: Shared Packages
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - learngrid-events
+          - learngrid-redis
+          - learngrid-security
+          - learngrid-observability
+    defaults:
+      run:
+        working-directory: backend/shared/${{ matrix.package }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Install dependencies
+        run: poetry install --no-interaction
+
+      - name: Lint
+        run: poetry run ruff check .
+
+      - name: Format check
+        run: poetry run ruff format --check .
+
+      - name: Typecheck
+        run: |
+          if grep -q '^\[tool.mypy\]' pyproject.toml; then
+            poetry run mypy .
+          fi
+
+      - name: Test
+        run: poetry run pytest
+
+  quality:
+    name: Repo Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Actionlint
+        uses: rhysd/actionlint@v1
+
+      - name: Git whitespace check
+        run: git diff --check
+
+      - name: Shell syntax
+        run: |
+          bash -n scripts/run-dev.sh
+          bash -n scripts/generate-local-gateway-cert.sh
+          bash -n scripts/verify-postgres-backup-restore.sh
 
   gateway:
     name: API Gateway
@@ -98,8 +181,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install pytest
-        run: python -m pip install pytest
+      - name: Install test requirements
+        run: python -m pip install -r requirements-test.txt
 
       - name: Shell syntax
         run: |
@@ -116,3 +199,341 @@ jobs:
 
       - name: Gateway tests
         run: python -m pytest tests/gateway
+
+  security:
+    name: Security Baseline
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test requirements
+        run: python -m pip install -r requirements-test.txt
+
+      - name: Shell syntax
+        run: |
+          bash -n scripts/run-dev.sh
+          bash -n scripts/generate-local-gateway-cert.sh
+          bash -n scripts/verify-postgres-backup-restore.sh
+
+      - name: Static security tests
+        run: python -m pytest tests/security tests/gateway
+
+      - name: Start PostgreSQL
+        run: docker compose up -d postgres
+
+      - name: Verify backup restore
+        run: bash scripts/verify-postgres-backup-restore.sh
+
+      - name: Stop infrastructure
+        if: always()
+        run: docker compose down
+
+  deployment:
+    name: Deployment Static Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test requirements
+        run: python -m pip install -r requirements-test.txt
+
+      - name: Deployment tests
+        run: python -m pytest tests/deployment
+
+  contracts:
+    name: Contract Tests
+    runs-on: ubuntu-latest
+    needs: [backend, shared]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test requirements
+        run: python -m pip install -r requirements-test.txt
+
+      - name: Contract tests
+        run: python -m pytest tests/contracts
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [shared]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test requirements
+        run: python -m pip install -r requirements-test.txt
+
+      - name: Start Compose infrastructure
+        run: |
+          docker compose up -d postgres redis minio kafka
+          docker compose run --rm minio-init
+          docker compose run --rm kafka-init
+
+      - name: Integration tests
+        run: python -m pytest tests/integration
+
+      - name: Stop infrastructure
+        if: always()
+        run: docker compose down
+
+  e2e:
+    name: Selenium E2E Smoke
+    runs-on: ubuntu-latest
+    needs: [frontend]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test requirements
+        run: python -m pip install -r requirements-test.txt
+
+      - name: Selenium tests
+        run: python -m pytest tests/e2e
+
+  load:
+    name: k6 Load Smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: k6 smoke
+        run: docker run --rm -v "${PWD}:/work" -w /work grafana/k6:0.55.0 run tests/load/smoke.js
+
+  helm:
+    name: Helm Validation
+    runs-on: ubuntu-latest
+    needs: [deployment]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Install kubeconform
+        run: |
+          curl -fsSL -o kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          tar -xzf kubeconform.tar.gz kubeconform
+          sudo mv kubeconform /usr/local/bin/kubeconform
+
+      - name: Helm dependency build
+        run: |
+          helm dependency build infrastructure/helm/learngrid-platform
+          helm dependency build infrastructure/helm/learngrid-runtime
+          helm dependency build infrastructure/helm/learngrid-app
+
+      - name: Helm lint
+        run: |
+          helm lint infrastructure/helm/learngrid-platform
+          helm lint infrastructure/helm/learngrid-runtime
+          helm lint infrastructure/helm/learngrid-app
+
+      - name: Helm template
+        run: |
+          mkdir -p rendered
+          helm template learngrid-platform infrastructure/helm/learngrid-platform > rendered/platform.yaml
+          helm template learngrid-runtime infrastructure/helm/learngrid-runtime > rendered/runtime.yaml
+          helm template learngrid-app infrastructure/helm/learngrid-app > rendered/app.yaml
+
+      - name: Kubernetes schema validation
+        run: kubeconform -ignore-missing-schemas -strict rendered/*.yaml
+
+  images:
+    name: Build And Scan Images
+    runs-on: ubuntu-latest
+    needs: [frontend, backend, shared, quality, gateway, security, deployment, contracts, integration, e2e, load, helm]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: auth-service
+            dockerfile: backend/services/auth-service/Dockerfile
+          - image: user-service
+            dockerfile: backend/services/user-service/Dockerfile
+          - image: course-service
+            dockerfile: backend/services/course-service/Dockerfile
+          - image: content-service
+            dockerfile: backend/services/content-service/Dockerfile
+          - image: enrollment-service
+            dockerfile: backend/services/enrollment-service/Dockerfile
+          - image: progress-service
+            dockerfile: backend/services/progress-service/Dockerfile
+          - image: assessment-service
+            dockerfile: backend/services/assessment-service/Dockerfile
+          - image: grading-service
+            dockerfile: backend/services/grading-service/Dockerfile
+          - image: notification-service
+            dockerfile: backend/services/notification-service/Dockerfile
+          - image: analytics-service
+            dockerfile: backend/services/analytics-service/Dockerfile
+          - image: frontend-service
+            dockerfile: frontend/Dockerfile
+          - image: api-gateway
+            dockerfile: infrastructure/docker/nginx/Dockerfile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare image tags
+        run: |
+          {
+            echo "IMAGE_NAMESPACE=${GITHUB_REPOSITORY,,}"
+            echo "SHORT_SHA=${GITHUB_SHA::12}"
+            echo "BRANCH_TAG=${GITHUB_REF_NAME//\//-}"
+          } >> "$GITHUB_ENV"
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.image }}:sha-${{ env.SHORT_SHA }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.image }}:${{ env.BRANCH_TAG }}
+          load: ${{ github.event_name == 'pull_request' }}
+
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@0.29.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.image }}:sha-${{ env.SHORT_SHA }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+
+  deploy-staging:
+    name: Deploy Staging
+    runs-on: ubuntu-latest
+    needs: [images]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    environment: staging
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Prepare deployment env
+        run: |
+          echo "IMAGE_NAMESPACE=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+          echo "SHORT_SHA=${GITHUB_SHA::12}" >> "$GITHUB_ENV"
+          printf '%s' "${{ secrets.KUBE_CONFIG_STAGING }}" > "$RUNNER_TEMP/kubeconfig"
+          echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+
+      - name: Deploy Helm charts
+        run: |
+          helm upgrade --install learngrid-platform infrastructure/helm/learngrid-platform --namespace learngrid-system --create-namespace --wait --timeout 10m
+          helm upgrade --install learngrid-runtime infrastructure/helm/learngrid-runtime --namespace learngrid --create-namespace --wait --timeout 20m
+          helm upgrade --install learngrid-app infrastructure/helm/learngrid-app --namespace learngrid --create-namespace --wait --timeout 20m \
+            --set "image.registry=${{ env.REGISTRY }}/${IMAGE_NAMESPACE}" \
+            --set "image.tag=sha-${SHORT_SHA}"
+
+      - name: Rollout status
+        run: |
+          kubectl -n learngrid rollout status deployment/api-gateway --timeout=300s
+          kubectl -n learngrid rollout status deployment/frontend-service --timeout=300s
+          for deployment in auth-service user-service course-service content-service enrollment-service progress-service assessment-service grading-service notification-service analytics-service; do
+            kubectl -n learngrid rollout status "deployment/${deployment}" --timeout=300s
+          done
+
+      - name: In-cluster smoke
+        run: |
+          kubectl -n learngrid run smoke-curl --rm -i --restart=Never --image=curlimages/curl:8.11.1 -- \
+            curl -fsS http://api-gateway:8080/gateway/health
+
+      - name: Selenium staging smoke
+        env:
+          E2E_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+          E2E_STUDENT_EMAIL: ${{ secrets.E2E_STUDENT_EMAIL }}
+          E2E_STUDENT_PASSWORD: ${{ secrets.E2E_STUDENT_PASSWORD }}
+          E2E_INSTRUCTOR_EMAIL: ${{ secrets.E2E_INSTRUCTOR_EMAIL }}
+          E2E_INSTRUCTOR_PASSWORD: ${{ secrets.E2E_INSTRUCTOR_PASSWORD }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+        run: |
+          python -m pip install -r requirements-test.txt
+          sudo apt-get update
+          sudo apt-get install --yes firefox
+          python -m pytest tests/e2e
+
+  deploy-production:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Prepare deployment env
+        run: |
+          echo "IMAGE_NAMESPACE=${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+          echo "SHORT_SHA=${GITHUB_SHA::12}" >> "$GITHUB_ENV"
+          printf '%s' "${{ secrets.KUBE_CONFIG_PRODUCTION }}" > "$RUNNER_TEMP/kubeconfig"
+          echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+
+      - name: Deploy Helm charts
+        run: |
+          helm upgrade --install learngrid-platform infrastructure/helm/learngrid-platform --namespace learngrid-system --create-namespace --wait --timeout 10m
+          helm upgrade --install learngrid-runtime infrastructure/helm/learngrid-runtime --namespace learngrid --create-namespace --wait --timeout 20m
+          helm upgrade --install learngrid-app infrastructure/helm/learngrid-app --namespace learngrid --create-namespace --wait --timeout 20m \
+            --set "image.registry=${{ env.REGISTRY }}/${IMAGE_NAMESPACE}" \
+            --set "image.tag=sha-${SHORT_SHA}"
+
+      - name: Production smoke
+        run: |
+          kubectl -n learngrid rollout status deployment/api-gateway --timeout=300s
+          kubectl -n learngrid run production-smoke-curl --rm -i --restart=Never --image=curlimages/curl:8.11.1 -- \
+            curl -fsS http://api-gateway:8080/gateway/health

@@ -53,7 +53,9 @@ class ContentAsset(models.Model):
     class Meta:
         db_table = "content_assets"
         indexes = [
-            models.Index(fields=["institution_id", "status"], name="idx_content_assets_inst_status"),
+            models.Index(
+                fields=["institution_id", "status"], name="idx_content_assets_inst_status"
+            ),
             models.Index(fields=["owner_profile_id"], name="idx_content_assets_owner"),
             models.Index(fields=["asset_type"], name="idx_content_assets_asset_type"),
         ]

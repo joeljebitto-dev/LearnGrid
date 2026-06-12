@@ -119,7 +119,9 @@ class GradeRecordSearchSerializer(serializers.Serializer):
     assessment_id = serializers.UUIDField(required=False)
     submission_id = serializers.UUIDField(required=False)
     status = serializers.ChoiceField(choices=GradeRecordStatus.choices, required=False)
-    sort = serializers.ChoiceField(choices=GRADE_SORT_CHOICES, default="-updated_at", required=False)
+    sort = serializers.ChoiceField(
+        choices=GRADE_SORT_CHOICES, default="-updated_at", required=False
+    )
 
 
 class GradeCalculateSerializer(serializers.Serializer):
@@ -141,7 +143,9 @@ class ManualReviewCompleteSerializer(serializers.Serializer):
 
 class GradeOverrideSerializer(serializers.Serializer):
     score = serializers.DecimalField(max_digits=8, decimal_places=2, min_value=0)
-    max_score = serializers.DecimalField(max_digits=8, decimal_places=2, required=False, min_value=0)
+    max_score = serializers.DecimalField(
+        max_digits=8, decimal_places=2, required=False, min_value=0
+    )
     change_reason = serializers.CharField(allow_blank=False)
 
 

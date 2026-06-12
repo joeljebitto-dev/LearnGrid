@@ -1,16 +1,21 @@
 # Python
 __pycache__/
 *.py[cod]
+.coverage
+.coverage.*
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+htmlcov/
 .venv/
 db.sqlite3
 
 # Node
 node_modules/
+.pnpm-store/
 dist/
 coverage/
+.vite/
 
 # Environment
 .env
@@ -18,11 +23,25 @@ coverage/
 !.env.example
 LOCAL_BOT_USERS.txt
 
+# Test and build artifacts
+test-results/
+playwright-report/
+junit*.xml
+coverage.xml
+k6-summary*.json
+
+# Docker and local runtime output
+*.pid
+*.log
+tmp/
+temp/
+
 # Local gateway TLS
 infrastructure/docker/nginx/certs/*
 !infrastructure/docker/nginx/certs/.gitkeep
 
 # Local tooling
 .DS_Store
+Thumbs.db
 .idea/
 .vscode/

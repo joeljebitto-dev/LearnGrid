@@ -64,7 +64,9 @@ def allow_permissions(monkeypatch, institution_id, permissions_allowed=None):
     monkeypatch.setattr(permissions, "remote_authorization_check", fake_remote_authorization_check)
 
 
-def patch_context(monkeypatch, institution_id, profile_id, *, profile_type="student", enrolled=True):
+def patch_context(
+    monkeypatch, institution_id, profile_id, *, profile_type="student", enrolled=True
+):
     monkeypatch.setattr(
         views,
         "get_course_context",
@@ -73,11 +75,17 @@ def patch_context(monkeypatch, institution_id, profile_id, *, profile_type="stud
     monkeypatch.setattr(
         views,
         "current_profile",
-        lambda **_kwargs: {"id": str(profile_id), "profile_type": profile_type, "institution_id": str(institution_id)},
+        lambda **_kwargs: {
+            "id": str(profile_id),
+            "profile_type": profile_type,
+            "institution_id": str(institution_id),
+        },
     )
     monkeypatch.setattr(views, "has_enrollment_access", lambda **_kwargs: enrolled)
     monkeypatch.setattr(services, "has_enrollment_access", lambda **_kwargs: enrolled)
-    monkeypatch.setattr(services, "validate_content_asset", lambda **kwargs: {"id": str(kwargs["asset_id"])})
+    monkeypatch.setattr(
+        services, "validate_content_asset", lambda **kwargs: {"id": str(kwargs["asset_id"])}
+    )
 
 
 def create_assignment(*, course_id, due_at=None, allow_late=False):

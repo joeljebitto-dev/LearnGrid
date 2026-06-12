@@ -158,7 +158,9 @@ def create_question_bank(*, validated_data: dict[str, Any]) -> QuestionBank:
     return QuestionBank.objects.create(**validated_data)
 
 
-def update_question_bank(*, question_bank: QuestionBank, validated_data: dict[str, Any]) -> QuestionBank:
+def update_question_bank(
+    *, question_bank: QuestionBank, validated_data: dict[str, Any]
+) -> QuestionBank:
     for field in ["title", "description"]:
         if field in validated_data:
             setattr(question_bank, field, validated_data[field])
@@ -207,7 +209,9 @@ def create_assessment(*, validated_data: dict[str, Any]) -> Assessment:
         if questions:
             replace_quiz_questions(assessment=assessment, question_payloads=questions)
     elif assessment.assessment_type == AssessmentType.ASSIGNMENT:
-        Assignment.objects.create(assessment=assessment, **_default_assignment_config(assignment_config or {}))
+        Assignment.objects.create(
+            assessment=assessment, **_default_assignment_config(assignment_config or {})
+        )
     return assessment
 
 
@@ -217,7 +221,14 @@ def update_assessment(*, assessment: Assessment, validated_data: dict[str, Any])
     assignment_config = validated_data.pop("assignment_config", None)
     questions = validated_data.pop("questions", None)
 
-    for field in ["course_id", "lesson_id", "title", "description", "available_from", "available_until"]:
+    for field in [
+        "course_id",
+        "lesson_id",
+        "title",
+        "description",
+        "available_from",
+        "available_until",
+    ]:
         if field in validated_data:
             setattr(assessment, field, validated_data[field])
     assessment.save()
@@ -245,7 +256,9 @@ def update_quiz_config(*, quiz: Quiz, validated_data: dict[str, Any]) -> Quiz:
     return quiz
 
 
-def update_assignment_config(*, assignment: Assignment, validated_data: dict[str, Any]) -> Assignment:
+def update_assignment_config(
+    *, assignment: Assignment, validated_data: dict[str, Any]
+) -> Assignment:
     for field in ["due_at", "allow_late_submission", "max_points", "resource_asset_id"]:
         if field in validated_data:
             setattr(assignment, field, validated_data[field])
@@ -278,21 +291,29 @@ def save_assignment_submission(
         student_profile_id=profile["id"],
         defaults={"status": AssignmentSubmissionStatus.DRAFT},
     )
-    if submission.status not in {AssignmentSubmissionStatus.DRAFT, AssignmentSubmissionStatus.SUBMITTED, AssignmentSubmissionStatus.LATE}:
+    if submission.status not in {
+        AssignmentSubmissionStatus.DRAFT,
+        AssignmentSubmissionStatus.SUBMITTED,
+        AssignmentSubmissionStatus.LATE,
+    }:
         raise ValidationError({"submission": "Submission cannot be changed in its current status."})
 
     for field in ["submission_text", "attachment_asset_id"]:
         if field in validated_data:
             setattr(submission, field, validated_data[field])
     if submit:
-        _finalize_assignment_submission(submission=submission, actor_profile_id=profile["id"], correlation_id=correlation_id)
+        _finalize_assignment_submission(
+            submission=submission, actor_profile_id=profile["id"], correlation_id=correlation_id
+        )
     else:
         submission.status = AssignmentSubmissionStatus.DRAFT
         submission.save()
         SubmissionAuditLog.objects.create(
             submission_type=SubmissionType.ASSIGNMENT_SUBMISSION,
             submission_id=submission.id,
-            event_type="assignment_submission_created" if created else "assignment_submission_saved",
+            event_type="assignment_submission_created"
+            if created
+            else "assignment_submission_saved",
             actor_profile_id=profile["id"],
             metadata={"assignment_id": str(assignment.id)},
         )
@@ -332,8 +353,14 @@ def submit_assignment_submission(
     actor_profile_id,
     correlation_id: str | None = None,
 ) -> AssignmentSubmission:
-    if submission.status not in {AssignmentSubmissionStatus.DRAFT, AssignmentSubmissionStatus.SUBMITTED, AssignmentSubmissionStatus.LATE}:
-        raise ValidationError({"submission": "Submission cannot be submitted in its current status."})
+    if submission.status not in {
+        AssignmentSubmissionStatus.DRAFT,
+        AssignmentSubmissionStatus.SUBMITTED,
+        AssignmentSubmissionStatus.LATE,
+    }:
+        raise ValidationError(
+            {"submission": "Submission cannot be submitted in its current status."}
+        )
     _validate_assignment_available(submission.assignment)
     return _finalize_assignment_submission(
         submission=submission,
@@ -365,7 +392,9 @@ def mark_assignment_submission_graded(
 
 
 @transaction.atomic
-def replace_quiz_questions(*, assessment: Assessment, question_payloads: list[dict[str, Any]]) -> list[QuizQuestion]:
+def replace_quiz_questions(
+    *, assessment: Assessment, question_payloads: list[dict[str, Any]]
+) -> list[QuizQuestion]:
     if assessment.assessment_type not in {AssessmentType.QUIZ, AssessmentType.EXAM}:
         raise ValidationError({"questions": "Only quizzes and exams support ordered questions."})
     quiz = assessment.quiz
@@ -389,39 +418,39 @@ def replace_quiz_questions(*, assessment: Assessment, question_payloads: list[di
     if missing:
         raise ValidationError({"questions": "All questions must exist and be active."})
 
-    normalized = []
+    normalized: list[tuple[Question, int, Decimal | None]] = []
     used_positions: set[int] = set()
     for index, item in enumerate(question_payloads, start=1):
-        position = item.get("position") or index
+        position = int(item.get("position") or index)
         if position in used_positions:
             raise ValidationError({"questions": "Question positions must be unique."})
         used_positions.add(position)
-        normalized.append(
-            {
-                "question": questions[item["question_id"]],
-                "position": position,
-                "points_override": item.get("points_override"),
-            }
-        )
+        normalized.append((questions[item["question_id"]], position, item.get("points_override")))
 
     quiz.question_links.all().delete()
     return [
         QuizQuestion.objects.create(
             quiz=quiz,
-            question=item["question"],
-            position=item["position"],
-            points_override=item.get("points_override"),
+            question=question,
+            position=position,
+            points_override=points_override,
         )
-        for item in normalized
+        for question, position, points_override in normalized
     ]
 
 
 def publish_assessment(*, assessment: Assessment, correlation_id: str | None = None) -> Assessment:
     if assessment.assessment_type in {AssessmentType.QUIZ, AssessmentType.EXAM}:
         if not hasattr(assessment, "quiz") or not assessment.quiz.question_links.exists():
-            raise ValidationError({"questions": "Published quizzes and exams require at least one question."})
-    if assessment.assessment_type == AssessmentType.ASSIGNMENT and not hasattr(assessment, "assignment"):
-        raise ValidationError({"assignment_config": "Published assignments require assignment configuration."})
+            raise ValidationError(
+                {"questions": "Published quizzes and exams require at least one question."}
+            )
+    if assessment.assessment_type == AssessmentType.ASSIGNMENT and not hasattr(
+        assessment, "assignment"
+    ):
+        raise ValidationError(
+            {"assignment_config": "Published assignments require assignment configuration."}
+        )
     assessment.status = AssessmentStatus.PUBLISHED
     assessment.deleted_at = None
     assessment.save(update_fields=["status", "deleted_at", "updated_at"])
@@ -429,7 +458,10 @@ def publish_assessment(*, assessment: Assessment, correlation_id: str | None = N
         event_type="AssessmentPublished",
         aggregate_id=assessment.id,
         correlation_id=correlation_id,
-        payload={"course_id": str(assessment.course_id), "assessment_type": assessment.assessment_type},
+        payload={
+            "course_id": str(assessment.course_id),
+            "assessment_type": assessment.assessment_type,
+        },
     )
     return assessment
 
@@ -441,7 +473,10 @@ def close_assessment(*, assessment: Assessment, correlation_id: str | None = Non
         event_type="AssessmentClosed",
         aggregate_id=assessment.id,
         correlation_id=correlation_id,
-        payload={"course_id": str(assessment.course_id), "assessment_type": assessment.assessment_type},
+        payload={
+            "course_id": str(assessment.course_id),
+            "assessment_type": assessment.assessment_type,
+        },
     )
     return assessment
 
@@ -532,7 +567,9 @@ def save_attempt_answers(*, attempt: QuizAttempt, answers: list[dict[str, Any]])
             if question_id not in allowed_questions:
                 raise ValidationError({"question_id": "Question does not belong to this attempt."})
             link = allowed_questions[question_id]
-            score = score_answer(question=link.question, answer_payload=item["answer_payload"], link=link)
+            score = score_answer(
+                question=link.question, answer_payload=item["answer_payload"], link=link
+            )
             defaults: dict[str, Any] = {"answer_payload": item["answer_payload"], "score": score}
             if score is not None:
                 defaults["graded_at"] = timezone.now()
@@ -564,7 +601,9 @@ def submit_attempt(
     total = Decimal("0")
     for answer in attempt.answers.select_related("question").all():
         link = QuizQuestion.objects.get(quiz=attempt.quiz, question=answer.question)
-        answer.score = score_answer(question=answer.question, answer_payload=answer.answer_payload, link=link)
+        answer.score = score_answer(
+            question=answer.question, answer_payload=answer.answer_payload, link=link
+        )
         if answer.score is not None:
             answer.graded_at = timezone.now()
             total += answer.score
@@ -612,7 +651,11 @@ def ordered_attempt_questions(attempt: QuizAttempt) -> list[Question]:
     links = list(attempt.quiz.question_links.select_related("question").all())
     links_by_question_id = {link.question_id: link for link in links}
     if order:
-        ordered_links = [links_by_question_id[question_id] for question_id in order if question_id in links_by_question_id]
+        ordered_links = [
+            links_by_question_id[question_id]
+            for question_id in order
+            if question_id in links_by_question_id
+        ]
         ordered_links.extend([link for link in links if link.question_id not in order])
     else:
         ordered_links = links
@@ -621,12 +664,16 @@ def ordered_attempt_questions(attempt: QuizAttempt) -> list[Question]:
 
 def points_by_question(attempt: QuizAttempt) -> dict:
     return {
-        link.question_id: link.points_override if link.points_override is not None else link.question.points
+        link.question_id: link.points_override
+        if link.points_override is not None
+        else link.question.points
         for link in attempt.quiz.question_links.select_related("question")
     }
 
 
-def score_answer(*, question: Question, answer_payload: dict[str, Any], link: QuizQuestion) -> Decimal | None:
+def score_answer(
+    *, question: Question, answer_payload: dict[str, Any], link: QuizQuestion
+) -> Decimal | None:
     points = link.points_override if link.points_override is not None else question.points
     correct = question.correct_answer
     if question.question_type == QuestionType.MULTIPLE_CHOICE:
@@ -638,15 +685,25 @@ def score_answer(*, question: Question, answer_payload: dict[str, Any], link: Qu
         actual = answer_payload.get("choice_ids") if isinstance(answer_payload, dict) else None
         if not isinstance(expected, list) or not isinstance(actual, list):
             return Decimal("0")
-        return points if {str(item) for item in actual} == {str(item) for item in expected} else Decimal("0")
+        return (
+            points
+            if {str(item) for item in actual} == {str(item) for item in expected}
+            else Decimal("0")
+        )
     if question.question_type == QuestionType.TRUE_FALSE:
         expected = correct.get("value") if isinstance(correct, dict) else correct
         actual = answer_payload.get("value") if isinstance(answer_payload, dict) else None
         return points if actual is expected else Decimal("0")
     if question.question_type == QuestionType.SHORT_ANSWER and isinstance(correct, dict):
         accepted = correct.get("accepted_answers") or []
-        actual = str(answer_payload.get("text", "")).strip().lower() if isinstance(answer_payload, dict) else ""
-        return points if actual in {str(item).strip().lower() for item in accepted} else Decimal("0")
+        actual = (
+            str(answer_payload.get("text", "")).strip().lower()
+            if isinstance(answer_payload, dict)
+            else ""
+        )
+        return (
+            points if actual in {str(item).strip().lower() for item in accepted} else Decimal("0")
+        )
     return None
 
 
@@ -699,8 +756,12 @@ def assignment_submission_grading_source(submission: AssignmentSubmission) -> di
         "status": submission.status,
         "source_payload": {
             "submission_text": submission.submission_text,
-            "attachment_asset_id": str(submission.attachment_asset_id) if submission.attachment_asset_id else None,
-            "submitted_at": submission.submitted_at.isoformat() if submission.submitted_at else None,
+            "attachment_asset_id": str(submission.attachment_asset_id)
+            if submission.attachment_asset_id
+            else None,
+            "submitted_at": submission.submitted_at.isoformat()
+            if submission.submitted_at
+            else None,
         },
     }
 
@@ -760,9 +821,19 @@ def _finalize_assignment_submission(
     late = bool(assignment.due_at and now > assignment.due_at)
     if late and not assignment.allow_late_submission:
         raise ValidationError({"due_at": "Late submissions are not allowed for this assignment."})
-    submission.status = AssignmentSubmissionStatus.LATE if late else AssignmentSubmissionStatus.SUBMITTED
+    submission.status = (
+        AssignmentSubmissionStatus.LATE if late else AssignmentSubmissionStatus.SUBMITTED
+    )
     submission.submitted_at = now
-    submission.save(update_fields=["submission_text", "attachment_asset_id", "status", "submitted_at", "updated_at"])
+    submission.save(
+        update_fields=[
+            "submission_text",
+            "attachment_asset_id",
+            "status",
+            "submitted_at",
+            "updated_at",
+        ]
+    )
     SubmissionAuditLog.objects.create(
         submission_type=SubmissionType.ASSIGNMENT_SUBMISSION,
         submission_id=submission.id,

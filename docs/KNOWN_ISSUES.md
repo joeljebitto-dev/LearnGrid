@@ -18,8 +18,11 @@ Related spec: [SPEC-008](specs/008-content-upload-storage-access.md).
 Related task: [T-008](tasks/T-008-content-upload-storage-access.md).
 
 ## OD-003 Deployment Model
-Status: Open.  
-Decision needed: Select fully on-premise Kubernetes, cloud Kubernetes, or hybrid deployment.  
+Status: Resolved.
+Decision: Use on-prem Kubernetes as the LearnGrid deployment model. Application images are built
+and pushed to GHCR, then deployed to staging and production clusters with Helm through GitHub
+Actions kubeconfig secrets. PostgreSQL, Redis, Kafka, MinIO, and the Grafana observability stack run
+inside the on-prem cluster.
 Related spec: [SPEC-023](specs/023-ci-cd-deployment-observability.md).  
 Related task: [T-023](tasks/T-023-ci-cd-deployment-observability.md).
 

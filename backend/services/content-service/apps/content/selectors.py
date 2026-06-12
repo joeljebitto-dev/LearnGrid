@@ -6,12 +6,16 @@ from .models import ContentAsset, ContentAssetStatus, ContentPermission, Content
 def asset_queryset(*, include_deleted: bool = False) -> QuerySet[ContentAsset]:
     queryset = ContentAsset.objects.select_related("file_metadata")
     if not include_deleted:
-        queryset = queryset.exclude(status=ContentAssetStatus.DELETED).filter(deleted_at__isnull=True)
+        queryset = queryset.exclude(status=ContentAssetStatus.DELETED).filter(
+            deleted_at__isnull=True
+        )
     return queryset
 
 
 def search_assets(filters: dict, *, management: bool = False) -> QuerySet[ContentAsset]:
-    queryset = asset_queryset(include_deleted=management and filters.get("status") == ContentAssetStatus.DELETED)
+    queryset = asset_queryset(
+        include_deleted=management and filters.get("status") == ContentAssetStatus.DELETED
+    )
     if institution_id := filters.get("institution_id"):
         queryset = queryset.filter(institution_id=institution_id)
     if owner_profile_id := filters.get("owner_profile_id"):

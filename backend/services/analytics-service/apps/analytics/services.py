@@ -7,11 +7,16 @@ from decimal import Decimal
 from typing import Any
 from urllib import error, request as urlrequest
 
+import redis
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Avg
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
+from learngrid_redis import RedisKeyBuilder
+from learngrid_redis import get_json_cache
+from learngrid_redis import redis_client
+from learngrid_redis import set_json_cache
 from learngrid_events import DuplicateEvent
 from learngrid_events import publish_event as publish_kafka_event
 from rest_framework.exceptions import APIException, NotFound, PermissionDenied
@@ -27,10 +32,10 @@ from .models import (
     UsageMetric,
 )
 from .permissions import remote_authorization_check
-from .selectors import PLATFORM_SCOPE_ID
+from .selectors import PLATFORM_SCOPE_ID, dashboard_payload
 
 
-SEARCH_PERMISSION_BY_RESOURCE = {
+SEARCH_PERMISSION_BY_RESOURCE: dict[str, str] = {
     SearchResourceType.COURSE: "course.view",
     SearchResourceType.USER: "profile.view",
     SearchResourceType.ENROLLMENT: "enrollment.view",
@@ -142,6 +147,61 @@ def require_instructor_profile(profile: dict[str, Any]) -> None:
         raise PermissionDenied("Instructor dashboard requires an instructor profile.")
 
 
+def cached_dashboard_payload(
+    *,
+    portal: str,
+    scope_type: str,
+    scope_id,
+    profile: dict | None = None,
+    institution_id=None,
+) -> dict[str, Any]:
+    cache_key = _dashboard_cache_key(
+        portal=portal,
+        scope_type=scope_type,
+        scope_id=scope_id,
+        profile_id=profile.get("id") if profile else None,
+    )
+    cached = get_json_cache(_redis_client(), cache_key)
+    if cached is not None:
+        return cached
+
+    payload = dashboard_payload(
+        portal=portal,
+        scope_type=scope_type,
+        scope_id=scope_id,
+        profile=profile,
+        institution_id=institution_id,
+    )
+    set_json_cache(
+        _redis_client(),
+        cache_key,
+        payload,
+        settings.ANALYTICS_DASHBOARD_CACHE_TTL_SECONDS,
+    )
+    return payload
+
+
+def cached_platform_dashboard_payload(profile: dict | None = None) -> dict[str, Any]:
+    return cached_dashboard_payload(
+        portal="admin",
+        scope_type=DashboardScopeType.PLATFORM,
+        scope_id=PLATFORM_SCOPE_ID,
+        profile=profile,
+    )
+
+
+def invalidate_dashboard_cache(*, scope_type: str, scope_id=None) -> None:
+    suffix = [scope_type]
+    if scope_id is not None:
+        suffix.append(str(scope_id))
+    try:
+        client = _redis_client()
+        for key in client.scan_iter(f"{_key_builder().prefix_for('cache', 'dashboard', suffix)}*"):
+            client.delete(key)
+    except (redis.RedisError, OSError):
+        return
+
+
 @transaction.atomic
 def ingest_event(
     validated_data: dict[str, Any],
@@ -191,12 +251,38 @@ def handle_kafka_analytics_event(event: dict[str, Any]) -> dict[str, Any]:
     return {"status": "processed", "event_id": str(stored_event.event_id)}
 
 
-def publish_analytics_event(*, event_type: str, aggregate_id, payload: dict[str, Any]) -> dict[str, Any]:
+def publish_analytics_event(
+    *,
+    event_type: str,
+    aggregate_id,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
     return publish_kafka_event(
         event_type=event_type,
         aggregate_id=aggregate_id,
         producer_service=settings.SERVICE_NAME,
         payload=payload,
+    )
+
+
+def _redis_client():
+    return redis_client(
+        settings.REDIS_URL,
+        decode_responses=True,
+        socket_connect_timeout=settings.REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS,
+        socket_timeout=settings.REDIS_SOCKET_TIMEOUT_SECONDS,
+    )
+
+
+def _key_builder() -> RedisKeyBuilder:
+    return RedisKeyBuilder(service=settings.SERVICE_NAME, env=settings.REDIS_ENV)
+
+
+def _dashboard_cache_key(*, portal: str, scope_type: str, scope_id, profile_id=None) -> str:
+    return _key_builder().key(
+        "cache",
+        "dashboard",
+        [scope_type, str(scope_id), portal, str(profile_id or "none")],
     )
 
 
@@ -249,6 +335,7 @@ def upsert_dashboard_aggregate(validated_data: dict[str, Any]) -> tuple[Dashboar
             "computed_at": timezone.now(),
         },
     )
+    invalidate_dashboard_cache(scope_type=aggregate.scope_type, scope_id=aggregate.scope_id)
     return aggregate, created
 
 
@@ -327,7 +414,10 @@ def _events_for_report(*, institution_id, parameters: dict[str, Any]) -> Any:
 def _usage_metrics_for_report(*, institution_id, parameters: dict[str, Any]) -> Any:
     queryset = UsageMetric.objects.all()
     if institution_id:
-        queryset = queryset.filter(scope_type=DashboardScopeType.INSTITUTION, scope_id=institution_id)
+        queryset = queryset.filter(
+            scope_type=DashboardScopeType.INSTITUTION,
+            scope_id=institution_id,
+        )
     if start_at := _parse_parameter_datetime(parameters.get("start_at")):
         queryset = queryset.filter(bucket_start_at__gte=start_at)
     if end_at := _parse_parameter_datetime(parameters.get("end_at")):
@@ -397,9 +487,10 @@ def _enrollments_report(*, institution_id, parameters: dict[str, Any]) -> dict[s
 
 
 def _completion_rates_report(*, institution_id, parameters: dict[str, Any]) -> dict[str, Any]:
-    metrics = _usage_metrics_for_report(institution_id=institution_id, parameters=parameters).filter(
-        metric_name="course_completion_percent",
-    )
+    metrics = _usage_metrics_for_report(
+        institution_id=institution_id,
+        parameters=parameters,
+    ).filter(metric_name="course_completion_percent")
     events = _events_for_report(institution_id=institution_id, parameters=parameters).filter(
         event_type="CourseCompleted",
     )
@@ -415,9 +506,10 @@ def _completion_rates_report(*, institution_id, parameters: dict[str, Any]) -> d
 
 
 def _assessment_results_report(*, institution_id, parameters: dict[str, Any]) -> dict[str, Any]:
-    metrics = _usage_metrics_for_report(institution_id=institution_id, parameters=parameters).filter(
-        metric_name="assessment_score_percent",
-    )
+    metrics = _usage_metrics_for_report(
+        institution_id=institution_id,
+        parameters=parameters,
+    ).filter(metric_name="assessment_score_percent")
     submissions = _search_records_for_report(
         resource_type=SearchResourceType.SUBMISSION,
         institution_id=institution_id,

@@ -147,7 +147,9 @@ def test_batch_and_cohort_jobs_create_summaries(api_client, access_token, monkey
     assert response.status_code == 201
     assert response.json()["summary"]["created"] == 1
     assert response.json()["summary"]["failed"] == 1
-    assert Enrollment.objects.filter(student_profile_id=student_id, course_id=course_id).count() == 1
+    assert (
+        Enrollment.objects.filter(student_profile_id=student_id, course_id=course_id).count() == 1
+    )
 
     response = api_client.post(
         "/api/enrollments/cohort-enrollments/",

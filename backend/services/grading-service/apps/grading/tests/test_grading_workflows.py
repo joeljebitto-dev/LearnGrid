@@ -68,11 +68,23 @@ def patch_context(monkeypatch, institution_id, profile_id):
     monkeypatch.setattr(
         views,
         "current_profile",
-        lambda **_kwargs: {"id": str(profile_id), "profile_type": "instructor", "institution_id": str(institution_id)},
+        lambda **_kwargs: {
+            "id": str(profile_id),
+            "profile_type": "instructor",
+            "institution_id": str(institution_id),
+        },
     )
 
 
-def grading_source(*, course_id, student_id, assessment_id=None, submission_id=None, score="8.00", max_score="10.00"):
+def grading_source(
+    *,
+    course_id,
+    student_id,
+    assessment_id=None,
+    submission_id=None,
+    score="8.00",
+    max_score="10.00",
+):
     return {
         "submission_type": "quiz_attempt",
         "submission_id": str(submission_id or uuid4()),

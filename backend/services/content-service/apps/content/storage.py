@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import BinaryIO
+from typing import BinaryIO, cast
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -56,7 +56,7 @@ def stat_storage_object(object_key: str) -> StoredObject:
     except OSError as exc:
         raise ObjectStorageError("Could not connect to object storage.") from exc
     return StoredObject(
-        size=stat.size,
+        size=int(stat.size or 0),
         content_type=getattr(stat, "content_type", None),
         metadata=getattr(stat, "metadata", {}) or {},
     )
@@ -77,7 +77,7 @@ def upload_storage_object(
             data,
             length,
             content_type=content_type,
-            metadata=metadata,
+            metadata=cast(dict[str, str | list[str] | tuple[str]] | None, metadata),
         )
     except S3Error as exc:
         raise ObjectStorageError("Could not upload object to MinIO.") from exc

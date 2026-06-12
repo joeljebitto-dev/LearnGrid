@@ -76,7 +76,9 @@ def encode_headers(headers: dict[str, Any] | None = None) -> HeaderList:
     return encoded
 
 
-def decode_headers(headers: HeaderList | tuple[tuple[str, bytes], ...] | None = None) -> dict[str, str]:
+def decode_headers(
+    headers: HeaderList | tuple[tuple[str, bytes], ...] | None = None,
+) -> dict[str, str]:
     decoded = {}
     for key, value in headers or []:
         decoded[key] = value.decode("utf-8") if isinstance(value, bytes) else str(value)

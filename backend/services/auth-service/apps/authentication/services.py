@@ -1,22 +1,34 @@
 from __future__ import annotations
 
 import hmac
+import json
+import secrets
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from hashlib import sha256
-from typing import Any
+from typing import Any, cast
 
 import jwt
 import redis
 from django.conf import settings
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
+from learngrid_redis import RedisKeyBuilder
+from learngrid_redis import digest_json
+from learngrid_redis import digest_value
+from learngrid_redis import fixed_window_rate_limit
+from learngrid_redis import redis_client
+from learngrid_redis import set_json_cache
 from learngrid_events import publish_event as publish_kafka_event
-from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
+from rest_framework.exceptions import APIException, AuthenticationFailed
+from rest_framework.exceptions import PermissionDenied, Throttled
+from rest_framework.exceptions import ValidationError
 
 from .models import (
     Account,
@@ -29,6 +41,8 @@ from .models import (
     LoginAuditEvent,
     LoginAuditLog,
     Permission,
+    PasswordResetStatus,
+    PasswordResetToken,
     Role,
     RoleAssignment,
     RolePermission,
@@ -38,6 +52,22 @@ from .models import (
 
 
 _UNSET = object()
+AUTH_ACCOUNT_CREATED_AUDIT_EVENT = "auth_account_created"
+AUTH_ACCOUNT_UPDATED_AUDIT_EVENT = "auth_account_updated"
+AUTH_ACCOUNT_DEACTIVATED_AUDIT_EVENT = "auth_account_deactivated"
+
+
+class RedisSecurityUnavailable(APIException):
+    status_code = 503
+    default_code = "redis_security_unavailable"
+    default_detail = "Security controls are temporarily unavailable."
+
+
+def _validate_password_policy(password: str, *, field_name: str) -> None:
+    try:
+        validate_password(password)
+    except DjangoValidationError as exc:
+        raise ValidationError({field_name: list(exc.messages)}) from exc
 
 
 @dataclass(frozen=True)
@@ -77,19 +107,35 @@ def hash_token(token: str) -> str:
 
 
 def _redis_client() -> redis.Redis:
-    return redis.Redis.from_url(
+    return redis_client(
         settings.REDIS_URL,
         decode_responses=True,
-        socket_connect_timeout=0.2,
-        socket_timeout=0.2,
+        socket_connect_timeout=settings.REDIS_SOCKET_CONNECT_TIMEOUT_SECONDS,
+        socket_timeout=settings.REDIS_SOCKET_TIMEOUT_SECONDS,
     )
 
 
+def _key_builder() -> RedisKeyBuilder:
+    return RedisKeyBuilder(service=settings.SERVICE_NAME, env=settings.REDIS_ENV)
+
+
 def _blacklist_key(token_jti: uuid.UUID | str) -> str:
-    return f"auth:blacklist:{token_jti}"
+    return _key_builder().key("blacklist", "jwt", str(token_jti))
 
 
-def _ttl_seconds(expires_at: timezone.datetime) -> int:
+def _password_reset_key(raw_token: str) -> str:
+    return _key_builder().key("password-reset", "token", digest_value(raw_token))
+
+
+def _otp_key(*, purpose: str, subject: str) -> str:
+    return _key_builder().key(
+        "otp",
+        purpose,
+        digest_json({"purpose": purpose, "subject": subject}),
+    )
+
+
+def _ttl_seconds(expires_at: datetime) -> int:
     return max(0, int((expires_at - timezone.now()).total_seconds()))
 
 
@@ -106,6 +152,51 @@ def _request_user_agent(request: Any) -> str | None:
     if request is None:
         return None
     return request.META.get("HTTP_USER_AGENT")
+
+
+def _enforce_rate_limit(
+    *,
+    name: str,
+    identity: dict[str, Any],
+    limit: int,
+    window_seconds: int,
+    detail: str,
+) -> None:
+    key = _key_builder().key("rate-limit", name, digest_json(identity))
+    try:
+        result = fixed_window_rate_limit(
+            _redis_client(),
+            key,
+            limit=limit,
+            window_seconds=window_seconds,
+        )
+    except RuntimeError as exc:
+        raise Throttled(
+            detail="Redis-backed rate limiting is temporarily unavailable.",
+            wait=window_seconds,
+        ) from exc
+    if not result.allowed:
+        raise Throttled(detail=detail, wait=result.ttl_seconds or window_seconds)
+
+
+def _enforce_login_rate_limit(*, email: str, request: Any = None) -> None:
+    _enforce_rate_limit(
+        name="login",
+        identity={"email": email, "ip": _request_ip(request)},
+        limit=settings.AUTH_LOGIN_RATE_LIMIT_COUNT,
+        window_seconds=settings.AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS,
+        detail="Too many login attempts.",
+    )
+
+
+def _enforce_password_reset_rate_limit(*, email: str, request: Any = None) -> None:
+    _enforce_rate_limit(
+        name="password-reset",
+        identity={"email": email, "ip": _request_ip(request)},
+        limit=settings.AUTH_PASSWORD_RESET_RATE_LIMIT_COUNT,
+        window_seconds=settings.AUTH_PASSWORD_RESET_TTL_SECONDS,
+        detail="Too many password reset requests.",
+    )
 
 
 def _audit(
@@ -149,7 +240,7 @@ def encode_token(
     credential: Credential,
     token_type: str,
     token_jti: uuid.UUID,
-    expires_at: timezone.datetime,
+    expires_at: datetime,
 ) -> str:
     now = timezone.now()
     payload = {
@@ -185,7 +276,7 @@ def decode_token(token: str, expected_type: str, *, verify_exp: bool = True) -> 
 
 def blacklist_token_jti(
     token_jti: uuid.UUID | str,
-    expires_at: timezone.datetime,
+    expires_at: datetime,
     *,
     account: Account | None = None,
     reason: str = BlacklistReason.LOGOUT,
@@ -283,6 +374,7 @@ def issue_token_pair_for_credentials(
     device_label: str | None = None,
 ) -> TokenPair:
     normalized_email = email.strip().lower()
+    _enforce_login_rate_limit(email=normalized_email, request=request)
     try:
         account = Account.objects.select_related("credential").get(email__iexact=normalized_email)
     except Account.DoesNotExist as exc:
@@ -316,6 +408,8 @@ def create_managed_account(
     actor_account: Account | None = None,
     request: Any = None,
 ) -> Account:
+    _validate_password_policy(temporary_password, field_name="temporary_password")
+    normalized_scope_id = _validate_scope(scope_type, scope_id)
     account = Account.objects.create(
         email=email.strip().lower(),
         phone=phone or None,
@@ -332,10 +426,19 @@ def create_managed_account(
             account=account,
             role=role,
             scope_type=scope_type,
-            scope_id=scope_id,
+            scope_id=normalized_scope_id,
             assigned_by_account=actor_account,
             request=request,
         )
+    _audit_authorization(
+        AUTH_ACCOUNT_CREATED_AUDIT_EVENT,
+        actor_account=actor_account,
+        target_account=account,
+        scope_type=scope_type,
+        scope_id=normalized_scope_id,
+        request=request,
+        metadata={"role_code": role_code},
+    )
     publish_auth_event(
         event_type="AuthAccountCreated",
         aggregate_id=account.id,
@@ -345,31 +448,203 @@ def create_managed_account(
 
 
 @transaction.atomic
+def request_password_reset(*, email: str, request: Any = None) -> str | None:
+    normalized_email = email.strip().lower()
+    _enforce_password_reset_rate_limit(email=normalized_email, request=request)
+
+    try:
+        account = Account.objects.select_related("credential").get(email__iexact=normalized_email)
+    except Account.DoesNotExist:
+        _audit(LoginAuditEvent.PASSWORD_RESET, email_attempted=normalized_email, request=request)
+        return None
+
+    if not account.is_active:
+        _audit(
+            LoginAuditEvent.PASSWORD_RESET,
+            account=account,
+            email_attempted=normalized_email,
+            request=request,
+        )
+        return None
+
+    raw_token = secrets.token_urlsafe(32)
+    expires_at = timezone.now() + timedelta(seconds=settings.AUTH_PASSWORD_RESET_TTL_SECONDS)
+    reset_token = PasswordResetToken.objects.create(
+        account=account,
+        token_hash=hash_token(raw_token),
+        requested_ip=_request_ip(request),
+        expires_at=expires_at,
+    )
+    try:
+        _redis_client().setex(
+            _password_reset_key(raw_token),
+            settings.AUTH_PASSWORD_RESET_TTL_SECONDS,
+            str(reset_token.id),
+        )
+    except (redis.RedisError, OSError) as exc:
+        reset_token.status = PasswordResetStatus.REVOKED
+        reset_token.save(update_fields=["status"])
+        raise RedisSecurityUnavailable("Password reset is temporarily unavailable.") from exc
+
+    _audit(LoginAuditEvent.PASSWORD_RESET, account=account, request=request)
+    return raw_token
+
+
+def confirm_password_reset(*, token: str, new_password: str) -> None:
+    _validate_password_policy(new_password, field_name="new_password")
+    token_hash = hash_token(token)
+    reset_token = (
+        PasswordResetToken.objects.select_related("account", "account__credential")
+        .filter(token_hash=token_hash, status=PasswordResetStatus.PENDING)
+        .order_by("-created_at")
+        .first()
+    )
+    if reset_token is None:
+        raise ValidationError({"token": "Password reset token is invalid."})
+
+    if reset_token.expires_at <= timezone.now():
+        PasswordResetToken.objects.filter(id=reset_token.id).update(
+            status=PasswordResetStatus.EXPIRED,
+        )
+        raise ValidationError({"token": "Password reset token has expired."})
+
+    client = _redis_client()
+    try:
+        redis_token_id = client.get(_password_reset_key(token))
+    except (redis.RedisError, OSError) as exc:
+        raise RedisSecurityUnavailable("Password reset is temporarily unavailable.") from exc
+
+    if redis_token_id != str(reset_token.id):
+        PasswordResetToken.objects.filter(id=reset_token.id).update(
+            status=PasswordResetStatus.EXPIRED,
+        )
+        raise ValidationError({"token": "Password reset token has expired."})
+
+    with transaction.atomic():
+        reset_token = (
+            PasswordResetToken.objects.select_for_update()
+            .select_related("account", "account__credential")
+            .get(id=reset_token.id, status=PasswordResetStatus.PENDING)
+        )
+        credential = reset_token.account.credential
+        credential.password_hash = make_password(new_password)
+        credential.must_change_password = False
+        credential.password_changed_at = timezone.now()
+        credential.save(
+            update_fields=[
+                "password_hash",
+                "must_change_password",
+                "password_changed_at",
+                "updated_at",
+            ]
+        )
+
+        reset_token.status = PasswordResetStatus.USED
+        reset_token.used_at = timezone.now()
+        reset_token.save(update_fields=["status", "used_at"])
+        revoke_account_tokens(reset_token.account, reason=BlacklistReason.PASSWORD_CHANGE)
+    try:
+        client.delete(_password_reset_key(token))
+    except (redis.RedisError, OSError):
+        pass
+
+
+def issue_otp(*, purpose: str, subject: str, code: str) -> None:
+    key = _otp_key(purpose=purpose, subject=subject)
+    payload = {"code_hash": hash_token(code), "attempts": 0}
+    if not set_json_cache(_redis_client(), key, payload, settings.AUTH_OTP_TTL_SECONDS):
+        raise RedisSecurityUnavailable("OTP storage is temporarily unavailable.")
+
+
+def verify_otp(*, purpose: str, subject: str, code: str) -> bool:
+    key = _otp_key(purpose=purpose, subject=subject)
+    client = _redis_client()
+    try:
+        cached = cast(str | bytes | bytearray | None, client.get(key))
+    except (redis.RedisError, OSError) as exc:
+        raise RedisSecurityUnavailable("OTP verification is temporarily unavailable.") from exc
+    if not cached:
+        return False
+    try:
+        payload = json.loads(cached)
+    except (TypeError, ValueError):
+        return False
+
+    attempts = int(payload.get("attempts", 0))
+    if attempts >= settings.AUTH_OTP_MAX_ATTEMPTS:
+        _delete_redis_key(client, key)
+        return False
+
+    if hmac.compare_digest(str(payload.get("code_hash", "")), hash_token(code)):
+        _delete_redis_key(client, key)
+        return True
+
+    attempts += 1
+    if attempts >= settings.AUTH_OTP_MAX_ATTEMPTS:
+        _delete_redis_key(client, key)
+        return False
+
+    payload["attempts"] = attempts
+    try:
+        ttl = int(cast(int, client.ttl(key)))
+        client.setex(key, ttl if ttl > 0 else settings.AUTH_OTP_TTL_SECONDS, json.dumps(payload))
+    except (redis.RedisError, OSError) as exc:
+        raise RedisSecurityUnavailable("OTP verification is temporarily unavailable.") from exc
+    return False
+
+
+def _delete_redis_key(client: redis.Redis, key: str) -> None:
+    try:
+        client.delete(key)
+    except (redis.RedisError, OSError) as exc:
+        raise RedisSecurityUnavailable("Redis key deletion is temporarily unavailable.") from exc
+
+
+@transaction.atomic
 def update_managed_account(
     account: Account,
     *,
     email=_UNSET,
     phone=_UNSET,
     status=_UNSET,
+    actor_account: Account | None = None,
+    request: Any = None,
+    scope_type: str = "",
+    scope_id: uuid.UUID | str | None = None,
 ) -> Account:
     update_fields = ["updated_at"]
+    changed_fields = []
     revoke_tokens = False
     if email is not _UNSET:
         account.email = email.strip().lower()
         update_fields.append("email")
+        changed_fields.append("email")
     if phone is not _UNSET:
         account.phone = phone or None
         update_fields.append("phone")
+        changed_fields.append("phone")
     if status is not _UNSET:
         account.status = status
         update_fields.append("status")
+        changed_fields.append("status")
         if status == AccountStatus.DEACTIVATED:
             account.deleted_at = timezone.now()
             update_fields.append("deleted_at")
+            changed_fields.append("deleted_at")
             revoke_tokens = True
     account.save(update_fields=update_fields)
     if revoke_tokens:
         revoke_account_tokens(account, reason=BlacklistReason.ADMIN_REVOKE)
+    normalized_scope_id = _validate_scope(scope_type, scope_id) if scope_type else None
+    _audit_authorization(
+        AUTH_ACCOUNT_UPDATED_AUDIT_EVENT,
+        actor_account=actor_account,
+        target_account=account,
+        scope_type=scope_type,
+        scope_id=normalized_scope_id,
+        request=request,
+        metadata={"changed_fields": changed_fields},
+    )
     publish_auth_event(
         event_type="AuthAccountUpdated",
         aggregate_id=account.id,
@@ -379,11 +654,27 @@ def update_managed_account(
 
 
 @transaction.atomic
-def deactivate_managed_account(account: Account) -> Account:
+def deactivate_managed_account(
+    account: Account,
+    *,
+    actor_account: Account | None = None,
+    request: Any = None,
+    scope_type: str = "",
+    scope_id: uuid.UUID | str | None = None,
+) -> Account:
     account.status = AccountStatus.DEACTIVATED
     account.deleted_at = timezone.now()
     account.save(update_fields=["status", "deleted_at", "updated_at"])
     revoke_account_tokens(account, reason=BlacklistReason.ADMIN_REVOKE)
+    normalized_scope_id = _validate_scope(scope_type, scope_id) if scope_type else None
+    _audit_authorization(
+        AUTH_ACCOUNT_DEACTIVATED_AUDIT_EVENT,
+        actor_account=actor_account,
+        target_account=account,
+        scope_type=scope_type,
+        scope_id=normalized_scope_id,
+        request=request,
+    )
     publish_auth_event(
         event_type="AuthAccountDeactivated",
         aggregate_id=account.id,
@@ -445,7 +736,12 @@ def logout_tokens(
         account=account,
         revoked_at__isnull=True,
     ).update(revoked_at=timezone.now())
-    blacklist_token_jti(token_jti, refresh_expires_at, account=account, reason=BlacklistReason.LOGOUT)
+    blacklist_token_jti(
+        token_jti,
+        refresh_expires_at,
+        account=account,
+        reason=BlacklistReason.LOGOUT,
+    )
 
     if access_token:
         access_payload = decode_token(access_token, "access", verify_exp=False)
@@ -500,13 +796,17 @@ def _permission_cache_key(
     scope_id: uuid.UUID | str | None,
 ) -> str:
     normalized_scope = str(scope_id) if scope_id else "none"
-    return f"auth:permissions:{account_id}:{permission_code}:{scope_type}:{normalized_scope}"
+    return _key_builder().key(
+        "permission-cache",
+        "check",
+        [str(account_id), permission_code, scope_type, normalized_scope],
+    )
 
 
 def _permission_cache_prefix(account_id: uuid.UUID | str | None = None) -> str:
     if account_id:
-        return f"auth:permissions:{account_id}:"
-    return "auth:permissions:"
+        return _key_builder().prefix_for("permission-cache", "check", str(account_id))
+    return _key_builder().prefix_for("permission-cache", "check")
 
 
 def _normalize_scope_id(scope_type: str, scope_id: uuid.UUID | str | None) -> uuid.UUID | None:
@@ -643,9 +943,19 @@ def has_permission(
         if cached is not None:
             return cached == "1"
     except redis.RedisError:
-        return _has_permission_from_database(account, permission_code, scope_type, normalized_scope_id)
+        return _has_permission_from_database(
+            account,
+            permission_code,
+            scope_type,
+            normalized_scope_id,
+        )
 
-    allowed = _has_permission_from_database(account, permission_code, scope_type, normalized_scope_id)
+    allowed = _has_permission_from_database(
+        account,
+        permission_code,
+        scope_type,
+        normalized_scope_id,
+    )
     try:
         _redis_client().setex(
             cache_key,
@@ -732,7 +1042,10 @@ def grant_role_permission(
     actor_account: Account | None = None,
     request: Any = None,
 ) -> RolePermission:
-    role_permission, created = RolePermission.objects.get_or_create(role=role, permission=permission)
+    role_permission, created = RolePermission.objects.get_or_create(
+        role=role,
+        permission=permission,
+    )
     if created:
         _audit_authorization(
             AuthorizationAuditEvent.ROLE_PERMISSION_GRANTED,

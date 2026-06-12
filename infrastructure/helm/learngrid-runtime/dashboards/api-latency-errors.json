@@ -1,0 +1,26 @@
+{
+  "uid": "learngrid-api-latency-errors",
+  "title": "LearnGrid API Latency And Errors",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "API request latency p95",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(django_http_requests_latency_seconds_by_view_method_bucket[5m])) by (le, view, method))"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "API 5xx errors",
+      "targets": [
+        {
+          "expr": "sum(rate(django_http_responses_total_by_status_total{status=~\"5..\"}[5m])) by (job)"
+        }
+      ]
+    }
+  ]
+}

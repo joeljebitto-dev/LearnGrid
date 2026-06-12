@@ -72,7 +72,9 @@ class ContentAssetListCreateView(APIView):
     def post(self, request):
         serializer = ContentAssetCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        require_content_permission(request, "content.manage", serializer.validated_data["institution_id"])
+        require_content_permission(
+            request, "content.manage", serializer.validated_data["institution_id"]
+        )
         asset = create_asset(
             validated_data=serializer.validated_data,
             correlation_id=_correlation_id(request),
@@ -86,7 +88,9 @@ class PresignedUploadCreateView(APIView):
     def post(self, request):
         serializer = PresignedUploadCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        require_content_permission(request, "content.manage", serializer.validated_data["institution_id"])
+        require_content_permission(
+            request, "content.manage", serializer.validated_data["institution_id"]
+        )
         result = create_presigned_upload(
             validated_data=serializer.validated_data,
             correlation_id=_correlation_id(request),
@@ -110,7 +114,9 @@ class ProxyUploadCreateView(APIView):
     def post(self, request):
         serializer = ProxyUploadCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        require_content_permission(request, "content.manage", serializer.validated_data["institution_id"])
+        require_content_permission(
+            request, "content.manage", serializer.validated_data["institution_id"]
+        )
         asset = proxy_upload_asset(
             validated_data=serializer.validated_data,
             correlation_id=_correlation_id(request),
@@ -181,8 +187,12 @@ class ContentPermissionListCreateView(APIView):
         require_content_permission(request, "content.manage", asset.institution_id)
         serializer = ContentPermissionCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        content_permission = create_permission(asset=asset, validated_data=serializer.validated_data)
-        return Response(ContentPermissionSerializer(content_permission).data, status=status.HTTP_201_CREATED)
+        content_permission = create_permission(
+            asset=asset, validated_data=serializer.validated_data
+        )
+        return Response(
+            ContentPermissionSerializer(content_permission).data, status=status.HTTP_201_CREATED
+        )
 
 
 class SignedAccessCreateView(APIView):
@@ -208,7 +218,9 @@ class SignedDownloadView(APIView):
     permission_classes = []
 
     def get(self, request, access_id):
-        return Response(resolve_signed_access(access_id=access_id, token=request.query_params.get("token", "")))
+        return Response(
+            resolve_signed_access(access_id=access_id, token=request.query_params.get("token", ""))
+        )
 
 
 class ContentVersionListCreateView(APIView):

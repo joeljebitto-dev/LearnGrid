@@ -36,6 +36,40 @@ def access_token():
     )
 
 
+class FakeRedis:
+    def __init__(self):
+        self.data: dict[str, str] = {}
+        self.ttls: dict[str, int] = {}
+
+    def get(self, key):
+        return self.data.get(key)
+
+    def setex(self, key, ttl, value):
+        self.data[key] = value
+        self.ttls[key] = ttl
+
+    def scan_iter(self, pattern):
+        prefix = pattern.removesuffix("*")
+        return [key for key in self.data if key.startswith(prefix)]
+
+    def delete(self, key):
+        self.data.pop(key, None)
+        self.ttls.pop(key, None)
+
+    def set(self, key, value, nx=False, ex=None):
+        if nx and key in self.data:
+            return False
+        self.data[key] = value
+        self.ttls[key] = ex
+        return True
+
+    def eval(self, _script, _count, key, token):
+        if self.data.get(key) == token:
+            self.delete(key)
+            return 1
+        return 0
+
+
 class BrokenRedis:
     def get(self, _key):
         raise redis.RedisError("redis unavailable")
@@ -46,10 +80,13 @@ class BrokenRedis:
     def scan_iter(self, _pattern):
         raise redis.RedisError("redis unavailable")
 
+    def set(self, *_args, **_kwargs):
+        raise redis.RedisError("redis unavailable")
+
 
 @pytest.fixture(autouse=True)
 def disable_external_redis(monkeypatch):
-    monkeypatch.setattr(services, "_redis_client", lambda: BrokenRedis())
+    monkeypatch.setattr(services, "_redis_client", lambda: FakeRedis())
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -394,3 +431,52 @@ def test_course_revision_snapshots_increment_versions(api_client, access_token, 
     )
     assert response.status_code == 200
     assert response.json()["version_number"] == 1
+
+
+@pytest.mark.django_db
+def test_reorder_returns_conflict_when_redis_lock_is_contended(
+    api_client,
+    access_token,
+    monkeypatch,
+):
+    institution_id = uuid4()
+    course = create_course(institution_id)
+    module_one = CourseModule.objects.create(course=course, title="One", position=1)
+    module_two = CourseModule.objects.create(course=course, title="Two", position=2)
+    fake_redis = FakeRedis()
+    lock_key = services._key_builder().key("lock", "course-structure", str(course.id))
+    fake_redis.data[lock_key] = "other-owner"
+    monkeypatch.setattr(services, "_redis_client", lambda: fake_redis)
+    allow_course_manage(monkeypatch, institution_id)
+
+    response = api_client.post(
+        f"/api/courses/{course.id}/modules/reorder/",
+        {"module_ids": [str(module_two.id), str(module_one.id)]},
+        **auth_headers(access_token),
+        format="json",
+    )
+
+    assert response.status_code == 409
+
+
+@pytest.mark.django_db
+def test_reorder_returns_conflict_when_redis_lock_is_unavailable(
+    api_client,
+    access_token,
+    monkeypatch,
+):
+    institution_id = uuid4()
+    course = create_course(institution_id)
+    module_one = CourseModule.objects.create(course=course, title="One", position=1)
+    module_two = CourseModule.objects.create(course=course, title="Two", position=2)
+    monkeypatch.setattr(services, "_redis_client", lambda: BrokenRedis())
+    allow_course_manage(monkeypatch, institution_id)
+
+    response = api_client.post(
+        f"/api/courses/{course.id}/modules/reorder/",
+        {"module_ids": [str(module_two.id), str(module_one.id)]},
+        **auth_headers(access_token),
+        format="json",
+    )
+
+    assert response.status_code == 409

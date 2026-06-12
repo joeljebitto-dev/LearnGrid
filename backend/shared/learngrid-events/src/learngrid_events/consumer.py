@@ -38,7 +38,9 @@ def consume_event(
     max_retry_attempts: int = 3,
 ) -> ConsumerResult:
     validate_event_envelope(event)
-    decoded_headers = decode_headers(headers) if isinstance(headers, (list, tuple)) else {**(headers or {})}
+    decoded_headers = (
+        decode_headers(headers) if isinstance(headers, (list, tuple)) else {**(headers or {})}
+    )
     attempts = int(decoded_headers.get("x-retry-attempt", "0"))
     try:
         handler(event)
@@ -54,7 +56,9 @@ def consume_event(
         )
     except Exception as exc:
         if attempts + 1 >= max_retry_attempts:
-            _send_dead_letter(adapter=adapter, topic=topic, event=event, attempts=attempts + 1, error=exc)
+            _send_dead_letter(
+                adapter=adapter, topic=topic, event=event, attempts=attempts + 1, error=exc
+            )
             return ConsumerResult(
                 status="dead_lettered",
                 event_id=event["event_id"],
@@ -82,7 +86,9 @@ def consume_event(
     return ConsumerResult(status="processed", event_id=event["event_id"], attempts=attempts)
 
 
-def _send_dead_letter(*, adapter, topic: str, event: dict[str, Any], attempts: int, error: Exception) -> None:
+def _send_dead_letter(
+    *, adapter, topic: str, event: dict[str, Any], attempts: int, error: Exception
+) -> None:
     adapter.send(
         dead_letter_topic(topic),
         event,

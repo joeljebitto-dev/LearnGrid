@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from .models import (
@@ -20,14 +22,30 @@ from .models import (
 )
 
 
-QUESTION_SORT_CHOICES = ["created_at", "-created_at", "updated_at", "-updated_at", "points", "-points"]
-ASSESSMENT_SORT_CHOICES = ["created_at", "-created_at", "available_from", "-available_from", "title", "-title"]
+QUESTION_SORT_CHOICES = [
+    "created_at",
+    "-created_at",
+    "updated_at",
+    "-updated_at",
+    "points",
+    "-points",
+]
+ASSESSMENT_SORT_CHOICES = [
+    "created_at",
+    "-created_at",
+    "available_from",
+    "-available_from",
+    "title",
+    "-title",
+]
 
 
 def _choice_ids(choices) -> set[str]:
     if not isinstance(choices, list):
         return set()
-    return {str(choice.get("id")) for choice in choices if isinstance(choice, dict) and choice.get("id")}
+    return {
+        str(choice.get("id")) for choice in choices if isinstance(choice, dict) and choice.get("id")
+    }
 
 
 def _normalize_bool_answer(value):
@@ -35,7 +53,9 @@ def _normalize_bool_answer(value):
         value = value.get("value")
     if isinstance(value, bool):
         return value
-    raise serializers.ValidationError("True/false correct_answer must be a boolean or {'value': boolean}.")
+    raise serializers.ValidationError(
+        "True/false correct_answer must be a boolean or {'value': boolean}."
+    )
 
 
 def validate_question_payload(attrs: dict) -> dict:
@@ -44,24 +64,42 @@ def validate_question_payload(attrs: dict) -> dict:
     correct_answer = attrs.get("correct_answer")
 
     if question_type == QuestionType.CODING:
-        raise serializers.ValidationError({"question_type": "Coding questions are reserved for a future release."})
+        raise serializers.ValidationError(
+            {"question_type": "Coding questions are reserved for a future release."}
+        )
 
     if question_type in {QuestionType.MULTIPLE_CHOICE, QuestionType.MULTIPLE_SELECT}:
         ids = _choice_ids(choices)
         if not ids:
-            raise serializers.ValidationError({"choices": "Objective questions require choices with stable ids."})
+            raise serializers.ValidationError(
+                {"choices": "Objective questions require choices with stable ids."}
+            )
 
         if question_type == QuestionType.MULTIPLE_CHOICE:
-            correct_id = correct_answer.get("choice_id") if isinstance(correct_answer, dict) else correct_answer
+            correct_id = (
+                correct_answer.get("choice_id")
+                if isinstance(correct_answer, dict)
+                else correct_answer
+            )
             if not correct_id or str(correct_id) not in ids:
-                raise serializers.ValidationError({"correct_answer": "Correct choice_id must exist in choices."})
+                raise serializers.ValidationError(
+                    {"correct_answer": "Correct choice_id must exist in choices."}
+                )
         else:
-            correct_ids = correct_answer.get("choice_ids") if isinstance(correct_answer, dict) else correct_answer
+            correct_ids = (
+                correct_answer.get("choice_ids")
+                if isinstance(correct_answer, dict)
+                else correct_answer
+            )
             if not isinstance(correct_ids, list) or not correct_ids:
-                raise serializers.ValidationError({"correct_answer": "Correct choice_ids must be a non-empty list."})
+                raise serializers.ValidationError(
+                    {"correct_answer": "Correct choice_ids must be a non-empty list."}
+                )
             unknown = {str(choice_id) for choice_id in correct_ids} - ids
             if unknown:
-                raise serializers.ValidationError({"correct_answer": "All correct choice_ids must exist in choices."})
+                raise serializers.ValidationError(
+                    {"correct_answer": "All correct choice_ids must exist in choices."}
+                )
 
     if question_type == QuestionType.TRUE_FALSE:
         attrs["correct_answer"] = {"value": _normalize_bool_answer(correct_answer)}
@@ -104,7 +142,9 @@ class QuestionBankSearchSerializer(serializers.Serializer):
     institution_id = serializers.UUIDField(required=False)
     owner_profile_id = serializers.UUIDField(required=False)
     q = serializers.CharField(required=False, allow_blank=True, max_length=255)
-    sort = serializers.ChoiceField(choices=QUESTION_SORT_CHOICES, default="-created_at", required=False)
+    sort = serializers.ChoiceField(
+        choices=QUESTION_SORT_CHOICES, default="-created_at", required=False
+    )
 
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -177,7 +217,9 @@ class QuestionSearchSerializer(serializers.Serializer):
     question_type = serializers.ChoiceField(choices=QuestionType.choices, required=False)
     status = serializers.ChoiceField(choices=QuestionStatus.choices, required=False)
     q = serializers.CharField(required=False, allow_blank=True, max_length=255)
-    sort = serializers.ChoiceField(choices=QUESTION_SORT_CHOICES, default="-created_at", required=False)
+    sort = serializers.ChoiceField(
+        choices=QUESTION_SORT_CHOICES, default="-created_at", required=False
+    )
 
 
 class QuizConfigSerializer(serializers.Serializer):
@@ -191,7 +233,13 @@ class QuizConfigSerializer(serializers.Serializer):
 class AssignmentConfigSerializer(serializers.Serializer):
     due_at = serializers.DateTimeField(required=False, allow_null=True)
     allow_late_submission = serializers.BooleanField(default=False, required=False)
-    max_points = serializers.DecimalField(max_digits=8, decimal_places=2, default=0, required=False, min_value=0)
+    max_points = serializers.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=Decimal("0"),
+        required=False,
+        min_value=Decimal("0"),
+    )
     resource_asset_id = serializers.UUIDField(required=False, allow_null=True)
 
 
@@ -341,7 +389,9 @@ class AssessmentCreateSerializer(serializers.Serializer):
         if assessment_type == AssessmentType.ASSIGNMENT:
             attrs["assignment_config"] = attrs.get("assignment_config") or {}
             if attrs.get("questions"):
-                raise serializers.ValidationError({"questions": "Assignments do not support quiz questions."})
+                raise serializers.ValidationError(
+                    {"questions": "Assignments do not support quiz questions."}
+                )
         return attrs
 
 
@@ -364,7 +414,9 @@ class AssessmentUpdateSerializer(serializers.Serializer):
         }
         _validate_window(window)
         if assessment.assessment_type == AssessmentType.ASSIGNMENT and attrs.get("questions"):
-            raise serializers.ValidationError({"questions": "Assignments do not support quiz questions."})
+            raise serializers.ValidationError(
+                {"questions": "Assignments do not support quiz questions."}
+            )
         return attrs
 
 
@@ -374,7 +426,9 @@ class AssessmentSearchSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=AssessmentStatus.choices, required=False)
     assessment_type = serializers.ChoiceField(choices=AssessmentType.choices, required=False)
     q = serializers.CharField(required=False, allow_blank=True, max_length=255)
-    sort = serializers.ChoiceField(choices=ASSESSMENT_SORT_CHOICES, default="-created_at", required=False)
+    sort = serializers.ChoiceField(
+        choices=ASSESSMENT_SORT_CHOICES, default="-created_at", required=False
+    )
 
 
 class QuizQuestionReplaceSerializer(serializers.Serializer):
@@ -386,7 +440,15 @@ class QuizAnswerSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = QuizAnswer
-        fields = ["id", "question_id", "answer_payload", "score", "graded_at", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "question_id",
+            "answer_payload",
+            "score",
+            "graded_at",
+            "created_at",
+            "updated_at",
+        ]
 
 
 class QuizAttemptSerializer(serializers.ModelSerializer):
@@ -469,4 +531,6 @@ def _validate_window(attrs: dict) -> None:
     available_from = attrs.get("available_from")
     available_until = attrs.get("available_until")
     if available_from and available_until and available_until <= available_from:
-        raise serializers.ValidationError({"available_until": "End window must be after start window."})
+        raise serializers.ValidationError(
+            {"available_until": "End window must be after start window."}
+        )

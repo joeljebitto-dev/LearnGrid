@@ -39,7 +39,9 @@ class NotificationTemplateSerializer(serializers.ModelSerializer):
 
 class NotificationTemplateCreateSerializer(serializers.Serializer):
     event_type = serializers.CharField(max_length=80)
-    channel = serializers.ChoiceField(choices=NotificationChannel.choices, default=NotificationChannel.IN_APP)
+    channel = serializers.ChoiceField(
+        choices=NotificationChannel.choices, default=NotificationChannel.IN_APP
+    )
     subject_template = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     body_template = serializers.CharField()
     status = serializers.ChoiceField(choices=TemplateStatus.choices, default=TemplateStatus.ACTIVE)
@@ -97,7 +99,9 @@ class NotificationSearchSerializer(serializers.Serializer):
     event_type = serializers.CharField(required=False, max_length=80)
     unread = serializers.BooleanField(required=False)
     include_deleted = serializers.BooleanField(required=False, default=False)
-    sort = serializers.ChoiceField(choices=NOTIFICATION_SORT_CHOICES, default="-created_at", required=False)
+    sort = serializers.ChoiceField(
+        choices=NOTIFICATION_SORT_CHOICES, default="-created_at", required=False
+    )
 
     def validate(self, attrs):
         if "unread" not in self.initial_data:

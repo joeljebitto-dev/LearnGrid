@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import dj_database_url
+from learngrid_observability.django import configure_django_observability
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 
@@ -17,22 +18,33 @@ ALLOWED_HOSTS = [
 ]
 
 INSTALLED_APPS = [
+    "django_prometheus",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.staticfiles",
     "corsheaders",
     "rest_framework",
+    "drf_spectacular",
     "learngrid_events",
     "apps.content",
 ]
 
 MIDDLEWARE = [
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
-TEMPLATES = []
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {},
+    },
+]
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
@@ -51,7 +63,7 @@ KAFKA_DEFAULT_PARTITIONS = int(os.getenv("KAFKA_DEFAULT_PARTITIONS", "3"))
 KAFKA_REPLICATION_FACTOR = int(os.getenv("KAFKA_REPLICATION_FACTOR", "1"))
 KAFKA_CONSUMER_GROUP = os.getenv("KAFKA_CONSUMER_GROUP", f"{SERVICE_NAME}-consumer")
 KAFKA_MAX_RETRY_ATTEMPTS = int(os.getenv("KAFKA_MAX_RETRY_ATTEMPTS", "3"))
-KAFKA_EVENT_HANDLERS = {}
+KAFKA_EVENT_HANDLERS: dict[str, str] = {}
 CONTENT_STORAGE_PROVIDER = os.getenv("CONTENT_STORAGE_PROVIDER", "minio")
 CONTENT_STORAGE_BUCKET = os.getenv("CONTENT_STORAGE_BUCKET", "learngrid-content")
 CONTENT_MINIO_ENDPOINT_URL = os.getenv("CONTENT_MINIO_ENDPOINT_URL", "http://127.0.0.1:9000")
@@ -59,6 +71,8 @@ CONTENT_MINIO_ACCESS_KEY = os.getenv("CONTENT_MINIO_ACCESS_KEY", "learngrid")
 CONTENT_MINIO_SECRET_KEY = os.getenv("CONTENT_MINIO_SECRET_KEY", "learngrid-minio-secret")
 CONTENT_MINIO_SECURE = os.getenv("CONTENT_MINIO_SECURE", "false").lower() == "true"
 CONTENT_MAX_UPLOAD_SIZE_BYTES = int(os.getenv("CONTENT_MAX_UPLOAD_SIZE_BYTES", "104857600"))
+DATA_UPLOAD_MAX_MEMORY_SIZE = CONTENT_MAX_UPLOAD_SIZE_BYTES
+FILE_UPLOAD_MAX_MEMORY_SIZE = CONTENT_MAX_UPLOAD_SIZE_BYTES
 CONTENT_ALLOWED_MIME_TYPES = [
     mime.strip()
     for mime in os.getenv(
@@ -67,9 +81,22 @@ CONTENT_ALLOWED_MIME_TYPES = [
     ).split(",")
     if mime.strip()
 ]
+CONTENT_ALLOWED_FILE_EXTENSIONS = [
+    extension.strip().lower()
+    for extension in os.getenv(
+        "CONTENT_ALLOWED_FILE_EXTENSIONS",
+        ".mp4,.pdf,.doc,.docx,.png,.jpg,.jpeg,.txt",
+    ).split(",")
+    if extension.strip()
+]
+CONTENT_MALWARE_SCAN_ENABLED = os.getenv("CONTENT_MALWARE_SCAN_ENABLED", "false").lower() == "true"
+CONTENT_MALWARE_SCANNER_COMMAND = os.getenv("CONTENT_MALWARE_SCANNER_COMMAND", "")
+CONTENT_MALWARE_SCAN_TIMEOUT_SECONDS = int(os.getenv("CONTENT_MALWARE_SCAN_TIMEOUT_SECONDS", "10"))
 CONTENT_SIGNED_ACCESS_TTL_SECONDS = int(os.getenv("CONTENT_SIGNED_ACCESS_TTL_SECONDS", "300"))
 CONTENT_PRESIGNED_UPLOAD_TTL_SECONDS = int(os.getenv("CONTENT_PRESIGNED_UPLOAD_TTL_SECONDS", "900"))
-CONTENT_PRESIGNED_DOWNLOAD_TTL_SECONDS = int(os.getenv("CONTENT_PRESIGNED_DOWNLOAD_TTL_SECONDS", "300"))
+CONTENT_PRESIGNED_DOWNLOAD_TTL_SECONDS = int(
+    os.getenv("CONTENT_PRESIGNED_DOWNLOAD_TTL_SECONDS", "300")
+)
 AUTH_SERVICE_BASE_URL = os.getenv("AUTH_SERVICE_BASE_URL", "http://127.0.0.1:8001")
 AUTH_JWT_SIGNING_KEY = os.getenv(
     "AUTH_JWT_SIGNING_KEY",
@@ -88,9 +115,30 @@ TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": ["apps.content.authentication.JWTAuthentication"],
 }
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": f"LearnGrid {SERVICE_NAME} API",
+    "DESCRIPTION": f"OpenAPI schema for {SERVICE_NAME}.",
+    "VERSION": "0.1.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "APPEND_COMPONENTS": {
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+            }
+        }
+    },
+    "SECURITY": [{"bearerAuth": []}],
+}
+configure_django_observability(globals())

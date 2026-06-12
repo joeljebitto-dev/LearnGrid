@@ -1,0 +1,6 @@
+apiVersion: v2
+name: learngrid-platform
+description: LearnGrid on-prem Kubernetes platform baseline
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

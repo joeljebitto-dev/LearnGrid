@@ -28,6 +28,13 @@ import {
 } from './api/dashboards';
 import { createUserProfile, type CreateUserProfilePayload } from './api/users';
 
+const phoneSchema = z
+  .string()
+  .trim()
+  .regex(/^\+?[1-9][0-9]{7,14}$/, 'Invalid phone number')
+  .optional()
+  .or(z.literal(''));
+
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1)
@@ -36,8 +43,8 @@ const loginSchema = z.object({
 const createUserSchema = z
   .object({
     email: z.string().email(),
-    phone: z.string().trim().optional(),
-    temporary_password: z.string().min(8),
+    phone: phoneSchema,
+    temporary_password: z.string().min(12),
     profile_type: z.enum(['student', 'instructor', 'admin']),
     institution_id: z.string().trim().optional(),
     first_name: z.string().trim().min(1),

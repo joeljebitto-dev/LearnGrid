@@ -157,7 +157,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="Permission",
             fields=[
-                ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
                 ("code", models.CharField(max_length=128, unique=True)),
                 ("resource", models.CharField(max_length=64)),
                 ("action", models.CharField(max_length=64)),
@@ -166,13 +171,20 @@ class Migration(migrations.Migration):
             ],
             options={
                 "db_table": "permissions",
-                "indexes": [models.Index(fields=["resource", "action"], name="idx_perm_resource_action")],
+                "indexes": [
+                    models.Index(fields=["resource", "action"], name="idx_perm_resource_action")
+                ],
             },
         ),
         migrations.CreateModel(
             name="Role",
             fields=[
-                ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
                 ("code", models.CharField(max_length=64, unique=True)),
                 ("name", models.CharField(max_length=128)),
                 (
@@ -199,7 +211,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="RoleAssignment",
             fields=[
-                ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
                 (
                     "scope_type",
                     models.CharField(
@@ -254,7 +271,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="RolePermission",
             fields=[
-                ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 (
                     "permission",
@@ -281,7 +303,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="AuthorizationAuditLog",
             fields=[
-                ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
+                (
+                    "id",
+                    models.UUIDField(
+                        default=uuid.uuid4, editable=False, primary_key=True, serialize=False
+                    ),
+                ),
                 (
                     "event_type",
                     models.CharField(
@@ -351,7 +378,9 @@ class Migration(migrations.Migration):
             options={
                 "db_table": "authorization_audit_logs",
                 "indexes": [
-                    models.Index(fields=["actor_account", "created_at"], name="idx_auth_audit_actor_created"),
+                    models.Index(
+                        fields=["actor_account", "created_at"], name="idx_auth_audit_actor_created"
+                    ),
                     models.Index(fields=["target_account"], name="idx_auth_audit_target"),
                     models.Index(fields=["event_type"], name="idx_auth_audit_event_type"),
                 ],

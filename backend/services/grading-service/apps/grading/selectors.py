@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from .models import Certificate, CertificateEligibility, GradeRecord, GradingRule, ManualReview, PublishedResult
+from .models import (
+    Certificate,
+    CertificateEligibility,
+    GradeRecord,
+    GradingRule,
+    ManualReview,
+    PublishedResult,
+)
 
 
 def grading_rule_queryset():

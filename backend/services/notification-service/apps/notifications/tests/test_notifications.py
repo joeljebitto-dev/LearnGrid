@@ -112,8 +112,12 @@ def test_template_crud(api_client, access_token, monkeypatch):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("event_type", ["StudentEnrolled", "AssignmentDueSoon", "GradePublished", "CourseCompleted"])
-def test_event_ingestion_creates_in_app_notification(api_client, access_token, monkeypatch, event_type):
+@pytest.mark.parametrize(
+    "event_type", ["StudentEnrolled", "AssignmentDueSoon", "GradePublished", "CourseCompleted"]
+)
+def test_event_ingestion_creates_in_app_notification(
+    api_client, access_token, monkeypatch, event_type
+):
     student_id = uuid4()
     allow_notification_permissions(monkeypatch)
     payload = event_payload(event_type, student_id)
@@ -127,9 +131,19 @@ def test_event_ingestion_creates_in_app_notification(api_client, access_token, m
 
     assert response.status_code == 200
     assert response.json()["status"] == "processed"
-    assert Notification.objects.filter(recipient_profile_id=student_id, event_type=event_type).count() == 1
-    assert DeliveryAttempt.objects.filter(channel=NotificationChannel.IN_APP, status=DeliveryStatus.SENT).count() == 1
-    assert NotificationTemplate.objects.filter(event_type=event_type, channel=NotificationChannel.IN_APP).exists()
+    assert (
+        Notification.objects.filter(recipient_profile_id=student_id, event_type=event_type).count()
+        == 1
+    )
+    assert (
+        DeliveryAttempt.objects.filter(
+            channel=NotificationChannel.IN_APP, status=DeliveryStatus.SENT
+        ).count()
+        == 1
+    )
+    assert NotificationTemplate.objects.filter(
+        event_type=event_type, channel=NotificationChannel.IN_APP
+    ).exists()
 
 
 @pytest.mark.django_db

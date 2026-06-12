@@ -114,7 +114,9 @@ def update_auth_account(
     )
 
 
-def deactivate_auth_account(*, token: str, auth_account_id, scope_type: str, scope_id) -> dict[str, Any]:
+def deactivate_auth_account(
+    *, token: str, auth_account_id, scope_type: str, scope_id
+) -> dict[str, Any]:
     return _auth_service_request(
         token=token,
         method="POST",
@@ -146,7 +148,9 @@ def _get_department(department_id, institution: Institution | None):
     except Department.DoesNotExist as exc:
         raise ValidationError({"department_id": "Department was not found."}) from exc
     if institution and department.institution_id != institution.id:
-        raise ValidationError({"department_id": "Department does not belong to the profile institution."})
+        raise ValidationError(
+            {"department_id": "Department does not belong to the profile institution."}
+        )
     return department
 
 
@@ -331,7 +335,9 @@ def create_user_profile(*, validated_data: dict[str, Any], token: str) -> UserPr
         except AuthServiceError:
             pass
         if isinstance(exc, IntegrityError):
-            raise ValidationError({"auth_account_id": "A profile already exists for this account."}) from exc
+            raise ValidationError(
+                {"auth_account_id": "A profile already exists for this account."}
+            ) from exc
         if isinstance(exc, ObjectDoesNotExist):
             raise ValidationError("Referenced profile data was not found.") from exc
         raise
@@ -356,7 +362,9 @@ def _update_role_profile(profile: UserProfile, validated_data: dict[str, Any]) -
         if "employee_number" in payload:
             instructor.employee_number = payload.get("employee_number") or None
         if "department_id" in payload:
-            instructor.department = _get_department(payload.get("department_id"), profile.institution)
+            instructor.department = _get_department(
+                payload.get("department_id"), profile.institution
+            )
         if "title" in payload:
             instructor.title = payload.get("title") or None
         if "bio" in payload:
@@ -372,7 +380,9 @@ def _update_role_profile(profile: UserProfile, validated_data: dict[str, Any]) -
         admin.save()
 
 
-def update_user_profile(*, profile: UserProfile, validated_data: dict[str, Any], token: str) -> UserProfile:
+def update_user_profile(
+    *, profile: UserProfile, validated_data: dict[str, Any], token: str
+) -> UserProfile:
     scope_type, scope_id = _scope_for_institution(profile.institution_id)
     if "email" in validated_data or "phone" in validated_data:
         update_auth_account(

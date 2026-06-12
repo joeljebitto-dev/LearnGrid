@@ -23,7 +23,9 @@ def course_queryset(*, include_deleted: bool = False) -> QuerySet[Course]:
     return queryset.prefetch_related(
         Prefetch(
             "category_links",
-            queryset=CourseCategoryLink.objects.select_related("category").order_by("category__name"),
+            queryset=CourseCategoryLink.objects.select_related("category").order_by(
+                "category__name"
+            ),
             to_attr="prefetched_category_links",
         ),
         Prefetch(

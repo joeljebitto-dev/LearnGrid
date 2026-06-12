@@ -28,23 +28,55 @@ from .views import (
 urlpatterns = [
     path("", CourseListCreateView.as_view(), name="course-list-create"),
     path("<uuid:course_id>/structure/", CourseStructureView.as_view(), name="course-structure"),
-    path("<uuid:course_id>/modules/", ModuleListCreateView.as_view(), name="course-module-list-create"),
-    path("<uuid:course_id>/modules/reorder/", ModuleReorderView.as_view(), name="course-module-reorder"),
-    path("<uuid:course_id>/revisions/", CourseRevisionListCreateView.as_view(), name="course-revision-list-create"),
+    path(
+        "<uuid:course_id>/modules/",
+        ModuleListCreateView.as_view(),
+        name="course-module-list-create",
+    ),
+    path(
+        "<uuid:course_id>/modules/reorder/",
+        ModuleReorderView.as_view(),
+        name="course-module-reorder",
+    ),
+    path(
+        "<uuid:course_id>/revisions/",
+        CourseRevisionListCreateView.as_view(),
+        name="course-revision-list-create",
+    ),
     path("<uuid:course_id>/", CourseDetailView.as_view(), name="course-detail"),
     path("<uuid:course_id>/publish/", CoursePublishView.as_view(), name="course-publish"),
     path("<uuid:course_id>/archive/", CourseArchiveView.as_view(), name="course-archive"),
     path("modules/<uuid:module_id>/", ModuleDetailView.as_view(), name="course-module-detail"),
-    path("modules/<uuid:module_id>/lessons/", LessonListCreateView.as_view(), name="lesson-list-create"),
-    path("modules/<uuid:module_id>/lessons/reorder/", LessonReorderView.as_view(), name="lesson-reorder"),
+    path(
+        "modules/<uuid:module_id>/lessons/",
+        LessonListCreateView.as_view(),
+        name="lesson-list-create",
+    ),
+    path(
+        "modules/<uuid:module_id>/lessons/reorder/",
+        LessonReorderView.as_view(),
+        name="lesson-reorder",
+    ),
     path("lessons/<uuid:lesson_id>/", LessonDetailView.as_view(), name="lesson-detail"),
     path("lessons/<uuid:lesson_id>/publish/", LessonPublishView.as_view(), name="lesson-publish"),
-    path("lessons/<uuid:lesson_id>/topics/", TopicListCreateView.as_view(), name="topic-list-create"),
-    path("lessons/<uuid:lesson_id>/topics/reorder/", TopicReorderView.as_view(), name="topic-reorder"),
+    path(
+        "lessons/<uuid:lesson_id>/topics/", TopicListCreateView.as_view(), name="topic-list-create"
+    ),
+    path(
+        "lessons/<uuid:lesson_id>/topics/reorder/", TopicReorderView.as_view(), name="topic-reorder"
+    ),
     path("topics/<uuid:topic_id>/", TopicDetailView.as_view(), name="topic-detail"),
-    path("revisions/<uuid:revision_id>/", CourseRevisionDetailView.as_view(), name="course-revision-detail"),
+    path(
+        "revisions/<uuid:revision_id>/",
+        CourseRevisionDetailView.as_view(),
+        name="course-revision-detail",
+    ),
     path("categories/", CategoryListCreateView.as_view(), name="course-category-list-create"),
-    path("categories/<uuid:category_id>/", CategoryDetailView.as_view(), name="course-category-detail"),
+    path(
+        "categories/<uuid:category_id>/",
+        CategoryDetailView.as_view(),
+        name="course-category-detail",
+    ),
     path("tags/", TagListCreateView.as_view(), name="course-tag-list-create"),
     path("tags/<uuid:tag_id>/", TagDetailView.as_view(), name="course-tag-detail"),
 ]

@@ -70,7 +70,10 @@ def test_seeded_roles_and_permissions_exist():
 
     assert expected_roles <= set(Role.objects.values_list("code", flat=True))
     assert expected_permissions <= set(Permission.objects.values_list("code", flat=True))
-    assert RolePermission.objects.filter(role__code="super_admin").count() == Permission.objects.count()
+    assert (
+        RolePermission.objects.filter(role__code="super_admin").count()
+        == Permission.objects.count()
+    )
 
 
 @pytest.mark.django_db
@@ -292,7 +295,12 @@ def test_rbac_assignment_api_requires_management_and_records_audit(api_client):
 
     response = api_client.post(
         "/api/auth/rbac/role-assignments/",
-        {"account_id": str(target.id), "role_code": "student", "scope_type": "course", "scope_id": str(course_id)},
+        {
+            "account_id": str(target.id),
+            "role_code": "student",
+            "scope_type": "course",
+            "scope_id": str(course_id),
+        },
         HTTP_AUTHORIZATION=f"Bearer {access}",
         format="json",
     )

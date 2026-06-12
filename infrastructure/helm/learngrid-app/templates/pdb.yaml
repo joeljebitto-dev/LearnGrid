@@ -1,0 +1,43 @@
+{{- range $name, $_ := .Values.backendServices }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $name }}
+    {{- include "learngrid.labels" $ | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $name }}
+---
+{{- end }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend-service
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: frontend-service
+    {{- include "learngrid.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: frontend-service
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api-gateway
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: api-gateway
+    {{- include "learngrid.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api-gateway

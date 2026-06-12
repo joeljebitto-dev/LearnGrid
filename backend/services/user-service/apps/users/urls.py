@@ -17,9 +17,17 @@ from .views import (
 
 urlpatterns = [
     path("institutions/", InstitutionListCreateView.as_view(), name="institution-list-create"),
-    path("institutions/<uuid:institution_id>/", InstitutionDetailView.as_view(), name="institution-detail"),
+    path(
+        "institutions/<uuid:institution_id>/",
+        InstitutionDetailView.as_view(),
+        name="institution-detail",
+    ),
     path("departments/", DepartmentListCreateView.as_view(), name="department-list-create"),
-    path("departments/<uuid:department_id>/", DepartmentDetailView.as_view(), name="department-detail"),
+    path(
+        "departments/<uuid:department_id>/",
+        DepartmentDetailView.as_view(),
+        name="department-detail",
+    ),
     path("batches/", BatchListCreateView.as_view(), name="batch-list-create"),
     path("batches/<uuid:batch_id>/", BatchDetailView.as_view(), name="batch-detail"),
     path("profiles/", ProfileListCreateView.as_view(), name="profile-list-create"),

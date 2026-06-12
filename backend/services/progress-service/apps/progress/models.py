@@ -49,7 +49,9 @@ class LessonProgress(models.Model):
         ]
         indexes = [
             models.Index(fields=["course_id", "status"], name="idx_lesson_progress_course"),
-            models.Index(fields=["student_profile_id", "course_id"], name="idx_lesson_progress_student"),
+            models.Index(
+                fields=["student_profile_id", "course_id"], name="idx_lesson_progress_student"
+            ),
         ]
 
 
@@ -129,7 +131,9 @@ class CourseProgress(models.Model):
         ]
         indexes = [
             models.Index(fields=["course_id", "status"], name="idx_course_progress_course"),
-            models.Index(fields=["student_profile_id", "status"], name="idx_course_progress_student"),
+            models.Index(
+                fields=["student_profile_id", "status"], name="idx_course_progress_student"
+            ),
         ]
 
 

@@ -32,7 +32,11 @@ urlpatterns = [
         PresignedUploadCompleteView.as_view(),
         name="presigned-upload-complete",
     ),
-    path("assets/<uuid:asset_id>/publish/", ContentAssetPublishView.as_view(), name="content-asset-publish"),
+    path(
+        "assets/<uuid:asset_id>/publish/",
+        ContentAssetPublishView.as_view(),
+        name="content-asset-publish",
+    ),
     path(
         "assets/<uuid:asset_id>/permissions/",
         ContentPermissionListCreateView.as_view(),

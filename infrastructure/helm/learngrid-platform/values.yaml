@@ -1,0 +1,8 @@
+namespaces:
+  app: learngrid
+  observability: learngrid-observability
+
+podSecurity:
+  enforce: restricted
+  audit: restricted
+  warn: restricted

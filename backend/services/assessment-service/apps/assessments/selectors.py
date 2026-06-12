@@ -33,7 +33,9 @@ def assessment_queryset(*, include_deleted: bool = False, include_metadata: bool
         queryset = queryset.select_related("quiz", "assignment").prefetch_related(
             Prefetch(
                 "quiz__question_links",
-                queryset=QuizQuestion.objects.select_related("question", "question__question_bank").order_by(
+                queryset=QuizQuestion.objects.select_related(
+                    "question", "question__question_bank"
+                ).order_by(
                     "position",
                     "id",
                 ),

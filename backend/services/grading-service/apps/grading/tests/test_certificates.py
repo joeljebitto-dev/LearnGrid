@@ -70,7 +70,11 @@ def patch_context(monkeypatch, institution_id, profile_id):
     monkeypatch.setattr(
         views,
         "current_profile",
-        lambda **_kwargs: {"id": str(profile_id), "profile_type": "instructor", "institution_id": str(institution_id)},
+        lambda **_kwargs: {
+            "id": str(profile_id),
+            "profile_type": "instructor",
+            "institution_id": str(institution_id),
+        },
     )
 
 
@@ -102,7 +106,9 @@ def evaluate_payload(student_id, course_id, certificate_asset_id=None):
 
 
 @pytest.mark.django_db
-def test_eligible_student_is_auto_issued_certificate_idempotently(api_client, access_token, monkeypatch):
+def test_eligible_student_is_auto_issued_certificate_idempotently(
+    api_client, access_token, monkeypatch
+):
     institution_id = uuid4()
     manager_id = uuid4()
     student_id = uuid4()
@@ -192,7 +198,9 @@ def test_ineligible_reasons_are_stable(api_client, access_token, monkeypatch):
     )
     assert missing_results.json()["eligibility"]["reason"] == "published_results_missing"
 
-    create_published_result(student_id=student_id, course_id=course_id, score="60.00", max_score="100.00")
+    create_published_result(
+        student_id=student_id, course_id=course_id, score="60.00", max_score="100.00"
+    )
     below_threshold = api_client.post(
         "/api/grading/certificates/eligibility/evaluate/",
         evaluate_payload(student_id, course_id),
@@ -204,7 +212,9 @@ def test_ineligible_reasons_are_stable(api_client, access_token, monkeypatch):
 
 
 @pytest.mark.django_db
-def test_course_level_certificate_threshold_overrides_default(api_client, access_token, monkeypatch):
+def test_course_level_certificate_threshold_overrides_default(
+    api_client, access_token, monkeypatch
+):
     institution_id = uuid4()
     manager_id = uuid4()
     student_id = uuid4()
@@ -217,7 +227,9 @@ def test_course_level_certificate_threshold_overrides_default(api_client, access
         configuration={"certificate_min_percent": "90"},
         created_by_profile_id=manager_id,
     )
-    create_published_result(student_id=student_id, course_id=course_id, score="85.00", max_score="100.00")
+    create_published_result(
+        student_id=student_id, course_id=course_id, score="85.00", max_score="100.00"
+    )
     monkeypatch.setattr(
         services,
         "fetch_course_progress",
@@ -237,7 +249,9 @@ def test_course_level_certificate_threshold_overrides_default(api_client, access
 
 
 @pytest.mark.django_db
-def test_certificate_asset_linking_revoke_and_student_visibility(api_client, access_token, monkeypatch):
+def test_certificate_asset_linking_revoke_and_student_visibility(
+    api_client, access_token, monkeypatch
+):
     institution_id = uuid4()
     manager_id = uuid4()
     student_id = uuid4()
@@ -256,7 +270,8 @@ def test_certificate_asset_linking_revoke_and_student_visibility(api_client, acc
     monkeypatch.setattr(
         services,
         "validate_content_asset",
-        lambda **kwargs: validated_assets.append(str(kwargs["asset_id"])) or {"id": str(kwargs["asset_id"])},
+        lambda **kwargs: validated_assets.append(str(kwargs["asset_id"]))
+        or {"id": str(kwargs["asset_id"])},
     )
 
     issue_response = api_client.post(

@@ -34,6 +34,29 @@ def test_gateway_cors_preflight_live():
     ) as response:
         assert response.status == 204
         assert response.headers["Access-Control-Allow-Origin"] == "http://127.0.0.1:5173"
+        assert response.headers["Vary"] == "Origin"
+
+
+def test_gateway_disallowed_cors_origin_live():
+    with open_gateway(
+        "/api/auth/session/",
+        method="OPTIONS",
+        headers={
+            "Origin": "https://evil.example.com",
+            "Access-Control-Request-Method": "GET",
+        },
+    ) as response:
+        assert response.status == 204
+        assert response.headers.get("Access-Control-Allow-Origin", "") == ""
+
+
+def test_gateway_security_headers_live():
+    with open_gateway("/gateway/health") as response:
+        assert response.headers["Strict-Transport-Security"].startswith("max-age=31536000")
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        assert response.headers["X-Frame-Options"] == "DENY"
+        assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+        assert "frame-ancestors 'none'" in response.headers["Content-Security-Policy"]
 
 
 def test_gateway_oversized_request_live():
