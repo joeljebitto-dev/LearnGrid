@@ -32,3 +32,6 @@ Each task file contains checklist items. Mark an item complete only after implem
 | [T-022](tasks/T-022-security.md) | Security | [SPEC-022](specs/022-security.md) |
 | [T-023](tasks/T-023-ci-cd-deployment-observability.md) | CI/CD, Deployment, And Observability | [SPEC-023](specs/023-ci-cd-deployment-observability.md) |
 | [T-024](tasks/T-024-testing-quality.md) | Testing And Quality | [SPEC-024](specs/024-testing-quality.md) |
+| [T-025](tasks/T-025-frontend-feature-completion.md) | Frontend Feature Completion | [SPEC-006](specs/006-course-catalog-metadata.md), [SPEC-024](specs/024-testing-quality.md) |
+| [T-026](tasks/T-026-backend-hardening-api-completion.md) | Backend Hardening And API Completion | [SPEC-020](specs/020-kafka-eventing.md), [SPEC-024](specs/024-testing-quality.md) |
+| [T-027](tasks/T-027-production-readiness-evidence.md) | Production Readiness Evidence | [SPEC-023](specs/023-ci-cd-deployment-observability.md) |

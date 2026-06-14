@@ -116,6 +116,7 @@ Kafka lag, CPU, memory, and autoscaling-related signals once real staging metric
   deployment gates.
 - `scripts/verify-staging-release.sh` and `.github/workflows/production-readiness.yml` provide the
   real staging evidence path; completion still depends on a run against a real cluster.
+- Production-readiness evidence is tracked in [T-027](tasks/T-027-production-readiness-evidence.md).
 
 ## TEST-009 Repo Quality Commands
 Root-level test utilities are listed in `requirements-test.txt`.

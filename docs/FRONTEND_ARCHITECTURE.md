@@ -46,4 +46,4 @@ frontend/src/utils
 | Admin | User management, course management, enrollment, reports, institution controls | [SPEC-004](specs/004-user-profile-management.md), [SPEC-009](specs/009-enrollment-access-management.md), [SPEC-018](specs/018-search-reporting-analytics.md) |
 
 ## FE-005 Related Tasks
-See [T-011](tasks/T-011-dashboards-portals.md), [T-001](tasks/T-001-project-setup.md), and [T-024](tasks/T-024-testing-quality.md).
+See [T-001](tasks/T-001-project-setup.md), [T-011](tasks/T-011-dashboards-portals.md), [T-024](tasks/T-024-testing-quality.md), and [T-025](tasks/T-025-frontend-feature-completion.md).

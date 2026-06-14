@@ -92,4 +92,4 @@ apps/<domain>/tests/
   integration, Selenium journey smoke tests, and k6 load smoke scripts.
 
 ## BE-010 Related Tasks
-See [TASKS.md](TASKS.md) for implementation checklists, especially [T-001](tasks/T-001-project-setup.md), [T-020](tasks/T-020-kafka-eventing.md), [T-021](tasks/T-021-redis-architecture.md), [T-022](tasks/T-022-security.md), [T-023](tasks/T-023-ci-cd-deployment-observability.md), and [T-024](tasks/T-024-testing-quality.md).
+See [TASKS.md](TASKS.md) for implementation checklists, especially [T-001](tasks/T-001-project-setup.md), [T-020](tasks/T-020-kafka-eventing.md), [T-021](tasks/T-021-redis-architecture.md), [T-022](tasks/T-022-security.md), [T-023](tasks/T-023-ci-cd-deployment-observability.md), [T-024](tasks/T-024-testing-quality.md), and [T-026](tasks/T-026-backend-hardening-api-completion.md).
