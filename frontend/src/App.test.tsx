@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, test, vi } from 'vitest';
@@ -20,6 +20,39 @@ import {
   getStudentDashboard
 } from './api/dashboards';
 import { createUserProfile } from './api/users';
+import { listCourses } from './api/courses';
+import { createPresignedUpload, listContentAssets } from './api/content';
+import {
+  createEnrollment,
+  listBatchEnrollments,
+  listCohortEnrollments,
+  listEnrollments
+} from './api/enrollments';
+import { listCourseProgress } from './api/progress';
+import {
+  createQuestionBank,
+  listAssessments,
+  listQuestionBanks
+} from './api/assessments';
+import {
+  listCertificates,
+  listGradeRecords,
+  listGradingRules,
+  listPublishedResults,
+  publishGrade
+} from './api/grading';
+import {
+  listNotificationPreferences,
+  listNotifications,
+  markAllNotificationsRead
+} from './api/notifications';
+import {
+  generateReport,
+  listDashboardAggregates,
+  listReportSnapshots,
+  listUsageMetrics,
+  searchResources
+} from './api/analytics';
 
 vi.mock('./api/auth', async () => {
   const actual = await vi.importActual<typeof import('./api/auth')>('./api/auth');
@@ -41,6 +74,108 @@ vi.mock('./api/dashboards', () => ({
 
 vi.mock('./api/users', () => ({
   createUserProfile: vi.fn()
+}));
+
+vi.mock('./api/courses', () => ({
+  listCourses: vi.fn(),
+  getCourse: vi.fn(),
+  createCourse: vi.fn(),
+  updateCourse: vi.fn(),
+  publishCourse: vi.fn(),
+  archiveCourse: vi.fn(),
+  deleteCourse: vi.fn(),
+  getCourseStructure: vi.fn(),
+  listCategories: vi.fn(),
+  listTags: vi.fn(),
+  createModule: vi.fn(),
+  createLesson: vi.fn(),
+  publishLesson: vi.fn(),
+  createTopic: vi.fn()
+}));
+
+vi.mock('./api/content', () => ({
+  listContentAssets: vi.fn(),
+  createPresignedUpload: vi.fn(),
+  completePresignedUpload: vi.fn(),
+  proxyUploadAsset: vi.fn(),
+  createSignedAccess: vi.fn()
+}));
+
+vi.mock('./api/enrollments', () => ({
+  listEnrollments: vi.fn(),
+  createEnrollment: vi.fn(),
+  transitionEnrollment: vi.fn(),
+  getEnrollmentHistory: vi.fn(),
+  checkEnrollmentAccess: vi.fn(),
+  listBatchEnrollments: vi.fn(),
+  createBatchEnrollment: vi.fn(),
+  listCohortEnrollments: vi.fn(),
+  createCohortEnrollment: vi.fn()
+}));
+
+vi.mock('./api/progress', () => ({
+  listCourseProgress: vi.fn(),
+  updateLessonProgress: vi.fn(),
+  updateVideoProgress: vi.fn(),
+  updateAssessmentProgress: vi.fn()
+}));
+
+vi.mock('./api/assessments', () => ({
+  listQuestionBanks: vi.fn(),
+  createQuestionBank: vi.fn(),
+  listQuestions: vi.fn(),
+  createQuestion: vi.fn(),
+  listAssessments: vi.fn(),
+  createAssessment: vi.fn(),
+  updateAssessment: vi.fn(),
+  replaceAssessmentQuestions: vi.fn(),
+  publishAssessment: vi.fn(),
+  closeAssessment: vi.fn(),
+  startQuizAttempt: vi.fn(),
+  getQuizAttempt: vi.fn(),
+  saveQuizAnswers: vi.fn(),
+  submitQuizAttempt: vi.fn(),
+  autoSubmitQuizAttempt: vi.fn(),
+  listAssignmentSubmissions: vi.fn(),
+  createAssignmentSubmission: vi.fn(),
+  updateAssignmentSubmission: vi.fn(),
+  submitAssignmentSubmission: vi.fn()
+}));
+
+vi.mock('./api/grading', () => ({
+  listGradingRules: vi.fn(),
+  createGradingRule: vi.fn(),
+  listGradeRecords: vi.fn(),
+  calculateGrade: vi.fn(),
+  createManualReview: vi.fn(),
+  completeManualReview: vi.fn(),
+  overrideGrade: vi.fn(),
+  publishGrade: vi.fn(),
+  listPublishedResults: vi.fn(),
+  listCertificates: vi.fn(),
+  evaluateCertificateEligibility: vi.fn(),
+  updateCertificateAsset: vi.fn(),
+  revokeCertificate: vi.fn()
+}));
+
+vi.mock('./api/notifications', () => ({
+  listNotifications: vi.fn(),
+  markNotificationRead: vi.fn(),
+  markNotificationUnread: vi.fn(),
+  markAllNotificationsRead: vi.fn(),
+  listNotificationPreferences: vi.fn(),
+  upsertNotificationPreference: vi.fn(),
+  listNotificationTemplates: vi.fn()
+}));
+
+vi.mock('./api/analytics', () => ({
+  searchResources: vi.fn(),
+  searchResourceType: vi.fn(),
+  listReportSnapshots: vi.fn(),
+  createReportSnapshot: vi.fn(),
+  generateReport: vi.fn(),
+  listDashboardAggregates: vi.fn(),
+  listUsageMetrics: vi.fn()
 }));
 
 const baseProfile = {
@@ -175,6 +310,30 @@ beforeEach(() => {
   vi.mocked(getInstructorDashboard).mockReset();
   vi.mocked(getAdminDashboard).mockReset();
   vi.mocked(createUserProfile).mockReset();
+  vi.mocked(listCourses).mockReset();
+  vi.mocked(listContentAssets).mockReset();
+  vi.mocked(createPresignedUpload).mockReset();
+  vi.mocked(listEnrollments).mockReset();
+  vi.mocked(createEnrollment).mockReset();
+  vi.mocked(listBatchEnrollments).mockReset();
+  vi.mocked(listCohortEnrollments).mockReset();
+  vi.mocked(listCourseProgress).mockReset();
+  vi.mocked(listQuestionBanks).mockReset();
+  vi.mocked(createQuestionBank).mockReset();
+  vi.mocked(listAssessments).mockReset();
+  vi.mocked(listGradeRecords).mockReset();
+  vi.mocked(listGradingRules).mockReset();
+  vi.mocked(listPublishedResults).mockReset();
+  vi.mocked(publishGrade).mockReset();
+  vi.mocked(listCertificates).mockReset();
+  vi.mocked(listNotifications).mockReset();
+  vi.mocked(markAllNotificationsRead).mockReset();
+  vi.mocked(listNotificationPreferences).mockReset();
+  vi.mocked(searchResources).mockReset();
+  vi.mocked(listReportSnapshots).mockReset();
+  vi.mocked(listDashboardAggregates).mockReset();
+  vi.mocked(listUsageMetrics).mockReset();
+  vi.mocked(generateReport).mockReset();
   vi.mocked(getStudentDashboard).mockResolvedValue(studentDashboard);
   vi.mocked(getInstructorDashboard).mockResolvedValue(instructorDashboard);
   vi.mocked(getAdminDashboard).mockResolvedValue(adminDashboard);
@@ -193,6 +352,93 @@ beforeEach(() => {
     provider_label: 'SSO',
     scopes: ['openid', 'email', 'profile']
   });
+  vi.mocked(listCourses).mockResolvedValue({
+    count: 1,
+    next: null,
+    previous: null,
+    results: [
+      {
+        id: 'course-1',
+        title: 'Biology Basics',
+        description: 'Cells and systems',
+        status: 'published',
+        difficulty_level: 'beginner',
+        categories: [],
+        tags: [],
+        prerequisite_course_ids: [],
+        learning_outcomes: []
+      }
+    ]
+  });
+  vi.mocked(listContentAssets).mockResolvedValue({ count: 0, next: null, previous: null, results: [] });
+  vi.mocked(createPresignedUpload).mockResolvedValue({
+    asset: { id: 'asset-1', title: 'Slides', status: 'draft' },
+    object_key: 'objects/slides.pdf',
+    upload_url: 'http://minio/upload',
+    upload_headers: {},
+    expires_at: '2026-01-01T00:15:00Z'
+  });
+  vi.mocked(listEnrollments).mockResolvedValue({ count: 0, next: null, previous: null, results: [] });
+  vi.mocked(listBatchEnrollments).mockResolvedValue({ count: 0, next: null, previous: null, results: [] });
+  vi.mocked(listCohortEnrollments).mockResolvedValue({ count: 0, next: null, previous: null, results: [] });
+  vi.mocked(createEnrollment).mockResolvedValue({
+    id: 'enrollment-1',
+    student_profile_id: baseProfile.id,
+    course_id: 'course-1',
+    institution_id: baseProfile.institution_id,
+    status: 'active'
+  });
+  vi.mocked(listCourseProgress).mockResolvedValue({
+    count: 1,
+    next: null,
+    previous: null,
+    results: [
+      {
+        id: 'progress-1',
+        course_id: 'course-1',
+        status: 'in_progress',
+        completion_percent: 45,
+        lessons_completed: 3,
+        assessments_completed: 1
+      }
+    ]
+  });
+  vi.mocked(listQuestionBanks).mockResolvedValue({ count: 0, next: null, previous: null, results: [] });
+  vi.mocked(createQuestionBank).mockResolvedValue({ id: 'bank-1', title: 'Midterm bank' });
+  vi.mocked(listAssessments).mockResolvedValue({ count: 0, next: null, previous: null, results: [] });
+  vi.mocked(listGradeRecords).mockResolvedValue({
+    count: 1,
+    next: null,
+    previous: null,
+    results: [{ id: 'grade-1', title: 'Quiz 1', status: 'calculated', score: 90 }]
+  });
+  vi.mocked(listGradingRules).mockResolvedValue({ count: 0, next: null, previous: null, results: [] });
+  vi.mocked(listPublishedResults).mockResolvedValue({ count: 0, next: null, previous: null, results: [] });
+  vi.mocked(publishGrade).mockResolvedValue({ id: 'result-1', title: 'Published' });
+  vi.mocked(listCertificates).mockResolvedValue({
+    count: 1,
+    next: null,
+    previous: null,
+    results: [{ id: 'certificate-1', certificate_number: 'LG-20260101-ABCDEF1234', valid: true }]
+  });
+  vi.mocked(listNotifications).mockResolvedValue({
+    count: 1,
+    next: null,
+    previous: null,
+    results: [{ id: 'notification-1', title: 'Grade published', event_type: 'GradePublished', read_at: null }]
+  });
+  vi.mocked(markAllNotificationsRead).mockResolvedValue({ status: 'ok' });
+  vi.mocked(listNotificationPreferences).mockResolvedValue({ count: 0, next: null, previous: null, results: [] });
+  vi.mocked(searchResources).mockResolvedValue({
+    count: 1,
+    next: null,
+    previous: null,
+    results: [{ id: 'search-1', title: 'Biology Basics', resource_type: 'course' }]
+  });
+  vi.mocked(listReportSnapshots).mockResolvedValue({ count: 0, next: null, previous: null, results: [] });
+  vi.mocked(listDashboardAggregates).mockResolvedValue({ count: 0, next: null, previous: null, results: [] });
+  vi.mocked(listUsageMetrics).mockResolvedValue({ count: 0, next: null, previous: null, results: [] });
+  vi.mocked(generateReport).mockResolvedValue({ id: 'report-1', report_type: 'active_users' });
 });
 
 test('unauthenticated users redirect to login', async () => {
@@ -416,4 +662,113 @@ test('non-admin roles cannot access create user route', async () => {
 
   expect(await screen.findByRole('heading', { name: /student dashboard/i })).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: /create user/i })).not.toBeInTheDocument();
+});
+
+test('student catalog route renders API-backed courses and progress route renders completion state', async () => {
+  storeTestTokens();
+  vi.mocked(getSessionContext).mockResolvedValue(sessionContext('student'));
+
+  renderApp('/dashboard/student/courses');
+
+  expect(await screen.findByRole('heading', { name: /course catalog/i })).toBeInTheDocument();
+  expect(await screen.findByText(/Biology Basics/i)).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /catalog/i })).toBeInTheDocument();
+
+  cleanup();
+  renderApp('/dashboard/student/progress');
+  expect(await screen.findByRole('heading', { name: /learning progress/i })).toBeInTheDocument();
+  expect(await screen.findByText(/45%/i)).toBeInTheDocument();
+});
+
+test('instructor content route submits presigned upload metadata', async () => {
+  storeTestTokens();
+  vi.mocked(getSessionContext).mockResolvedValue(sessionContext('instructor', 'instructor'));
+
+  renderApp('/dashboard/instructor/content');
+
+  expect(await screen.findByRole('heading', { name: /content upload/i })).toBeInTheDocument();
+  await userEvent.type(screen.getAllByLabelText(/^Title$/i)[0], 'Slides');
+  await userEvent.type(screen.getByLabelText(/file name/i), 'slides.pdf');
+  await userEvent.clear(screen.getByLabelText(/file size bytes/i));
+  await userEvent.type(screen.getByLabelText(/file size bytes/i), '1200');
+  await userEvent.click(screen.getByRole('button', { name: /create upload url/i }));
+
+  await waitFor(() => expect(createPresignedUpload).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(createPresignedUpload).mock.calls[0][0]).toMatchObject({
+    title: 'Slides',
+    file_name: 'slides.pdf',
+    file_size_bytes: 1200
+  });
+});
+
+test('admin enrollment route creates an individual enrollment', async () => {
+  storeTestTokens();
+  vi.mocked(getSessionContext).mockResolvedValue(sessionContext('institution_admin', 'admin'));
+
+  renderApp('/dashboard/admin/enrollments');
+
+  expect(await screen.findByRole('heading', { name: /enrollment management/i })).toBeInTheDocument();
+  await userEvent.type(screen.getAllByLabelText(/student profile id/i)[0], baseProfile.id);
+  await userEvent.type(screen.getAllByLabelText(/^Course ID$/i)[0], '99999999-9999-9999-9999-999999999999');
+  await userEvent.click(screen.getByRole('button', { name: /^Save$/i }));
+
+  await waitFor(() => expect(createEnrollment).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(createEnrollment).mock.calls[0][0]).toMatchObject({
+    student_profile_id: baseProfile.id,
+    institution_id: baseProfile.institution_id
+  });
+});
+
+test('instructor assessment authoring creates a question bank', async () => {
+  storeTestTokens();
+  vi.mocked(getSessionContext).mockResolvedValue(sessionContext('instructor', 'instructor'));
+
+  renderApp('/dashboard/instructor/assessments');
+
+  expect(await screen.findByRole('heading', { name: /assessment authoring/i })).toBeInTheDocument();
+  await userEvent.type(screen.getAllByLabelText(/^Title$/i)[0], 'Midterm bank');
+  await userEvent.click(screen.getAllByRole('button', { name: /^Save$/i })[0]);
+
+  await waitFor(() => expect(createQuestionBank).toHaveBeenCalledTimes(1));
+  expect(vi.mocked(createQuestionBank).mock.calls[0][0]).toMatchObject({
+    title: 'Midterm bank',
+    owner_profile_id: baseProfile.id
+  });
+});
+
+test('instructor grading route publishes a grade and student certificates route renders issued certificate', async () => {
+  storeTestTokens();
+  vi.mocked(getSessionContext).mockResolvedValue(sessionContext('instructor', 'instructor'));
+
+  renderApp('/dashboard/instructor/grading');
+
+  expect(await screen.findByRole('heading', { name: /grading and manual reviews/i })).toBeInTheDocument();
+  await userEvent.click(await screen.findByRole('button', { name: /publish/i }));
+  await waitFor(() =>
+    expect(publishGrade).toHaveBeenCalledWith('grade-1', { published_feedback: null })
+  );
+
+  cleanup();
+  vi.mocked(getSessionContext).mockResolvedValue(sessionContext('student'));
+  renderApp('/dashboard/student/certificates');
+  expect(await screen.findByRole('heading', { name: /^certificates$/i })).toBeInTheDocument();
+  expect((await screen.findAllByText(/LG-20260101-ABCDEF1234/i)).length).toBeGreaterThan(0);
+});
+
+test('notification center and reports routes render API-backed operational data', async () => {
+  storeTestTokens();
+  vi.mocked(getSessionContext).mockResolvedValue(sessionContext('institution_admin', 'admin'));
+
+  renderApp('/dashboard/admin/notifications');
+
+  expect(await screen.findByRole('heading', { name: /notification center/i })).toBeInTheDocument();
+  expect(await screen.findByText(/Grade published/i)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: /mark all read/i }));
+  await waitFor(() => expect(markAllNotificationsRead).toHaveBeenCalledTimes(1));
+
+  renderApp('/dashboard/admin/reports');
+  expect(await screen.findByRole('heading', { name: /analytics and reporting/i })).toBeInTheDocument();
+  expect(await screen.findByText(/Biology Basics/i)).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: /generate report/i }));
+  await waitFor(() => expect(generateReport).toHaveBeenCalledTimes(1));
 });

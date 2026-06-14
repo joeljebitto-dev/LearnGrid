@@ -1,7 +1,8 @@
 # End-To-End Tests
 
-These Selenium tests cover the browser journeys that the current frontend exposes and skip cleanly
-unless a target app and credentials are configured.
+These Selenium tests cover the browser journeys that the current frontend exposes, including
+dashboard, feature-route, logout, and optional admin create-user smoke checks. Tests skip cleanly
+unless a target app, credentials, browser, and driver are configured.
 
 Required for role dashboard/logout smoke:
 
@@ -18,4 +19,3 @@ python -m pytest tests/e2e
 
 The admin create-user journey is mutating and remains opt-in with
 `E2E_CREATE_USER_ENABLED=true`.
-

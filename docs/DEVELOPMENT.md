@@ -149,6 +149,18 @@ pnpm -C frontend dev
 
 Local URL: `http://127.0.0.1:5173`
 
+Implemented portal routes:
+
+| Portal | Routes |
+| --- | --- |
+| Student | `/dashboard/student`, `/dashboard/student/courses`, `/dashboard/student/courses/:courseId`, `/dashboard/student/courses/:courseId/learn`, `/dashboard/student/progress`, `/dashboard/student/assessments/:assessmentId/attempt`, `/dashboard/student/assignments/:assignmentId/submit`, `/dashboard/student/certificates`, `/dashboard/student/notifications` |
+| Instructor | `/dashboard/instructor`, `/dashboard/instructor/courses`, `/dashboard/instructor/courses/:courseId/builder`, `/dashboard/instructor/content`, `/dashboard/instructor/assessments`, `/dashboard/instructor/grading`, `/dashboard/instructor/reports`, `/dashboard/instructor/notifications` |
+| Admin | `/dashboard/admin`, `/dashboard/admin/users/new`, `/dashboard/admin/enrollments`, `/dashboard/admin/reports`, `/dashboard/admin/notifications` |
+
+The Vite dev proxy routes all implemented `/api/*` service prefixes to local backend service ports.
+Frontend role-aware navigation hides unrelated portal routes, but backend authorization remains
+authoritative for every API request.
+
 ## Backend Services
 Each backend service is a Django REST Framework application with split settings and a public
 health endpoint. Production containers use Gunicorn and expose `/health/`, `/health/live/`,

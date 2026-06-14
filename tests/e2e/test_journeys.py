@@ -19,12 +19,41 @@ def test_student_learning_journey_surfaces_courses_assessments_grades_and_logout
     dashboard.sign_out()
 
 
+def test_student_feature_routes_surface_learning_tools(driver, base_url: str):
+    LoginPage(driver, base_url).open().sign_in(credentials_for("student"))
+    dashboard = DashboardPage(driver, base_url)
+
+    for path, heading in [
+        ("/dashboard/student/courses", "Course Catalog"),
+        ("/dashboard/student/progress", "Learning Progress"),
+        ("/dashboard/student/certificates", "Certificates"),
+        ("/dashboard/student/notifications", "Notification Center"),
+    ]:
+        dashboard.visit(path)
+        wait_for_heading(driver, dashboard, heading)
+
+
 def test_instructor_course_and_assessment_journey_surfaces_management_data(driver, base_url: str):
     dashboard = LoginPage(driver, base_url).open().sign_in(credentials_for("instructor"))
     wait_for_heading(driver, dashboard, "Instructor Dashboard")
 
     sections = set(dashboard.section_titles())
     assert {"Assessment status", "Course summaries", "Learner engagement"} <= sections
+
+
+def test_instructor_feature_routes_surface_authoring_and_grading_tools(driver, base_url: str):
+    LoginPage(driver, base_url).open().sign_in(credentials_for("instructor"))
+    dashboard = DashboardPage(driver, base_url)
+
+    for path, heading in [
+        ("/dashboard/instructor/courses", "Course Management"),
+        ("/dashboard/instructor/content", "Content Upload"),
+        ("/dashboard/instructor/assessments", "Assessment Authoring"),
+        ("/dashboard/instructor/grading", "Grading And Manual Reviews"),
+        ("/dashboard/instructor/reports", "Analytics And Reporting"),
+    ]:
+        dashboard.visit(path)
+        wait_for_heading(driver, dashboard, heading)
 
 
 def test_admin_rbac_denial_redirects_student_away_from_admin_page(driver, base_url: str):
@@ -34,6 +63,20 @@ def test_admin_rbac_denial_redirects_student_away_from_admin_page(driver, base_u
     dashboard = DashboardPage(driver, base_url)
     wait_for_heading(driver, dashboard, "Student Dashboard")
     assert "/dashboard/student" in driver.current_url
+
+
+def test_admin_feature_routes_surface_management_tools(driver, base_url: str):
+    LoginPage(driver, base_url).open().sign_in(credentials_for("admin"))
+    dashboard = DashboardPage(driver, base_url)
+
+    for path, heading in [
+        ("/dashboard/admin/users/new", "Create User"),
+        ("/dashboard/admin/enrollments", "Enrollment Management"),
+        ("/dashboard/admin/reports", "Analytics And Reporting"),
+        ("/dashboard/admin/notifications", "Notification Center"),
+    ]:
+        dashboard.visit(path)
+        wait_for_heading(driver, dashboard, heading)
 
 
 def test_admin_create_user_journey_when_enabled(driver, base_url: str):
