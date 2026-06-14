@@ -71,6 +71,7 @@ KAFKA_EVENT_HANDLERS: dict[str, str] = {
     "progress.assessment": "apps.progress.services.handle_kafka_progress_event",
 }
 AUTH_SERVICE_BASE_URL = os.getenv("AUTH_SERVICE_BASE_URL", "http://127.0.0.1:8001")
+AUTHORIZATION_CHECK_TIMEOUT_SECONDS = float(os.getenv("AUTHORIZATION_CHECK_TIMEOUT_SECONDS", "2"))
 AUTH_JWT_SIGNING_KEY = os.getenv(
     "AUTH_JWT_SIGNING_KEY",
     "insecure-local-auth-service-change-me-32bytes",

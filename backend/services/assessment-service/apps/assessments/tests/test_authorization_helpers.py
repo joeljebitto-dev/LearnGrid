@@ -7,6 +7,7 @@ import jwt
 import pytest
 from django.conf import settings
 from django.utils import timezone
+from learngrid_authz import client as authz_client
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.test import APIRequestFactory
 
@@ -95,7 +96,7 @@ def test_remote_permission_allows_authorized_response(monkeypatch, api_factory):
         captured["authorization"] = request.headers["Authorization"]
         return FakeResponse(True)
 
-    monkeypatch.setattr(permissions.urlrequest, "urlopen", fake_urlopen)
+    monkeypatch.setattr(authz_client.urlrequest, "urlopen", fake_urlopen)
     token = make_token()
     course_id = uuid4()
     request = authenticated_request(api_factory, token)
@@ -106,7 +107,7 @@ def test_remote_permission_allows_authorized_response(monkeypatch, api_factory):
     )
 
     assert allowed
-    assert captured["timeout"] == 2
+    assert captured["timeout"] == 2.0
     assert captured["payload"] == {
         "permission": "course.view",
         "scope_type": "course",
@@ -121,12 +122,12 @@ def test_remote_permission_denies_unauthorized_and_network_failure(monkeypatch, 
     permission = permissions.RemoteAuthorizationPermission()
 
     monkeypatch.setattr(
-        permissions.urlrequest, "urlopen", lambda _request, timeout: FakeResponse(False)
+        authz_client.urlrequest, "urlopen", lambda _request, timeout: FakeResponse(False)
     )
     assert not permission.has_permission(request, CourseView(uuid4()))
 
     def broken_urlopen(_request, timeout):
         raise error.URLError("auth-service unavailable")
 
-    monkeypatch.setattr(permissions.urlrequest, "urlopen", broken_urlopen)
+    monkeypatch.setattr(authz_client.urlrequest, "urlopen", broken_urlopen)
     assert not permission.has_permission(request, CourseView(uuid4()))

@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404
 from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -24,6 +25,12 @@ from .services import (
     update_lesson_progress,
     update_video_progress,
 )
+
+
+class ProgressPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 100
 
 
 class LessonProgressUpdateView(APIView):
@@ -67,6 +74,7 @@ class AssessmentProgressUpdateView(APIView):
 
 class CourseProgressListView(APIView):
     permission_classes = [IsAuthenticated]
+    pagination_class = ProgressPagination
 
     def get(self, request):
         serializer = CourseProgressSearchSerializer(data=request.query_params)
@@ -77,9 +85,13 @@ class CourseProgressListView(APIView):
         for field in ["student_profile_id", "course_id", "status"]:
             if value := serializer.validated_data.get(field):
                 queryset = queryset.filter(**{field: value})
-        return Response(
-            CourseProgressSerializer(queryset.order_by("-updated_at", "id"), many=True).data
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(
+            queryset.order_by("-updated_at", "id"),
+            request,
+            view=self,
         )
+        return paginator.get_paginated_response(CourseProgressSerializer(page, many=True).data)
 
 
 class CourseProgressDetailView(APIView):
@@ -93,6 +105,7 @@ class CourseProgressDetailView(APIView):
 
 class ProgressEventIngestView(APIView):
     permission_classes = [IsAuthenticated]
+    pagination_class = ProgressPagination
 
     def post(self, request):
         serializer = ProgressEventIngestSerializer(data=request.data)
@@ -104,4 +117,6 @@ class ProgressEventIngestView(APIView):
 
     def get(self, request):
         require_progress_permission(request, "progress.view")
-        return Response(ProgressEventSerializer(progress_event_queryset(), many=True).data)
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(progress_event_queryset(), request, view=self)
+        return paginator.get_paginated_response(ProgressEventSerializer(page, many=True).data)

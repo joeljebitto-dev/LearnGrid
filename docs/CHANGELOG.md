@@ -39,3 +39,6 @@ Source: [SRD.pdf](SRD.pdf)
 
 ## 2026-06-12
 - CHG-030 Finished repository-side closure by resolving `OD-004` to generic existing-account OIDC, `OD-005` to PostgreSQL `analytics_db`, and `OD-006` to MinIO signed video URLs; added auth-service OIDC APIs and frontend SSO callback handling; selected Redis Sentinel for production HA; added staging/performance readiness evidence scripts and a manual GitHub Actions readiness workflow while leaving real staging/performance evidence tasks open.
+
+## 2026-06-14
+- CHG-031 Implemented `T-026 Backend Hardening And API Completion` repository-side hardening with the shared `learngrid-authz` package, standardized remote authorization timeout settings, progress-service paginated list responses, backend hardening evidence docs, env/documentation updates, and T-026 contract checks.

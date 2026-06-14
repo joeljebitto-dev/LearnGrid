@@ -17,6 +17,7 @@ psycopg = { version = "^3.2.12", extras = ["binary"] }
 redis = "^7.0.1"
 gunicorn = "^23.0.0"
 learngrid-events = { path = "../../shared/learngrid-events", develop = true }
+learngrid-authz = { path = "../../shared/learngrid-authz", develop = true }
 learngrid-redis = { path = "../../shared/learngrid-redis", develop = true }
 learngrid-security = { path = "../../shared/learngrid-security", develop = true }
 learngrid-observability = { path = "../../shared/learngrid-observability", develop = true }

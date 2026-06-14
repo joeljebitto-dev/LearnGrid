@@ -322,12 +322,16 @@ Non-auth services validate JWTs locally and call `auth-service` for permission c
 | Environment variable | Default | Purpose |
 | --- | --- | --- |
 | `AUTH_SERVICE_BASE_URL` | `http://127.0.0.1:8001` | Auth-service URL used for authorization checks |
+| `AUTHORIZATION_CHECK_TIMEOUT_SECONDS` | `2` | Shared remote authorization timeout; failures deny by default |
 | `AUTH_JWT_SIGNING_KEY` | `insecure-local-auth-service-change-me-32bytes` | Shared JWT signing key for local token validation |
 | `AUTH_JWT_ISSUER` | `learngrid-auth-service` | Expected JWT issuer |
 | `AUTH_JWT_ALGORITHM` | `HS256` | JWT signing algorithm |
 
 Authorization failures deny by default. The permission cache is invalidated after role assignment
 and role-permission changes.
+
+T-026 backend hardening evidence, authorization matrices, eventing runbooks, high-risk workflow
+notes, and migration/retention policy live in [backend-hardening/](backend-hardening/README.md).
 
 ## User And Profile Management
 `user-service` implements the first profile workflow for

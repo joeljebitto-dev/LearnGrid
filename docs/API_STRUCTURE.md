@@ -9,8 +9,12 @@ This file is the overall API structure reference for implemented LearnGrid LMS A
 ## API-000 Common Rules
 - Backend APIs are JSON REST endpoints.
 - Protected endpoints require a bearer access token unless marked public.
-- Non-auth services validate JWTs locally and call `auth-service` for authorization decisions.
-- Paginated list responses use DRF shape: `count`, `next`, `previous`, and `results`.
+- Non-auth services validate JWTs locally and call `auth-service` for authorization decisions through
+  the shared `learngrid-authz` helper.
+- Remote authorization checks deny by default on rejection, malformed response, timeout, or network
+  failure. The default timeout is `AUTHORIZATION_CHECK_TIMEOUT_SECONDS=2`.
+- Paginated list responses use DRF shape: `count`, `next`, `previous`, and `results`; bounded
+  catalog/configuration reads are documented as bounded exceptions.
 - UUID path parameters are formatted as `<uuid>`.
 - Authorization denial or unreachable remote authorization denies access by default.
 

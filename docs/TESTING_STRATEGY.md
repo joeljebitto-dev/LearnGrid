@@ -41,6 +41,9 @@ Configure with `INTEGRATION_DATABASE_URL`, `INTEGRATION_REDIS_URL`,
 - Optional live checks use `CONTRACT_SERVICE_URLS` to fetch generated OpenAPI JSON.
 - Kafka contract tests validate topic naming, retry/DLQ naming, and representative
   `learngrid-events` envelopes.
+- T-026 hardening contract tests validate shared `learngrid-authz` usage, authorization timeout
+  settings, pagination conventions, migration reverse operations, and backend hardening evidence
+  docs.
 
 Run:
 
@@ -134,4 +137,6 @@ syntax, contract, integration, E2E, k6, security, deployment, image, and Helm ch
 
 ## TEST-010 Related Spec And Task
 Primary spec: [SPEC-024](specs/024-testing-quality.md).  
-Primary task: [T-024](tasks/T-024-testing-quality.md).
+Primary task: [T-024](tasks/T-024-testing-quality.md). Backend hardening follow-up evidence is
+tracked in [T-026](tasks/T-026-backend-hardening-api-completion.md) and
+[backend-hardening/](backend-hardening/README.md).

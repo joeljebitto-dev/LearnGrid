@@ -30,6 +30,9 @@ apps/<domain>/tests/
 ## BE-003 API Standards
 - Protected APIs must enforce backend authorization.
 - List APIs must support pagination, filtering, and sorting.
+- Top-level collection/search APIs return DRF pagination shape: `count`, `next`, `previous`, and
+  `results`, with `page_size` capped at `100`. Bounded nested reads may return arrays when the
+  owning API design documents the bound.
 - APIs must expose OpenAPI documentation at `/api/schema/` and `/api/docs/` through
   `drf-spectacular`.
 - APIs must validate all inputs through serializers and schema checks.
@@ -65,6 +68,9 @@ apps/<domain>/tests/
 
 ## BE-007 Security Standards
 - Security helpers live in [backend/shared/learngrid-security](../backend/shared/learngrid-security).
+- Cross-service authorization helpers live in
+  [backend/shared/learngrid-authz](../backend/shared/learngrid-authz). Non-auth services use this
+  shared package for remote auth-service checks, deny-by-default behavior, and timeout handling.
 - Production settings must require secrets and reject local-only placeholder values.
 - Production settings must enable SSL redirect, proxy SSL detection, HSTS, secure cookies, content
   sniffing protection, frame denial, and strict referrer policy.
@@ -88,8 +94,9 @@ apps/<domain>/tests/
 - Each backend service includes schema smoke tests for `/api/schema/` and `/api/docs/`.
 - Service CI runs `ruff check`, `ruff format --check`, `mypy`, Django checks, migration dry-runs,
   and pytest.
-- Repo-level tests cover OpenAPI/Kafka contracts, Compose-backed PostgreSQL/Redis/Kafka/MinIO
+- Repo-level tests cover OpenAPI/Kafka/T-026 hardening contracts, Compose-backed PostgreSQL/Redis/Kafka/MinIO
   integration, Selenium journey smoke tests, and k6 load smoke scripts.
+- Backend hardening evidence is tracked in [backend-hardening/](backend-hardening/README.md).
 
 ## BE-010 Related Tasks
 See [TASKS.md](TASKS.md) for implementation checklists, especially [T-001](tasks/T-001-project-setup.md), [T-020](tasks/T-020-kafka-eventing.md), [T-021](tasks/T-021-redis-architecture.md), [T-022](tasks/T-022-security.md), [T-023](tasks/T-023-ci-cd-deployment-observability.md), [T-024](tasks/T-024-testing-quality.md), and [T-026](tasks/T-026-backend-hardening-api-completion.md).

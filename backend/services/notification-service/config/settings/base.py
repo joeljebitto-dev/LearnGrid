@@ -71,6 +71,7 @@ KAFKA_EVENT_HANDLERS: dict[str, str] = {
     "notification.in_app": "apps.notifications.services.handle_kafka_notification_event",
 }
 AUTH_SERVICE_BASE_URL = os.getenv("AUTH_SERVICE_BASE_URL", "http://127.0.0.1:8001")
+AUTHORIZATION_CHECK_TIMEOUT_SECONDS = float(os.getenv("AUTHORIZATION_CHECK_TIMEOUT_SECONDS", "2"))
 USER_SERVICE_BASE_URL = os.getenv("USER_SERVICE_BASE_URL", "http://127.0.0.1:8002")
 AUTH_JWT_SIGNING_KEY = os.getenv(
     "AUTH_JWT_SIGNING_KEY",

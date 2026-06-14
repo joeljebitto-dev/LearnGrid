@@ -108,8 +108,8 @@ def test_progress_updates_course_completion_and_events(api_client, access_token,
         **auth_headers(access_token),
     )
     assert response.status_code == 200
-    assert response.json()[0]["status"] == CourseProgressStatus.COMPLETED
-    assert response.json()[0]["completion_percent"] == "100.00"
+    assert response.json()["results"][0]["status"] == CourseProgressStatus.COMPLETED
+    assert response.json()["results"][0]["completion_percent"] == "100.00"
 
 
 @pytest.mark.django_db

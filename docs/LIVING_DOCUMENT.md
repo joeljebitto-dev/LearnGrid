@@ -16,7 +16,8 @@ certificates, completed `T-017` notifications, completed `T-018` search/reportin
 completed `T-019` API gateway, completed `T-020` Kafka eventing, completed `T-021`
 Redis architecture, completed `T-022` security baseline, the repository implementation portion
 of `T-023` CI/CD, deployment, and observability, and the repository implementation portion of
-`T-024` testing and quality.
+`T-024` testing and quality, completed `T-025` frontend feature completion, and completed
+`T-026` backend hardening and API completion.
 The scaffold includes the React `frontend-service`, Django REST Framework baselines for `SVC-001`
 through `SVC-010`, local PostgreSQL and Redis Compose configuration, health endpoints, lockfiles,
 basic tests, and GitHub Actions CI. Auth-service now includes JWT access and refresh token APIs,
@@ -26,7 +27,8 @@ SSO that links verified provider identities to existing active accounts only. Au
 RBAC roles, permissions, scoped role assignments, authorization checks, Redis permission caching,
 authorization audit logs, Redis-backed login/reset rate limiting, password reset token state, and
 OTP helpers. Non-auth backend services can validate access JWTs and call auth-service
-for remote permission checks. User-service now owns institution support models, base user profiles,
+for remote permission checks through the shared `learngrid-authz` helper. User-service now owns
+institution support models, base user profiles,
 student/instructor/admin profile tables, user import job records, and profile create, search, update,
 and deactivate APIs that coordinate account lifecycle through auth-service. User-service also exposes
 institution, department, and batch management APIs with scoped `institution.manage` authorization,
@@ -58,6 +60,10 @@ OpenAPI/Kafka contract tests, Compose-backed integration tests, Selenium page-ob
 k6 load scripts, expanded CI quality gates, and staging/performance readiness evidence scripts are
 implemented for `T-024`. Final T-024 closure still requires a real staging/on-prem performance and
 autoscaling run.
+`T-026` centralizes remote authorization behavior, standardizes remaining top-level progress list
+responses to DRF pagination, adds backend hardening contract checks, and records API completeness,
+authorization, tenant isolation, eventing, high-risk workflow, migration, retention, and compliance
+evidence under [backend-hardening/](backend-hardening/README.md).
 
 ## LD-002 Source Of Truth
 - Product and architecture requirements come from [SRD.pdf](SRD.pdf).
@@ -73,6 +79,7 @@ autoscaling run.
 - Implemented security design notes: [security-design/](security-design/README.md).
 - Implemented deployment design notes: [deployment-design/](deployment-design/README.md).
 - Implemented observability design notes: [observability-design/](observability-design/README.md).
+- Backend hardening evidence notes: [backend-hardening/](backend-hardening/README.md).
 
 ## LD-003 Update Rules
 - Add or revise a spec before implementing a new feature.
