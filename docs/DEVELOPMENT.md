@@ -161,6 +161,18 @@ The Vite dev proxy routes all implemented `/api/*` service prefixes to local bac
 Frontend role-aware navigation hides unrelated portal routes, but backend authorization remains
 authoritative for every API request.
 
+Frontend UI quality follow-up is tracked in [T-028](tasks/T-028-ui-design-system-and-product-ux.md)
+and [T-029](tasks/T-029-accessibility-and-frontend-quality.md). Completion requires component-level
+evidence, accessibility checks, responsive review, role-based UX acceptance, and production-readiness
+artifacts rather than route implementation alone.
+
+The implemented design-system reference is [frontend-design-system.md](frontend-design-system.md).
+Shared primitives live in `frontend/src/features/shared/ui.tsx`, LMS product components live in
+`frontend/src/features/lms/LmsProductComponents.tsx`, and the component-preview equivalent lives in
+`frontend/src/features/design-system/DesignSystemPreview.tsx`.
+Frontend accessibility and quality evidence is tracked in
+[frontend-quality-evidence.md](frontend-quality-evidence.md).
+
 ## Backend Services
 Each backend service is a Django REST Framework application with split settings and a public
 health endpoint. Production containers use Gunicorn and expose `/health/`, `/health/live/`,

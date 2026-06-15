@@ -25,3 +25,4 @@ Notes:
 - Frontend verification completed with `pnpm -C frontend lint`, `pnpm -C frontend typecheck`, `pnpm -C frontend test`, and `pnpm -C frontend build`.
 - Selenium route coverage was expanded under `tests/e2e/`; local execution requires the root Python test environment and browser/driver dependencies.
 - Frontend authorization checks are only presentation controls; backend authorization remains authoritative.
+- Follow-up production UI quality is tracked in [T-028](T-028-ui-design-system-and-product-ux.md) and [T-029](T-029-accessibility-and-frontend-quality.md).

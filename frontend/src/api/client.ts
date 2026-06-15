@@ -1,6 +1,8 @@
 import axios from 'axios';
 
 const TOKEN_STORAGE_KEY = 'learngrid.tokens';
+const SESSION_EXPIRED_EVENT = 'learngrid:session-expired';
+const NETWORK_ERROR_EVENT = 'learngrid:network-error';
 
 export type TokenPair = {
   access: string;
@@ -40,6 +42,36 @@ export function hasStoredAccessToken() {
   return Boolean(getStoredTokens()?.access);
 }
 
+export function isStoredAccessTokenExpired(now = Date.now()) {
+  const tokens = getStoredTokens();
+  if (!tokens?.access_expires_at) {
+    return false;
+  }
+  return new Date(tokens.access_expires_at).getTime() <= now;
+}
+
+export function dispatchSessionExpired() {
+  window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+}
+
+export function dispatchNetworkError(message = 'The network request failed.') {
+  window.dispatchEvent(new CustomEvent(NETWORK_ERROR_EVENT, { detail: { message } }));
+}
+
+export function subscribeToSessionExpired(listener: () => void) {
+  window.addEventListener(SESSION_EXPIRED_EVENT, listener);
+  return () => window.removeEventListener(SESSION_EXPIRED_EVENT, listener);
+}
+
+export function subscribeToNetworkError(listener: (message: string) => void) {
+  const wrapped = (event: Event) => {
+    const detail = event instanceof CustomEvent ? event.detail : null;
+    listener(typeof detail?.message === 'string' ? detail.message : 'The network request failed.');
+  };
+  window.addEventListener(NETWORK_ERROR_EVENT, wrapped);
+  return () => window.removeEventListener(NETWORK_ERROR_EVENT, wrapped);
+}
+
 apiClient.interceptors.request.use((config) => {
   const token = getStoredTokens()?.access;
   if (token) {
@@ -47,3 +79,17 @@ apiClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401) {
+      clearStoredTokens();
+      dispatchSessionExpired();
+    }
+    if (!error?.response) {
+      dispatchNetworkError(error instanceof Error ? error.message : 'The service could not be reached.');
+    }
+    return Promise.reject(error);
+  }
+);

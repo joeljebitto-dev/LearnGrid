@@ -45,5 +45,13 @@ frontend/src/utils
 | Instructor | Course authoring, content upload, assessment authoring, grading, learner progress | [SPEC-006](specs/006-course-catalog-metadata.md), [SPEC-012](specs/012-assessment-authoring.md), [SPEC-015](specs/015-grading-results-audit.md) |
 | Admin | User management, course management, enrollment, reports, institution controls | [SPEC-004](specs/004-user-profile-management.md), [SPEC-009](specs/009-enrollment-access-management.md), [SPEC-018](specs/018-search-reporting-analytics.md) |
 
-## FE-005 Related Tasks
-See [T-001](tasks/T-001-project-setup.md), [T-011](tasks/T-011-dashboards-portals.md), [T-024](tasks/T-024-testing-quality.md), and [T-025](tasks/T-025-frontend-feature-completion.md).
+## FE-005 Design Quality Requirements
+- Use reusable design-system primitives for controls, forms, layout, feedback, navigation, data display, and LMS-specific product components.
+- Keep role-specific portals visually consistent while preserving domain-specific workflows for students, instructors, institution admins, and super admins.
+- Validate loading, empty, retry, no-access, error, disabled, mutation pending, and unsaved-change states as first-class UX behavior.
+- Meet keyboard, focus, screen-reader, contrast, responsive, and reduced-motion expectations before production readiness evidence is accepted.
+- The implemented design-system reference is [frontend-design-system.md](frontend-design-system.md), with React component preview coverage in `frontend/src/features/design-system/DesignSystemPreview.tsx`.
+- Frontend quality and accessibility evidence is tracked in [frontend-quality-evidence.md](frontend-quality-evidence.md).
+
+## FE-006 Related Tasks
+See [T-001](tasks/T-001-project-setup.md), [T-011](tasks/T-011-dashboards-portals.md), [T-024](tasks/T-024-testing-quality.md), [T-025](tasks/T-025-frontend-feature-completion.md), [T-028](tasks/T-028-ui-design-system-and-product-ux.md), and [T-029](tasks/T-029-accessibility-and-frontend-quality.md).

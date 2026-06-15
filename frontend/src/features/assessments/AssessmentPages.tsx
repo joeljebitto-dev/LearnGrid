@@ -21,7 +21,14 @@ import {
   submitQuizAttempt,
   type QuizAttempt
 } from '../../api/assessments';
+import { toList } from '../../api/types';
 import { PortalLayout } from '../layout/PortalLayout';
+import {
+  AssessmentAuthoringSummary,
+  AssignmentSubmissionState,
+  AttemptStatusPanel
+} from '../lms/LmsProductComponents';
+import { useUnsavedChangesWarning } from '../shared/quality';
 import {
   buttonClass,
   EntityList,
@@ -45,9 +52,12 @@ type FormMutation = {
 
 export function AssessmentAuthoringPage({ context }: { context: SessionContext }) {
   const queryClient = useQueryClient();
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  useUnsavedChangesWarning(hasUnsavedChanges, 'Assessment authoring has unsaved question or configuration changes.');
   const banksQuery = useQuery({ queryKey: ['question-banks'], queryFn: () => listQuestionBanks({ page_size: 20 }) });
   const assessmentsQuery = useQuery({ queryKey: ['assessments'], queryFn: () => listAssessments({ page_size: 20, sort: '-created_at' }) });
   const invalidate = async () => {
+    setHasUnsavedChanges(false);
     await queryClient.invalidateQueries({ queryKey: ['question-banks'] });
     await queryClient.invalidateQueries({ queryKey: ['assessments'] });
   };
@@ -129,14 +139,20 @@ export function AssessmentAuthoringPage({ context }: { context: SessionContext }
   return (
     <PortalLayout context={context} activeNav="assessment-authoring">
       <PageHeader title="Assessment Authoring" description="Build question banks, questions, quizzes, exams, and assignments." />
+      <div className="mb-5">
+        <AssessmentAuthoringSummary
+          banks={toList(banksQuery.data)}
+          assessments={toList(assessmentsQuery.data)}
+        />
+      </div>
       <div className="grid gap-5 xl:grid-cols-4">
-        <AssessmentFormPanel title="Question bank" mutation={bankMutation}>
+        <AssessmentFormPanel title="Question bank" mutation={bankMutation} onDirty={() => setHasUnsavedChanges(true)}>
           <Field htmlFor="bank-title" label="Title"><input id="bank-title" name="title" className={fieldClass} required /></Field>
           <Field htmlFor="bank-institution" label="Institution ID"><input id="bank-institution" name="institution_id" className={fieldClass} defaultValue={context.profile.institution_id ?? ''} required /></Field>
           <Field htmlFor="bank-description" label="Description"><textarea id="bank-description" name="description" className={fieldClass} rows={3} /></Field>
         </AssessmentFormPanel>
 
-        <AssessmentFormPanel title="Question" mutation={questionMutation}>
+        <AssessmentFormPanel title="Question" mutation={questionMutation} onDirty={() => setHasUnsavedChanges(true)}>
           <Field htmlFor="question-bank-id" label="Question bank ID"><input id="question-bank-id" name="question_bank_id" className={fieldClass} required /></Field>
           <Field htmlFor="question-type" label="Question type">
             <select id="question-type" name="question_type" className={fieldClass}>
@@ -153,7 +169,7 @@ export function AssessmentAuthoringPage({ context }: { context: SessionContext }
           <Field htmlFor="question-points" label="Points"><input id="question-points" name="points" className={fieldClass} type="number" min={0} defaultValue={1} /></Field>
         </AssessmentFormPanel>
 
-        <AssessmentFormPanel title="Assessment" mutation={assessmentMutation}>
+        <AssessmentFormPanel title="Assessment" mutation={assessmentMutation} onDirty={() => setHasUnsavedChanges(true)}>
           <Field htmlFor="assessment-title" label="Title"><input id="assessment-title" name="title" className={fieldClass} required /></Field>
           <Field htmlFor="assessment-course" label="Course ID"><input id="assessment-course" name="course_id" className={fieldClass} required /></Field>
           <Field htmlFor="assessment-institution" label="Institution ID"><input id="assessment-institution" name="institution_id" className={fieldClass} defaultValue={context.profile.institution_id ?? ''} required /></Field>
@@ -169,7 +185,7 @@ export function AssessmentAuthoringPage({ context }: { context: SessionContext }
           <Field htmlFor="max-points" label="Assignment max points"><input id="max-points" name="max_points" className={fieldClass} type="number" min={0} defaultValue={100} /></Field>
         </AssessmentFormPanel>
 
-        <AssessmentFormPanel title="Attach questions" mutation={attachMutation}>
+        <AssessmentFormPanel title="Attach questions" mutation={attachMutation} onDirty={() => setHasUnsavedChanges(true)}>
           <Field htmlFor="attach-assessment" label="Assessment ID"><input id="attach-assessment" name="assessment_id" className={fieldClass} required /></Field>
           <Field htmlFor="attach-questions" label="Question IDs"><textarea id="attach-questions" name="question_ids" className={fieldClass} rows={4} placeholder="Comma-separated UUIDs" required /></Field>
         </AssessmentFormPanel>
@@ -199,15 +215,17 @@ export function AssessmentAuthoringPage({ context }: { context: SessionContext }
 function AssessmentFormPanel({
   title,
   mutation,
+  onDirty,
   children
 }: {
   title: string;
   mutation: FormMutation;
+  onDirty?: () => void;
   children: ReactNode;
 }) {
   return (
     <Panel title={title}>
-      <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); mutation.mutate(event.currentTarget); }}>
+      <form className="space-y-4" onChange={onDirty} onSubmit={(event) => { event.preventDefault(); mutation.mutate(event.currentTarget); }}>
         {children}
         {mutation.isError ? <ErrorState title={`${title} failed`} error={mutation.error} /> : null}
         <button className={buttonClass} type="submit" disabled={mutation.isPending}>Save</button>
@@ -219,6 +237,8 @@ function AssessmentFormPanel({
 export function StudentAssessmentAttemptPage({ context }: { context: SessionContext }) {
   const { assessmentId = '' } = useParams();
   const [attempt, setAttempt] = useState<QuizAttempt | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  useUnsavedChangesWarning(hasUnsavedChanges, 'Quiz attempt has unsaved answers.');
   const startMutation = useMutation({
     mutationFn: () => startQuizAttempt(assessmentId),
     onSuccess: setAttempt
@@ -233,7 +253,10 @@ export function StudentAssessmentAttemptPage({ context }: { context: SessionCont
         }
       ]);
     },
-    onSuccess: setAttempt
+    onSuccess: (savedAttempt) => {
+      setHasUnsavedChanges(false);
+      setAttempt(savedAttempt);
+    }
   });
   const submitMutation = useMutation({ mutationFn: () => submitQuizAttempt(String(attempt?.id)), onSuccess: setAttempt });
   const autoMutation = useMutation({ mutationFn: () => autoSubmitQuizAttempt(String(attempt?.id)), onSuccess: setAttempt });
@@ -241,14 +264,18 @@ export function StudentAssessmentAttemptPage({ context }: { context: SessionCont
   return (
     <PortalLayout context={context} activeNav="student-courses">
       <PageHeader title="Assessment Attempt" description="Start, save draft answers, submit, or auto-submit a quiz/exam attempt." />
-      <Panel title="Attempt workflow">
+      <AttemptStatusPanel
+        status={attempt?.status}
+        timeRemaining={attempt ? 'Timer is enforced by the assessment service.' : 'Start an attempt to begin timing.'}
+        autosaveState={attempt ? 'Draft answers are saved on demand.' : 'No draft exists yet.'}
+      >
         <div className="space-y-4">
           <button className={buttonClass} type="button" onClick={() => startMutation.mutate()} disabled={startMutation.isPending}>Start attempt</button>
           {startMutation.isError ? <ErrorState title="Attempt start failed" error={startMutation.error} /> : null}
           {attempt ? (
             <>
               <JsonPreview value={attempt} />
-              <form className="grid gap-3 md:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); saveMutation.mutate(event.currentTarget); }}>
+              <form className="grid gap-3 md:grid-cols-[1fr_1fr_auto]" onChange={() => setHasUnsavedChanges(true)} onSubmit={(event) => { event.preventDefault(); saveMutation.mutate(event.currentTarget); }}>
                 <Field htmlFor="attempt-question-id" label="Question ID"><input id="attempt-question-id" name="question_id" className={fieldClass} required /></Field>
                 <Field htmlFor="attempt-answer" label="Answer"><input id="attempt-answer" name="answer" className={fieldClass} required /></Field>
                 <button className={`${buttonClass} self-end`} type="submit">Save draft</button>
@@ -260,7 +287,7 @@ export function StudentAssessmentAttemptPage({ context }: { context: SessionCont
             </>
           ) : null}
         </div>
-      </Panel>
+      </AttemptStatusPanel>
     </PortalLayout>
   );
 }
@@ -268,6 +295,8 @@ export function StudentAssessmentAttemptPage({ context }: { context: SessionCont
 export function AssignmentSubmissionPage({ context }: { context: SessionContext }) {
   const { assignmentId = '' } = useParams();
   const [submissionId, setSubmissionId] = useState('');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  useUnsavedChangesWarning(hasUnsavedChanges, 'Assignment submission has unsaved draft changes.');
   const draftMutation = useMutation({
     mutationFn: (form: HTMLFormElement) => {
       const data = new FormData(form);
@@ -278,7 +307,10 @@ export function AssignmentSubmissionPage({ context }: { context: SessionContext 
         submit: false
       });
     },
-    onSuccess: (submission) => setSubmissionId(submission.id)
+    onSuccess: (submission) => {
+      setHasUnsavedChanges(false);
+      setSubmissionId(submission.id);
+    }
   });
   const submitMutation = useMutation({ mutationFn: () => submitAssignmentSubmission(submissionId) });
 
@@ -286,7 +318,7 @@ export function AssignmentSubmissionPage({ context }: { context: SessionContext 
     <PortalLayout context={context} activeNav="student-courses">
       <PageHeader title="Assignment Submission" description="Save draft work, attach content assets, and submit final assignment responses." />
       <Panel title="Submission editor">
-        <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); draftMutation.mutate(event.currentTarget); }}>
+        <form className="space-y-4" onChange={() => setHasUnsavedChanges(true)} onSubmit={(event) => { event.preventDefault(); draftMutation.mutate(event.currentTarget); }}>
           <Field htmlFor="assignment-text" label="Text response">
             <textarea id="assignment-text" name="text_response" className={fieldClass} rows={8} />
           </Field>
@@ -304,6 +336,9 @@ export function AssignmentSubmissionPage({ context }: { context: SessionContext 
         ) : null}
         {submitMutation.isError ? <div className="mt-4"><ErrorState title="Submission failed" error={submitMutation.error} /></div> : null}
       </Panel>
+      <div className="mt-4">
+        <AssignmentSubmissionState submissionId={submissionId} />
+      </div>
     </PortalLayout>
   );
 }

@@ -2,8 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 
 import type { SessionContext } from '../../api/auth';
 import { listCertificates } from '../../api/grading';
+import { toList } from '../../api/types';
 import { PortalLayout } from '../layout/PortalLayout';
-import { EntityList, ErrorState, LoadingState, PageHeader } from '../shared/ui';
+import { CertificateCard } from '../lms/LmsProductComponents';
+import { EmptyState, ErrorState, LoadingState, PageHeader } from '../shared/ui';
 
 export function StudentCertificatesPage({ context }: { context: SessionContext }) {
   const query = useQuery({
@@ -20,12 +22,17 @@ export function StudentCertificatesPage({ context }: { context: SessionContext }
       {query.isLoading ? <LoadingState label="Loading certificates" /> : null}
       {query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : null}
       {query.data ? (
-        <EntityList
-          title="My certificates"
-          response={query.data}
-          detailKeys={['course_id', 'certificate_number', 'certificate_asset_id', 'valid']}
-          emptyMessage="No certificates have been issued yet."
-        />
+        <div className="grid gap-4 md:grid-cols-2">
+          {toList(query.data).length ? (
+            toList(query.data).map((certificate) => (
+              <CertificateCard key={certificate.id} certificate={certificate} />
+            ))
+          ) : (
+            <div className="md:col-span-2">
+              <EmptyState message="No certificates have been issued yet." />
+            </div>
+          )}
+        </div>
       ) : null}
     </PortalLayout>
   );

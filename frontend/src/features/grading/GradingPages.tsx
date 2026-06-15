@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 
 import type { SessionContext } from '../../api/auth';
@@ -17,17 +18,20 @@ import {
   revokeCertificate,
   updateCertificateAsset
 } from '../../api/grading';
+import { toList } from '../../api/types';
 import { PortalLayout } from '../layout/PortalLayout';
+import { CertificateCard, GradingReviewPanel, RubricCommentBox } from '../lms/LmsProductComponents';
+import { useUnsavedChangesWarning } from '../shared/quality';
 import {
   buttonClass,
+  Button,
   EntityList,
   ErrorState,
   fieldClass,
   Field,
   LoadingState,
   PageHeader,
-  Panel,
-  secondaryButtonClass
+  Panel
 } from '../shared/ui';
 
 type FormMutation = {
@@ -39,11 +43,14 @@ type FormMutation = {
 
 export function GradingPage({ context }: { context: SessionContext }) {
   const queryClient = useQueryClient();
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  useUnsavedChangesWarning(hasUnsavedChanges, 'Grading workflow has unsaved review, override, or certificate changes.');
   const recordsQuery = useQuery({ queryKey: ['grading', 'records'], queryFn: () => listGradeRecords({ page_size: 20 }) });
   const rulesQuery = useQuery({ queryKey: ['grading', 'rules'], queryFn: () => listGradingRules({ page_size: 20 }) });
   const resultsQuery = useQuery({ queryKey: ['grading', 'results'], queryFn: () => listPublishedResults({ page_size: 20 }) });
   const certificatesQuery = useQuery({ queryKey: ['grading', 'certificates'], queryFn: () => listCertificates({ include_revoked: true, page_size: 20 }) });
   const invalidate = async () => {
+    setHasUnsavedChanges(false);
     await queryClient.invalidateQueries({ queryKey: ['grading'] });
   };
   const ruleMutation = useMutation({
@@ -131,18 +138,32 @@ export function GradingPage({ context }: { context: SessionContext }) {
   return (
     <PortalLayout context={context} activeNav="grading">
       <PageHeader title="Grading And Manual Reviews" description="Manage rules, records, reviews, overrides, publication, and certificate workflows." />
+      <div className="mb-5 grid gap-5 xl:grid-cols-2">
+        <GradingReviewPanel record={toList(recordsQuery.data)[0]}>
+          <RubricCommentBox>
+            <p className="text-xs text-slate-500">
+              Use manual review, override, and publish actions below. Backend grade history remains immutable.
+            </p>
+          </RubricCommentBox>
+        </GradingReviewPanel>
+        <Panel title="Certificate workflow" description="Evaluate eligibility, link assets, and revoke issued certificates without deleting history.">
+          <p className="text-sm text-slate-600">
+            Certificate asset generation is external to the UI; this workflow links validated asset UUIDs and exposes revocation state.
+          </p>
+        </Panel>
+      </div>
       <div className="grid gap-5 xl:grid-cols-3">
-        <GradingFormPanel title="Create rule" mutation={ruleMutation}>
+        <GradingFormPanel title="Create rule" mutation={ruleMutation} onDirty={() => setHasUnsavedChanges(true)}>
           <Field htmlFor="rule-course" label="Course ID"><input id="rule-course" name="course_id" className={fieldClass} required /></Field>
           <Field htmlFor="rule-assessment" label="Assessment ID"><input id="rule-assessment" name="assessment_id" className={fieldClass} /></Field>
           <Field htmlFor="rule-type" label="Rule type"><input id="rule-type" name="rule_type" className={fieldClass} defaultValue="weighted_total" /></Field>
           <Field htmlFor="rule-certificate" label="Certificate min percent"><input id="rule-certificate" name="certificate_min_percent" className={fieldClass} type="number" defaultValue={70} /></Field>
         </GradingFormPanel>
-        <GradingFormPanel title="Calculate quiz grade" mutation={calculateMutation}>
+        <GradingFormPanel title="Calculate quiz grade" mutation={calculateMutation} onDirty={() => setHasUnsavedChanges(true)}>
           <Field htmlFor="calc-submission" label="Quiz attempt ID"><input id="calc-submission" name="submission_id" className={fieldClass} required /></Field>
           <Field htmlFor="calc-rule" label="Rule ID"><input id="calc-rule" name="rule_id" className={fieldClass} /></Field>
         </GradingFormPanel>
-        <GradingFormPanel title="Manual review" mutation={manualMutation}>
+        <GradingFormPanel title="Manual review" mutation={manualMutation} onDirty={() => setHasUnsavedChanges(true)}>
           <Field htmlFor="manual-submission-type" label="Submission type">
             <select id="manual-submission-type" name="submission_type" className={fieldClass}>
               <option value="assignment_submission">Assignment submission</option>
@@ -151,18 +172,18 @@ export function GradingPage({ context }: { context: SessionContext }) {
           </Field>
           <Field htmlFor="manual-submission" label="Submission ID"><input id="manual-submission" name="submission_id" className={fieldClass} required /></Field>
         </GradingFormPanel>
-        <GradingFormPanel title="Complete review" mutation={completeMutation}>
+        <GradingFormPanel title="Complete review" mutation={completeMutation} onDirty={() => setHasUnsavedChanges(true)}>
           <Field htmlFor="complete-review" label="Review ID"><input id="complete-review" name="review_id" className={fieldClass} required /></Field>
           <Field htmlFor="complete-score" label="Score"><input id="complete-score" name="score" className={fieldClass} type="number" min={0} required /></Field>
           <Field htmlFor="complete-feedback" label="Feedback"><textarea id="complete-feedback" name="feedback" className={fieldClass} rows={3} /></Field>
         </GradingFormPanel>
-        <GradingFormPanel title="Override grade" mutation={overrideMutation}>
+        <GradingFormPanel title="Override grade" mutation={overrideMutation} onDirty={() => setHasUnsavedChanges(true)}>
           <Field htmlFor="override-record" label="Grade record ID"><input id="override-record" name="grade_record_id" className={fieldClass} required /></Field>
           <Field htmlFor="override-score" label="Score"><input id="override-score" name="score" className={fieldClass} type="number" min={0} required /></Field>
           <Field htmlFor="override-max" label="Max score"><input id="override-max" name="max_score" className={fieldClass} type="number" min={0} /></Field>
           <Field htmlFor="override-reason" label="Change reason"><input id="override-reason" name="change_reason" className={fieldClass} required /></Field>
         </GradingFormPanel>
-        <GradingFormPanel title="Evaluate certificate" mutation={certificateMutation}>
+        <GradingFormPanel title="Evaluate certificate" mutation={certificateMutation} onDirty={() => setHasUnsavedChanges(true)}>
           <Field htmlFor="cert-student" label="Student profile ID"><input id="cert-student" name="student_profile_id" className={fieldClass} required /></Field>
           <Field htmlFor="cert-course" label="Course ID"><input id="cert-course" name="course_id" className={fieldClass} required /></Field>
           <Field htmlFor="cert-asset" label="Certificate asset ID"><input id="cert-asset" name="certificate_asset_id" className={fieldClass} /></Field>
@@ -177,7 +198,7 @@ export function GradingPage({ context }: { context: SessionContext }) {
             response={recordsQuery.data}
             detailKeys={['student_profile_id', 'course_id', 'score', 'status']}
             actions={(record) => (
-              <button className={secondaryButtonClass} type="button" onClick={() => publishMutation.mutate(record.id)}>Publish</button>
+              <Button variant="secondary" size="sm" onClick={() => publishMutation.mutate(record.id)}>Publish</Button>
             )}
           />
         ) : null}
@@ -185,19 +206,24 @@ export function GradingPage({ context }: { context: SessionContext }) {
         {resultsQuery.data ? <EntityList title="Published results" response={resultsQuery.data} detailKeys={['student_profile_id', 'course_id', 'published_score']} /> : null}
         {certificatesQuery.data ? (
           <Panel title="Certificates">
-            <form className="mb-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]" onSubmit={(event) => { event.preventDefault(); certificateAssetMutation.mutate(event.currentTarget); }}>
+            <form className="mb-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]" onChange={() => setHasUnsavedChanges(true)} onSubmit={(event) => { event.preventDefault(); certificateAssetMutation.mutate(event.currentTarget); }}>
               <Field htmlFor="cert-link-id" label="Certificate ID"><input id="cert-link-id" name="certificate_id" className={fieldClass} required /></Field>
               <Field htmlFor="cert-link-asset" label="Asset ID"><input id="cert-link-asset" name="certificate_asset_id" className={fieldClass} /></Field>
               <button className={`${buttonClass} self-end`} type="submit">Link asset</button>
             </form>
-            <EntityList
-              title="Issued certificates"
-              response={certificatesQuery.data}
-              detailKeys={['student_profile_id', 'course_id', 'certificate_number', 'revoked_at']}
-              actions={(certificate) => (
-                <button className={secondaryButtonClass} type="button" onClick={() => revokeMutation.mutate(certificate.id)}>Revoke</button>
-              )}
-            />
+            <div className="grid gap-3">
+              {toList(certificatesQuery.data).map((certificate) => (
+                <CertificateCard
+                  key={certificate.id}
+                  certificate={certificate}
+                  action={
+                    <Button variant="secondary" size="sm" onClick={() => revokeMutation.mutate(certificate.id)}>
+                      Revoke
+                    </Button>
+                  }
+                />
+              ))}
+            </div>
           </Panel>
         ) : null}
       </div>
@@ -208,15 +234,17 @@ export function GradingPage({ context }: { context: SessionContext }) {
 function GradingFormPanel({
   title,
   mutation,
+  onDirty,
   children
 }: {
   title: string;
   mutation: FormMutation;
+  onDirty?: () => void;
   children: ReactNode;
 }) {
   return (
     <Panel title={title}>
-      <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); mutation.mutate(event.currentTarget); }}>
+      <form className="space-y-4" onChange={onDirty} onSubmit={(event) => { event.preventDefault(); mutation.mutate(event.currentTarget); }}>
         {children}
         {mutation.isError ? <ErrorState title={`${title} failed`} error={mutation.error} /> : null}
         <button className={buttonClass} type="submit" disabled={mutation.isPending}>Submit</button>

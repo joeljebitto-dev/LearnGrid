@@ -9,9 +9,12 @@ import {
   markNotificationUnread,
   upsertNotificationPreference
 } from '../../api/notifications';
+import { toList } from '../../api/types';
 import { PortalLayout } from '../layout/PortalLayout';
+import { NotificationFeed } from '../lms/LmsProductComponents';
 import {
   buttonClass,
+  Button,
   EntityList,
   ErrorState,
   fieldClass,
@@ -70,15 +73,12 @@ export function NotificationCenterPage({
           {notificationsQuery.isLoading ? <LoadingState label="Loading notifications" /> : null}
           {notificationsQuery.isError ? <ErrorState error={notificationsQuery.error} onRetry={() => void notificationsQuery.refetch()} /> : null}
           {notificationsQuery.data ? (
-            <EntityList
-              title="Notifications"
-              response={notificationsQuery.data}
-              detailKeys={['event_type', 'read_at', 'created_at']}
-              emptyMessage="No notifications yet."
+            <NotificationFeed
+              notifications={toList(notificationsQuery.data)}
               actions={(notification) => (
                 <>
-                  <button className={secondaryButtonClass} type="button" onClick={() => readMutation.mutate(notification.id)}>Read</button>
-                  <button className={secondaryButtonClass} type="button" onClick={() => unreadMutation.mutate(notification.id)}>Unread</button>
+                  <Button variant="secondary" size="sm" onClick={() => readMutation.mutate(notification.id)}>Read</Button>
+                  <Button variant="secondary" size="sm" onClick={() => unreadMutation.mutate(notification.id)}>Unread</Button>
                 </>
               )}
             />

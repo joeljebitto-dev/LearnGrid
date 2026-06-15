@@ -9,6 +9,8 @@ Testing covers unit, API, integration, contract, browser end-to-end, load, secur
 - Test models, services, selectors, permissions, and serializers.
 - Test business logic independently from API views where possible.
 - Use Pytest and Django Test Framework.
+- Frontend component tests use Vitest and React Testing Library. Automated accessibility checks use
+  `jest-axe` against the design-system preview and focused quality-shell tests.
 
 ## TEST-003 API Tests
 - Cover authentication, permissions, validation, happy paths, and failure paths.
@@ -65,6 +67,8 @@ Required journeys:
 - Grade viewing
 - Role-based access control
 - Logout
+- Role-based UX acceptance for student, instructor, institution admin, and super admin portals
+- Responsive viewport and keyboard-navigation smoke checks for major frontend journeys
 
 Suggested structure:
 
@@ -139,4 +143,7 @@ syntax, contract, integration, E2E, k6, security, deployment, image, and Helm ch
 Primary spec: [SPEC-024](specs/024-testing-quality.md).  
 Primary task: [T-024](tasks/T-024-testing-quality.md). Backend hardening follow-up evidence is
 tracked in [T-026](tasks/T-026-backend-hardening-api-completion.md) and
-[backend-hardening/](backend-hardening/README.md).
+[backend-hardening/](backend-hardening/README.md). Frontend design-system, accessibility, UX, and
+design QA follow-up work is tracked in [T-028](tasks/T-028-ui-design-system-and-product-ux.md) and
+[T-029](tasks/T-029-accessibility-and-frontend-quality.md), with evidence in
+[frontend-quality-evidence.md](frontend-quality-evidence.md).

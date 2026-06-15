@@ -37,6 +37,7 @@ import { GradingPage } from './features/grading/GradingPages';
 import type { Portal } from './features/layout/PortalLayout';
 import { NotificationCenterPage } from './features/notifications/NotificationPages';
 import { StudentProgressPage } from './features/progress/ProgressPages';
+import { FrontendQualityShell } from './features/shared/quality';
 import { LoadingState } from './features/shared/ui';
 
 function portalHome(portal: Portal | 'none') {
@@ -69,7 +70,8 @@ function PortalRoute({
 
 export function App() {
   return (
-    <Routes>
+    <FrontendQualityShell>
+      <Routes>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/auth/oidc/callback" element={<OidcCallbackPage />} />
@@ -175,6 +177,7 @@ export function App() {
 
       <Route path="/dashboard/no-access" element={<NoAccessPage />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+      </Routes>
+    </FrontendQualityShell>
   );
 }

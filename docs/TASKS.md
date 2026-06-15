@@ -35,3 +35,5 @@ Each task file contains checklist items. Mark an item complete only after implem
 | [T-025](tasks/T-025-frontend-feature-completion.md) | Frontend Feature Completion | [SPEC-006](specs/006-course-catalog-metadata.md), [SPEC-024](specs/024-testing-quality.md) |
 | [T-026](tasks/T-026-backend-hardening-api-completion.md) | Backend Hardening And API Completion | [SPEC-020](specs/020-kafka-eventing.md), [SPEC-024](specs/024-testing-quality.md) |
 | [T-027](tasks/T-027-production-readiness-evidence.md) | Production Readiness Evidence | [SPEC-023](specs/023-ci-cd-deployment-observability.md) |
+| [T-028](tasks/T-028-ui-design-system-and-product-ux.md) | UI Design System And Product UX | [SPEC-011](specs/011-dashboards-portals.md), [SPEC-024](specs/024-testing-quality.md) |
+| [T-029](tasks/T-029-accessibility-and-frontend-quality.md) | Accessibility And Frontend Quality | [SPEC-011](specs/011-dashboards-portals.md), [SPEC-024](specs/024-testing-quality.md) |

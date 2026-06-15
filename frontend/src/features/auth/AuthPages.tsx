@@ -13,7 +13,7 @@ import {
 } from '../../api/auth';
 import { clearStoredTokens, hasStoredAccessToken } from '../../api/client';
 import { getFrontendStatus } from '../../api/status';
-import { buttonClass, fieldClass, LoadingState } from '../shared/ui';
+import { Button, ErrorState, Field, Input, LoadingState } from '../shared/ui';
 import { useSessionContext } from './session';
 import { startOidcAuthorization } from '../../api/auth';
 
@@ -82,7 +82,7 @@ export function LoginPage() {
   const oidcProviderLabel = oidcConfigQuery.data?.provider_label || 'SSO';
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-6xl items-center px-6 py-10">
+    <main className="mx-auto flex min-h-screen max-w-6xl items-center px-6 py-10" id="main-content">
       <section className="grid w-full gap-8 lg:grid-cols-[1fr_360px]">
         <div className="flex flex-col justify-center border-l-4 border-emerald-600 pl-6">
           <span className="text-sm font-semibold uppercase text-emerald-700">
@@ -96,58 +96,53 @@ export function LoginPage() {
         </div>
 
         <form
-          className="rounded border border-slate-200 bg-white p-5"
+          className="rounded-panel border border-slate-200 bg-white p-5 shadow-panel"
+          aria-describedby="login-form-description"
           onSubmit={form.handleSubmit((values) => loginMutation.mutate(values))}
         >
           <h2 className="text-xl font-semibold text-slate-950">Sign in</h2>
-          <label className="mt-5 block text-sm font-medium text-slate-700" htmlFor="email">
-            Email
-            <input
+          <p id="login-form-description" className="mt-1 text-sm text-slate-600">
+            Use your LearnGrid account or the configured SSO provider.
+          </p>
+          <div className="mt-5">
+            <Field htmlFor="email" label="Email" error={form.formState.errors.email?.message} required>
+              <Input
               id="email"
-              className={fieldClass}
               type="email"
               autoComplete="email"
+              aria-invalid={Boolean(form.formState.errors.email)}
               {...form.register('email')}
             />
-          </label>
-          {form.formState.errors.email ? (
-            <p className="mt-1 text-xs text-rose-700">{form.formState.errors.email.message}</p>
-          ) : null}
+            </Field>
+          </div>
 
-          <label className="mt-4 block text-sm font-medium text-slate-700" htmlFor="password">
-            Password
-            <input
+          <div className="mt-4">
+            <Field htmlFor="password" label="Password" error={form.formState.errors.password?.message} required>
+              <Input
               id="password"
-              className={fieldClass}
               type="password"
               autoComplete="current-password"
+              aria-invalid={Boolean(form.formState.errors.password)}
               {...form.register('password')}
             />
-          </label>
-          {loginMutation.isError ? (
-            <p className="mt-3 rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
-              Sign in failed.
-            </p>
-          ) : null}
-          {oidcAuthorizeMutation.isError ? (
-            <p className="mt-3 rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
-              SSO sign in could not be started.
-            </p>
-          ) : null}
-          <button className={`mt-5 w-full ${buttonClass}`} type="submit" disabled={loginMutation.isPending}>
-            {loginMutation.isPending ? 'Signing in' : 'Sign in'}
-          </button>
+            </Field>
+          </div>
+          {loginMutation.isError ? <div className="mt-3"><ErrorState title="Sign in failed" error={loginMutation.error} /></div> : null}
+          {oidcAuthorizeMutation.isError ? <div className="mt-3"><ErrorState title="SSO sign in could not be started" error={oidcAuthorizeMutation.error} /></div> : null}
+          <Button className="mt-5 w-full" type="submit" loading={loginMutation.isPending} loadingLabel="Signing in">
+            Sign in
+          </Button>
           {oidcEnabled ? (
-            <button
-              className="mt-3 w-full rounded border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500"
+            <Button
+              className="mt-3 w-full"
+              variant="secondary"
               type="button"
-              disabled={oidcAuthorizeMutation.isPending}
+              loading={oidcAuthorizeMutation.isPending}
+              loadingLabel="Opening SSO"
               onClick={() => oidcAuthorizeMutation.mutate()}
             >
-              {oidcAuthorizeMutation.isPending
-                ? 'Opening SSO'
-                : `Continue with ${oidcProviderLabel}`}
-            </button>
+              Continue with {oidcProviderLabel}
+            </Button>
           ) : null}
         </form>
       </section>
@@ -181,8 +176,8 @@ export function OidcCallbackPage() {
   }, [callbackMutation, code, state]);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl items-center px-6">
-      <section className="w-full rounded border border-slate-200 bg-white p-6">
+    <main className="mx-auto flex min-h-screen max-w-3xl items-center px-6" id="main-content">
+      <section className="w-full rounded-panel border border-slate-200 bg-white p-6 shadow-panel">
         <h1 className="text-2xl font-semibold text-slate-950">Completing SSO sign in</h1>
         {callbackMutation.isPending ? (
           <p className="mt-2 text-sm text-slate-600">Validating identity provider response.</p>
@@ -202,8 +197,8 @@ export function OidcCallbackPage() {
 
 export function NoAccessPage() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl items-center px-6">
-      <section className="rounded border border-slate-200 bg-white p-6">
+    <main className="mx-auto flex min-h-screen max-w-3xl items-center px-6" id="main-content">
+      <section className="rounded-panel border border-slate-200 bg-white p-6 shadow-panel">
         <h1 className="text-2xl font-semibold text-slate-950">No portal access</h1>
         <p className="mt-2 text-sm text-slate-600">
           This account does not have a student, instructor, or admin portal role.

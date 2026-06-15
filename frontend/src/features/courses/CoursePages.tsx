@@ -21,10 +21,19 @@ import {
 import { createEnrollment } from '../../api/enrollments';
 import { createSignedAccess } from '../../api/content';
 import { updateLessonProgress, updateVideoProgress } from '../../api/progress';
-import { toList, type Entity } from '../../api/types';
+import { toList } from '../../api/types';
 import { PortalLayout } from '../layout/PortalLayout';
 import {
+  CourseCard,
+  CourseCatalogFilters,
+  CourseDetailHeader,
+  CourseStructureTree,
+  LessonPlayerLayout
+} from '../lms/LmsProductComponents';
+import { useUnsavedChangesWarning } from '../shared/quality';
+import {
   buttonClass,
+  Button,
   EmptyState,
   EntityList,
   ErrorState,
@@ -74,70 +83,26 @@ export function CourseCatalogPage({ context }: { context: SessionContext }) {
         title="Course Catalog"
         description="Browse published courses with search, filters, pagination, and backend permission checks."
       />
-      <section className="mb-5 rounded border border-slate-200 bg-white p-4">
-        <div className="grid gap-3 md:grid-cols-4">
-          <Field htmlFor="catalog-q" label="Search">
-            <input
-              id="catalog-q"
-              className={fieldClass}
-              value={filters.q}
-              onChange={(event) => {
-                filters.setPage(1);
-                filters.setQ(event.target.value);
-              }}
-            />
-          </Field>
-          <Field htmlFor="catalog-status" label="Status">
-            <select
-              id="catalog-status"
-              className={fieldClass}
-              value={filters.status}
-              onChange={(event) => {
-                filters.setPage(1);
-                filters.setStatus(event.target.value);
-              }}
-            >
-              <option value="published">Published</option>
-              <option value="">Any permitted status</option>
-              <option value="draft">Draft</option>
-              <option value="archived">Archived</option>
-            </select>
-          </Field>
-          <Field htmlFor="catalog-difficulty" label="Difficulty">
-            <select
-              id="catalog-difficulty"
-              className={fieldClass}
-              value={filters.difficulty}
-              onChange={(event) => {
-                filters.setPage(1);
-                filters.setDifficulty(event.target.value);
-              }}
-            >
-              <option value="">Any</option>
-              <option value="beginner">Beginner</option>
-              <option value="intermediate">Intermediate</option>
-              <option value="advanced">Advanced</option>
-            </select>
-          </Field>
-          <div className="flex items-end gap-2">
-            <button
-              className={secondaryButtonClass}
-              type="button"
-              disabled={filters.page <= 1}
-              onClick={() => filters.setPage(Math.max(1, filters.page - 1))}
-            >
-              Previous
-            </button>
-            <button
-              className={secondaryButtonClass}
-              type="button"
-              onClick={() => filters.setPage(filters.page + 1)}
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      </section>
+      <CourseCatalogFilters
+        q={filters.q}
+        status={filters.status}
+        difficulty={filters.difficulty}
+        page={filters.page}
+        onQChange={(value) => {
+          filters.setPage(1);
+          filters.setQ(value);
+        }}
+        onStatusChange={(value) => {
+          filters.setPage(1);
+          filters.setStatus(value);
+        }}
+        onDifficultyChange={(value) => {
+          filters.setPage(1);
+          filters.setDifficulty(value);
+        }}
+        onPrevious={() => filters.setPage(Math.max(1, filters.page - 1))}
+        onNext={() => filters.setPage(filters.page + 1)}
+      />
 
       {query.isLoading ? <LoadingState label="Loading courses" /> : null}
       {query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : null}
@@ -145,26 +110,11 @@ export function CourseCatalogPage({ context }: { context: SessionContext }) {
         <div className="grid gap-4 lg:grid-cols-2">
           {courses.length ? (
             courses.map((course) => (
-              <article className="rounded border border-slate-200 bg-white p-5" key={course.id}>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-lg font-semibold text-slate-950">{itemTitle(course)}</h3>
-                  <StatusBadge value={course.status} />
-                </div>
-                <p className="mt-2 line-clamp-3 text-sm text-slate-600">
-                  {String(course.description || 'No course description provided.')}
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                  <span>{course.difficulty_level || 'unspecified'} difficulty</span>
-                  <span>{course.categories?.length ?? 0} categories</span>
-                  <span>{course.tags?.length ?? 0} tags</span>
-                </div>
-                <Link
-                  className="mt-4 inline-flex text-sm font-semibold text-emerald-700"
-                  to={`/dashboard/student/courses/${course.id}`}
-                >
-                  View course
-                </Link>
-              </article>
+              <CourseCard
+                key={course.id}
+                course={course}
+                href={`/dashboard/student/courses/${course.id}`}
+              />
             ))
           ) : (
             <div className="lg:col-span-2">
@@ -205,19 +155,26 @@ export function CourseDetailPage({ context }: { context: SessionContext }) {
       {query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : null}
       {query.data ? (
         <>
-          <PageHeader title={itemTitle(query.data)} description={String(query.data.description || '')}>
+          <CourseDetailHeader
+            course={query.data}
+            actions={
+              <>
+                <Button
+                  loading={enrollMutation.isPending}
+                  loadingLabel="Enrolling"
+                  onClick={() => enrollMutation.mutate(query.data)}
+                >
+                  Enroll
+                </Button>
+                <Link className={secondaryButtonClass} to={`/dashboard/student/courses/${query.data.id}/learn`}>
+                  Start learning
+                </Link>
+              </>
+            }
+          />
+          <PageHeader title="Course overview" description="Review metadata, outcomes, prerequisites, and course structure before learning.">
             <div className="flex flex-wrap gap-2">
-              <button
-                className={buttonClass}
-                type="button"
-                disabled={enrollMutation.isPending}
-                onClick={() => enrollMutation.mutate(query.data)}
-              >
-                {enrollMutation.isPending ? 'Enrolling' : 'Enroll'}
-              </button>
-              <Link className={secondaryButtonClass} to={`/dashboard/student/courses/${query.data.id}/learn`}>
-                Start learning
-              </Link>
+              <StatusBadge value={query.data.status} />
             </div>
           </PageHeader>
           {enrollMutation.isError ? <ErrorState title="Enrollment failed" error={enrollMutation.error} /> : null}
@@ -253,25 +210,7 @@ export function CourseDetailPage({ context }: { context: SessionContext }) {
             {structureQuery.isError ? <ErrorState error={structureQuery.error} onRetry={() => void structureQuery.refetch()} /> : null}
             {structureQuery.data ? (
               <Panel title="Modules and lessons">
-                {structureQuery.data.modules?.length ? (
-                  <div className="space-y-4">
-                    {structureQuery.data.modules.map((module) => (
-                      <section className="rounded border border-slate-200 p-4" key={module.id}>
-                        <h4 className="font-semibold text-slate-900">{itemTitle(module)}</h4>
-                        <ul className="mt-3 space-y-2 text-sm text-slate-700">
-                          {module.lessons?.map((lesson) => (
-                            <li key={lesson.id}>
-                              {itemTitle(lesson)}
-                              {lesson.topics?.length ? ` · ${lesson.topics.length} topics` : ''}
-                            </li>
-                          ))}
-                        </ul>
-                      </section>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState message="No modules are available yet." />
-                )}
+                <CourseStructureTree structure={structureQuery.data} />
               </Panel>
             ) : null}
           </div>
@@ -324,55 +263,38 @@ export function StudentLearningPlayerPage({ context }: { context: SessionContext
       {query.isLoading ? <LoadingState label="Loading lesson" /> : null}
       {query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : null}
       {query.data ? (
-        <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
-          <Panel title={firstLesson ? itemTitle(firstLesson) : 'No lesson selected'}>
-            {firstLesson ? (
-              <div className="space-y-4 text-sm text-slate-700">
-                <p>{String(firstLesson.summary || 'This lesson has no summary yet.')}</p>
-                {firstTopic ? (
-                  <div className="rounded border border-slate-200 p-4">
-                    <h4 className="font-semibold text-slate-950">{itemTitle(firstTopic)}</h4>
-                    <p className="mt-2 text-slate-600">
-                      Content asset: {assetId || 'No content asset attached'}
-                    </p>
-                  </div>
-                ) : null}
-                <div className="flex flex-wrap gap-2">
-                  <button className={buttonClass} type="button" onClick={() => lessonMutation.mutate()}>
-                    Mark lesson complete
-                  </button>
-                  <button
-                    className={secondaryButtonClass}
-                    type="button"
-                    disabled={!assetId}
-                    onClick={() => videoMutation.mutate()}
-                  >
-                    Mark video complete
-                  </button>
-                  <button
-                    className={secondaryButtonClass}
-                    type="button"
-                    disabled={!assetId}
-                    onClick={() => accessMutation.mutate()}
-                  >
-                    Request access link
-                  </button>
-                </div>
-                {lessonMutation.isError ? <ErrorState title="Lesson progress failed" error={lessonMutation.error} /> : null}
-                {videoMutation.isError ? <ErrorState title="Video progress failed" error={videoMutation.error} /> : null}
-                {accessMutation.isError ? <ErrorState title="Access denied" error={accessMutation.error} /> : null}
-                {accessMutation.data ? <JsonPreview value={accessMutation.data} /> : null}
-              </div>
-            ) : (
-              <EmptyState message="This course has no playable lessons yet." />
-            )}
-          </Panel>
-          <EntityList
-            title="Course outline"
-            response={(query.data.modules ?? []) as Entity[]}
-            emptyMessage="No modules."
-          />
-        </div>
+        <LessonPlayerLayout
+          lessonTitle={firstLesson ? itemTitle(firstLesson) : 'No lesson selected'}
+          summary={firstLesson?.summary}
+          assetId={assetId}
+          accessDenied={!firstLesson}
+          actions={
+            <>
+              <Button onClick={() => lessonMutation.mutate()}>Mark lesson complete</Button>
+              <Button
+                variant="secondary"
+                disabled={!assetId}
+                disabledReason={!assetId ? 'Attach a content asset before marking video progress.' : undefined}
+                onClick={() => videoMutation.mutate()}
+              >
+                Mark video complete
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={!assetId}
+                disabledReason={!assetId ? 'A signed access link needs an attached content asset.' : undefined}
+                onClick={() => accessMutation.mutate()}
+              >
+                Request access link
+              </Button>
+              {lessonMutation.isError ? <ErrorState title="Lesson progress failed" error={lessonMutation.error} /> : null}
+              {videoMutation.isError ? <ErrorState title="Video progress failed" error={videoMutation.error} /> : null}
+              {accessMutation.isError ? <ErrorState title="Access denied" error={accessMutation.error} /> : null}
+              {accessMutation.data ? <JsonPreview value={accessMutation.data} /> : null}
+            </>
+          }
+          outline={<CourseStructureTree structure={query.data} />}
+        />
       ) : null}
     </PortalLayout>
   );
@@ -524,6 +446,8 @@ export function CourseBuilderPage({ context }: { context: SessionContext }) {
   const { courseId = '' } = useParams();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  useUnsavedChangesWarning(hasUnsavedChanges, 'Course builder has unsaved module, lesson, or topic changes.');
   const query = useQuery({
     queryKey: ['courses', courseId, 'structure'],
     queryFn: () => getCourseStructure(courseId),
@@ -555,6 +479,7 @@ export function CourseBuilderPage({ context }: { context: SessionContext }) {
       });
     },
     onSuccess: async () => {
+      setHasUnsavedChanges(false);
       await queryClient.invalidateQueries({ queryKey: ['courses', courseId, 'structure'] });
     }
   });
@@ -576,6 +501,7 @@ export function CourseBuilderPage({ context }: { context: SessionContext }) {
         <Panel title="Add structure item">
           <form
             className="space-y-4"
+            onChange={() => setHasUnsavedChanges(true)}
             onSubmit={(event) => {
               event.preventDefault();
               mutation.mutate(event.currentTarget);
@@ -617,42 +543,11 @@ export function CourseBuilderPage({ context }: { context: SessionContext }) {
           {query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : null}
           {query.data ? (
             <Panel title={itemTitle(query.data)}>
-              {query.data.modules?.length ? (
-                <div className="space-y-4">
-                  {query.data.modules.map((module) => (
-                    <section className="rounded border border-slate-200 p-4" key={module.id}>
-                      <h4 className="font-semibold text-slate-950">{itemTitle(module)}</h4>
-                      <p className="mt-1 text-xs text-slate-500">Module ID: {module.id}</p>
-                      <ul className="mt-3 space-y-2">
-                        {module.lessons?.map((lesson) => (
-                          <li className="rounded bg-slate-50 p-3 text-sm" key={lesson.id}>
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="font-medium text-slate-900">{itemTitle(lesson)}</span>
-                              <button
-                                className={secondaryButtonClass}
-                                type="button"
-                                onClick={() => publishLessonMutation.mutate(lesson.id)}
-                              >
-                                Publish lesson
-                              </button>
-                            </div>
-                            <p className="mt-1 text-xs text-slate-500">Lesson ID: {lesson.id}</p>
-                            {lesson.topics?.length ? (
-                              <ul className="mt-2 list-disc pl-5 text-xs text-slate-600">
-                                {lesson.topics.map((topic) => (
-                                  <li key={topic.id}>{itemTitle(topic)} · {topic.content_asset_id || 'no asset'}</li>
-                                ))}
-                              </ul>
-                            ) : null}
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState message="No modules yet. Create the first module to start authoring." />
-              )}
+              <CourseStructureTree
+                structure={query.data}
+                mode="author"
+                onPublishLesson={(lessonId) => publishLessonMutation.mutate(lessonId)}
+              />
             </Panel>
           ) : null}
         </div>
