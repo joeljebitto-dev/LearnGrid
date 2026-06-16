@@ -1,0 +1,179 @@
+{
+  "seed_namespace": "learngrid-demo",
+  "institution": {
+    "id": "b0a71a11-0000-4000-8000-000000000001",
+    "name": "Bot Academy",
+    "code": "BOT"
+  },
+  "departments": {
+    "computer_science": {
+      "id": "b0a71a11-0000-4000-8000-000000000011",
+      "name": "Computer Science",
+      "code": "CS"
+    },
+    "academic_operations": {
+      "id": "b0a71a11-0000-4000-8000-000000000012",
+      "name": "Academic Operations",
+      "code": "OPS"
+    }
+  },
+  "batch": {
+    "id": "b0a71a11-0000-4000-8000-000000000021",
+    "name": "BOT-2026"
+  },
+  "accounts": {
+    "super_admin": {
+      "id": "b0a71a11-0000-4000-8000-000000000101",
+      "email": "bot.superadmin@learngrid.local",
+      "password": "BotSuperAdmin123!",
+      "role": "super_admin",
+      "profile_id": "b0a71a11-0000-4000-8000-000000000201"
+    },
+    "institution_admin": {
+      "id": "b0a71a11-0000-4000-8000-000000000102",
+      "email": "bot.admin@learngrid.local",
+      "password": "BotAdmin123!",
+      "role": "institution_admin",
+      "profile_id": "b0a71a11-0000-4000-8000-000000000202"
+    },
+    "instructor": {
+      "id": "b0a71a11-0000-4000-8000-000000000103",
+      "email": "bot.instructor@learngrid.local",
+      "password": "BotInstructor123!",
+      "role": "instructor",
+      "profile_id": "b0a71a11-0000-4000-8000-000000000203"
+    },
+    "student": {
+      "id": "b0a71a11-0000-4000-8000-000000000104",
+      "email": "bot.student@learngrid.local",
+      "password": "BotStudent123!",
+      "role": "student",
+      "profile_id": "b0a71a11-0000-4000-8000-000000000204"
+    }
+  },
+  "profiles": {
+    "super_admin": {
+      "first_name": "Bot",
+      "last_name": "Super Admin",
+      "display_name": "Bot Super Admin"
+    },
+    "institution_admin": {
+      "first_name": "Bot",
+      "last_name": "Admin",
+      "display_name": "Bot Institution Admin"
+    },
+    "instructor": {
+      "first_name": "Bot",
+      "last_name": "Instructor",
+      "display_name": "Bot Instructor",
+      "employee_number": "BOT-EMP-001",
+      "title": "Demo Instructor"
+    },
+    "student": {
+      "first_name": "Bot",
+      "last_name": "Student",
+      "display_name": "Bot Student",
+      "student_number": "BOT-STU-001"
+    }
+  },
+  "content": {
+    "lesson_document": {
+      "id": "b0a71a11-0000-4000-8000-000000000301",
+      "file_metadata_id": "b0a71a11-0000-4000-8000-000000000302",
+      "version_id": "b0a71a11-0000-4000-8000-000000000303",
+      "title": "Demo Lesson Notes",
+      "asset_type": "document",
+      "object_key": "demo/lesson-notes.pdf",
+      "file_name": "lesson-notes.pdf",
+      "mime_type": "application/pdf",
+      "file_size_bytes": 204800
+    },
+    "lesson_video": {
+      "id": "b0a71a11-0000-4000-8000-000000000304",
+      "file_metadata_id": "b0a71a11-0000-4000-8000-000000000305",
+      "version_id": "b0a71a11-0000-4000-8000-000000000306",
+      "title": "Demo Intro Video",
+      "asset_type": "video",
+      "object_key": "demo/intro-video.mp4",
+      "file_name": "intro-video.mp4",
+      "mime_type": "video/mp4",
+      "file_size_bytes": 10485760
+    }
+  },
+  "courses": {
+    "prerequisite": {
+      "id": "b0a71a11-0000-4000-8000-000000000401",
+      "title": "LearnGrid Orientation",
+      "slug": "learngrid-orientation"
+    },
+    "main": {
+      "id": "b0a71a11-0000-4000-8000-000000000402",
+      "title": "Foundations of Web Learning",
+      "slug": "foundations-of-web-learning",
+      "category_id": "b0a71a11-0000-4000-8000-000000000411",
+      "tag_id": "b0a71a11-0000-4000-8000-000000000412",
+      "module_id": "b0a71a11-0000-4000-8000-000000000421",
+      "lesson_id": "b0a71a11-0000-4000-8000-000000000431",
+      "topic_id": "b0a71a11-0000-4000-8000-000000000441",
+      "revision_id": "b0a71a11-0000-4000-8000-000000000451"
+    }
+  },
+  "enrollment": {
+    "id": "b0a71a11-0000-4000-8000-000000000501",
+    "history_id": "b0a71a11-0000-4000-8000-000000000502",
+    "access_grant_id": "b0a71a11-0000-4000-8000-000000000503",
+    "batch_enrollment_id": "b0a71a11-0000-4000-8000-000000000504",
+    "cohort_enrollment_id": "b0a71a11-0000-4000-8000-000000000505",
+    "cohort_id": "b0a71a11-0000-4000-8000-000000000506"
+  },
+  "progress": {
+    "lesson_progress_id": "b0a71a11-0000-4000-8000-000000000601",
+    "video_progress_id": "b0a71a11-0000-4000-8000-000000000602",
+    "assessment_progress_id": "b0a71a11-0000-4000-8000-000000000603",
+    "course_progress_id": "b0a71a11-0000-4000-8000-000000000604",
+    "event_id": "b0a71a11-0000-4000-8000-000000000605"
+  },
+  "assessment": {
+    "question_bank_id": "b0a71a11-0000-4000-8000-000000000701",
+    "question_one_id": "b0a71a11-0000-4000-8000-000000000702",
+    "question_two_id": "b0a71a11-0000-4000-8000-000000000703",
+    "quiz_assessment_id": "b0a71a11-0000-4000-8000-000000000704",
+    "quiz_id": "b0a71a11-0000-4000-8000-000000000705",
+    "quiz_question_one_id": "b0a71a11-0000-4000-8000-000000000706",
+    "quiz_question_two_id": "b0a71a11-0000-4000-8000-000000000707",
+    "quiz_attempt_id": "b0a71a11-0000-4000-8000-000000000708",
+    "quiz_answer_one_id": "b0a71a11-0000-4000-8000-000000000709",
+    "quiz_answer_two_id": "b0a71a11-0000-4000-8000-000000000710",
+    "assignment_assessment_id": "b0a71a11-0000-4000-8000-000000000711",
+    "assignment_id": "b0a71a11-0000-4000-8000-000000000712",
+    "assignment_submission_id": "b0a71a11-0000-4000-8000-000000000713",
+    "submission_audit_id": "b0a71a11-0000-4000-8000-000000000714"
+  },
+  "grading": {
+    "rule_id": "b0a71a11-0000-4000-8000-000000000801",
+    "quiz_grade_id": "b0a71a11-0000-4000-8000-000000000802",
+    "assignment_grade_id": "b0a71a11-0000-4000-8000-000000000803",
+    "manual_review_id": "b0a71a11-0000-4000-8000-000000000804",
+    "history_id": "b0a71a11-0000-4000-8000-000000000805",
+    "published_result_id": "b0a71a11-0000-4000-8000-000000000806",
+    "eligibility_id": "b0a71a11-0000-4000-8000-000000000807",
+    "certificate_id": "b0a71a11-0000-4000-8000-000000000808",
+    "certificate_number": "LG-20260615-BOTDEMO001"
+  },
+  "notification": {
+    "template_id": "b0a71a11-0000-4000-8000-000000000901",
+    "notification_id": "b0a71a11-0000-4000-8000-000000000902",
+    "delivery_attempt_id": "b0a71a11-0000-4000-8000-000000000903",
+    "preference_id": "b0a71a11-0000-4000-8000-000000000904"
+  },
+  "analytics": {
+    "event_fact_id": "b0a71a11-0000-4000-8000-000000001001",
+    "student_aggregate_id": "b0a71a11-0000-4000-8000-000000001002",
+    "instructor_aggregate_id": "b0a71a11-0000-4000-8000-000000001003",
+    "institution_aggregate_id": "b0a71a11-0000-4000-8000-000000001004",
+    "report_snapshot_id": "b0a71a11-0000-4000-8000-000000001005",
+    "usage_metric_id": "b0a71a11-0000-4000-8000-000000001006",
+    "course_search_id": "b0a71a11-0000-4000-8000-000000001007",
+    "user_search_id": "b0a71a11-0000-4000-8000-000000001008"
+  }
+}

@@ -38,6 +38,16 @@ curl http://127.0.0.1:8001/health/
 curl -k https://127.0.0.1:8443/gateway/health
 ```
 
+5. Add deterministic local demo data:
+
+```bash
+scripts/seed-sample-data.sh
+```
+
+Demo bot credentials are listed in [LOCAL_BOT_USERS.txt](LOCAL_BOT_USERS.txt). The seed is
+idempotent and safe to rerun; use `scripts/seed-sample-data.sh --reset-sample-data` to remove only
+the seeded demo records before reseeding.
+
 The default runner starts PostgreSQL, Redis, MinIO, all backend services, the frontend, and the
 local Nginx API Gateway. The gateway is available at `http://127.0.0.1:8080` and
 `https://127.0.0.1:8443`. Press `Ctrl+C` to stop app processes and the gateway. PostgreSQL, Redis,

@@ -78,6 +78,46 @@ Redis design details, key naming, TTLs, invalidation, and outage behavior are do
 chart uses a Sentinel-backed primary/replica topology for production. Local development continues
 to use the direct `REDIS_URL` path.
 
+## Sample Data
+Seed a full local demo dataset after PostgreSQL is running:
+
+```bash
+scripts/seed-sample-data.sh
+```
+
+The root seed command starts PostgreSQL if needed, ensures all service databases exist, runs
+migrations by default, then executes each service's `seed_sample_data` Django management command in
+dependency order: auth, user, content, course, enrollment, progress, assessment, grading,
+notification, and analytics.
+
+Useful options:
+
+| Command | Purpose |
+| --- | --- |
+| `scripts/seed-sample-data.sh --dry-run --skip-migrations` | Print planned records without writing |
+| `scripts/seed-sample-data.sh --service auth --skip-migrations` | Reseed one service |
+| `scripts/seed-sample-data.sh --reset-sample-data` | Delete only deterministic demo records, then reseed |
+| `scripts/seed-sample-data.sh --manifest scripts/sample-data/learngrid-demo.json` | Use an explicit manifest |
+
+The manifest is [learngrid-demo.json](../scripts/sample-data/learngrid-demo.json), and every
+cross-service relationship uses fixed UUIDs from that file. Seeding uses Django ORM
+`update_or_create` calls, not cross-service database joins.
+
+The demo institution is `Bot Academy` (`BOT`). Local bot credentials are kept in
+[LOCAL_BOT_USERS.txt](../LOCAL_BOT_USERS.txt):
+
+| Role | Username | Password |
+| --- | --- | --- |
+| Super Admin | `bot.superadmin@learngrid.local` | `BotSuperAdmin123!` |
+| Institution Admin | `bot.admin@learngrid.local` | `BotAdmin123!` |
+| Instructor | `bot.instructor@learngrid.local` | `BotInstructor123!` |
+| Student | `bot.student@learngrid.local` | `BotStudent123!` |
+
+The seed creates sample accounts, profiles, a published course with structure and content metadata,
+an enrollment, progress, quiz and assignment data, grading records, a certificate, notifications,
+search records, dashboard aggregates, usage metrics, and report snapshots. It is for local
+development only and must not be used for production data.
+
 ## API Gateway
 `T-019` resolves [OD-001](KNOWN_ISSUES.md#od-001-api-gateway-selection) to Nginx.
 `pnpm dev` and `pnpm dev:fast` start the gateway after backend and frontend services are healthy.
