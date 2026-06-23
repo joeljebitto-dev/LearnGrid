@@ -5,6 +5,12 @@ export type Enrollment = Entity & {
   student_profile_id?: string;
   course_id?: string;
   institution_id?: string;
+  status?: string;
+  enrolled_at?: string;
+  completed_at?: string | null;
+  expires_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export async function listEnrollments(params?: QueryParams): Promise<ListResponse<Enrollment>> {

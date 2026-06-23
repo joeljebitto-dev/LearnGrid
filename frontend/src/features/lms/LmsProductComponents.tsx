@@ -197,7 +197,6 @@ export function CourseStructureTree({
                 <Badge tone="neutral">Module {moduleIndex + 1}</Badge>
                 <h4 className="font-semibold text-slate-950">{itemTitle(module)}</h4>
               </div>
-              {mode === 'author' ? <p className="mt-1 text-xs text-slate-500">Module ID: {module.id}</p> : null}
             </div>
             {mode === 'author' ? <Tag>Drag order planned</Tag> : null}
           </div>

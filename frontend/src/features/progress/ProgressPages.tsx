@@ -24,6 +24,10 @@ export function StudentProgressPage({ context }: { context: SessionContext }) {
       <PageHeader
         title="Learning Progress"
         description="Track lesson, video, assessment, and course completion across active learning."
+        breadcrumbs={[
+          { label: 'Student', href: '/dashboard/student' },
+          { label: 'Progress' }
+        ]}
       />
       {query.isLoading ? <LoadingState label="Loading progress" /> : null}
       {query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : null}

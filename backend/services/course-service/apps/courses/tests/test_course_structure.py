@@ -117,6 +117,18 @@ def allow_course_view(monkeypatch, institution_id):
     )
 
 
+def allow_assigned_course_manage(monkeypatch, course_id):
+    monkeypatch.setattr(
+        permissions,
+        "remote_authorization_check",
+        lambda **kwargs: (
+            kwargs["permission"] == "course.manage"
+            and kwargs["scope_type"] == "course"
+            and kwargs["scope_id"] == str(course_id)
+        ),
+    )
+
+
 def create_course(institution_id, **overrides) -> Course:
     defaults = {
         "institution_id": institution_id,
@@ -236,6 +248,59 @@ def test_manage_user_can_create_nested_structure_and_reorder(
     )
     assert response.status_code == 200
     assert [module["id"] for module in response.json()["modules"]] == [module_two_id, module_one_id]
+
+
+@pytest.mark.django_db
+def test_course_scoped_instructor_can_author_assigned_course_structure(
+    api_client,
+    access_token,
+    monkeypatch,
+):
+    institution_id = uuid4()
+    assigned_course = create_course(institution_id)
+    other_course = create_course(institution_id)
+    allow_assigned_course_manage(monkeypatch, assigned_course.id)
+
+    response = api_client.post(
+        f"/api/courses/{assigned_course.id}/modules/",
+        {"title": "Assigned Module"},
+        **auth_headers(access_token),
+        format="json",
+    )
+    assert response.status_code == 201
+    module_id = response.json()["id"]
+
+    response = api_client.post(
+        f"/api/courses/modules/{module_id}/lessons/",
+        {"title": "Assigned Lesson"},
+        **auth_headers(access_token),
+        format="json",
+    )
+    assert response.status_code == 201
+    lesson_id = response.json()["id"]
+
+    response = api_client.post(
+        f"/api/courses/lessons/{lesson_id}/topics/",
+        {"title": "Assigned Topic"},
+        **auth_headers(access_token),
+        format="json",
+    )
+    assert response.status_code == 201
+
+    response = api_client.get(
+        f"/api/courses/{assigned_course.id}/structure/",
+        **auth_headers(access_token),
+    )
+    assert response.status_code == 200
+    assert response.json()["modules"][0]["id"] == module_id
+
+    response = api_client.post(
+        f"/api/courses/{other_course.id}/modules/",
+        {"title": "Blocked Module"},
+        **auth_headers(access_token),
+        format="json",
+    )
+    assert response.status_code == 403
 
 
 @pytest.mark.django_db

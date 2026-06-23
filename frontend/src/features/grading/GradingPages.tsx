@@ -137,7 +137,14 @@ export function GradingPage({ context }: { context: SessionContext }) {
 
   return (
     <PortalLayout context={context} activeNav="grading">
-      <PageHeader title="Grading And Manual Reviews" description="Manage rules, records, reviews, overrides, publication, and certificate workflows." />
+      <PageHeader
+        title="Grading And Manual Reviews"
+        description="Manage rules, records, reviews, overrides, publication, and certificate workflows."
+        breadcrumbs={[
+          { label: 'Instructor', href: '/dashboard/instructor' },
+          { label: 'Grading' }
+        ]}
+      />
       <div className="mb-5 grid gap-5 xl:grid-cols-2">
         <GradingReviewPanel record={toList(recordsQuery.data)[0]}>
           <RubricCommentBox>

@@ -1,12 +1,16 @@
 import { apiClient } from './client';
 import { cleanParams, type Entity, type ListResponse, type QueryParams } from './types';
 
+export type CourseStatus = 'draft' | 'published' | 'archived' | 'deleted' | (string & {});
+export type CourseDifficulty = 'beginner' | 'intermediate' | 'advanced' | (string & {});
+
 export type Course = Entity & {
   institution_id?: string;
   owner_profile_id?: string;
   description?: string | null;
-  difficulty_level?: string | null;
+  difficulty_level?: CourseDifficulty | null;
   slug?: string;
+  status?: CourseStatus;
   categories?: Entity[];
   tags?: Entity[];
   prerequisite_course_ids?: string[];
@@ -33,7 +37,7 @@ export type CoursePayload = {
   title: string;
   slug?: string | null;
   description?: string | null;
-  difficulty_level?: string | null;
+  difficulty_level?: CourseDifficulty | null;
   thumbnail_asset_id?: string | null;
   category_ids?: string[];
   tag_ids?: string[];
@@ -41,7 +45,18 @@ export type CoursePayload = {
   learning_outcomes?: Array<{ description: string; position?: number }>;
 };
 
-export async function listCourses(params?: QueryParams): Promise<ListResponse<Course>> {
+export type CourseListParams = QueryParams & {
+  institution_id?: string;
+  owner_profile_id?: string;
+  status?: CourseStatus | '';
+  difficulty_level?: CourseDifficulty | '';
+  q?: string;
+  sort?: string;
+  page?: number;
+  page_size?: number;
+};
+
+export async function listCourses(params?: CourseListParams): Promise<ListResponse<Course>> {
   const response = await apiClient.get<ListResponse<Course>>('/courses/', {
     params: cleanParams(params)
   });

@@ -1,12 +1,23 @@
 import { apiClient, storeTokens, type TokenPair } from './client';
+import { cleanParams, type QueryParams } from './types';
 
 export type RoleAssignment = {
   id: string;
+  account_id?: string;
   role_code: string;
-  role_name: string;
+  role_name?: string;
   scope_type: 'platform' | 'institution' | 'course' | 'assessment';
   scope_id: string | null;
+  assigned_by_account_id?: string | null;
   assigned_at: string;
+  revoked_at?: string | null;
+};
+
+export type RoleAssignmentPayload = {
+  account_id: string;
+  role_code: string;
+  scope_type: RoleAssignment['scope_type'];
+  scope_id?: string | null;
 };
 
 export type Session = {
@@ -86,6 +97,29 @@ export async function completeOidcCallback(payload: OidcCallbackPayload): Promis
 
 export async function getSession(): Promise<Session> {
   const response = await apiClient.get<Session>('/auth/session/');
+  return response.data;
+}
+
+export async function createRoleAssignment(
+  payload: RoleAssignmentPayload
+): Promise<RoleAssignment> {
+  const response = await apiClient.post<RoleAssignment>('/auth/rbac/role-assignments/', payload);
+  return response.data;
+}
+
+export type RoleAssignmentListParams = QueryParams & {
+  scope_type?: RoleAssignment['scope_type'];
+  scope_id?: string | null;
+  role_code?: string;
+  include_revoked?: boolean;
+};
+
+export async function listRoleAssignments(
+  params: RoleAssignmentListParams = {}
+): Promise<RoleAssignment[]> {
+  const response = await apiClient.get<RoleAssignment[]>('/auth/rbac/role-assignments/', {
+    params: cleanParams(params)
+  });
   return response.data;
 }
 

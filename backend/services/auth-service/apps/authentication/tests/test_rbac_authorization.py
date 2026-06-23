@@ -322,3 +322,71 @@ def test_rbac_assignment_api_requires_management_and_records_audit(api_client):
         event_type=AuthorizationAuditEvent.ROLE_ASSIGNMENT_REVOKED,
         target_account=target,
     ).exists()
+
+
+@pytest.mark.django_db
+def test_course_scope_can_list_staff_role_assignments(api_client):
+    viewer = create_account("course-viewer@example.com")
+    instructor = create_account("course-instructor@example.com")
+    assistant = create_account("course-assistant@example.com")
+    student = create_account("course-student@example.com")
+    course_id = uuid4()
+    other_course_id = uuid4()
+    services.assign_role(
+        account=viewer,
+        role=Role.objects.get(code="instructor"),
+        scope_type=AssignmentScopeType.COURSE,
+        scope_id=course_id,
+    )
+    services.assign_role(
+        account=instructor,
+        role=Role.objects.get(code="instructor"),
+        scope_type=AssignmentScopeType.COURSE,
+        scope_id=course_id,
+    )
+    services.assign_role(
+        account=assistant,
+        role=Role.objects.get(code="teaching_assistant"),
+        scope_type=AssignmentScopeType.COURSE,
+        scope_id=course_id,
+    )
+    services.assign_role(
+        account=student,
+        role=Role.objects.get(code="student"),
+        scope_type=AssignmentScopeType.COURSE,
+        scope_id=course_id,
+    )
+    access = issue_access_token(viewer)
+
+    response = api_client.get(
+        "/api/auth/rbac/role-assignments/",
+        {
+            "scope_type": "course",
+            "scope_id": str(course_id),
+            "role_code": "instructor,teaching_assistant",
+        },
+        HTTP_AUTHORIZATION=f"Bearer {access}",
+    )
+
+    assert response.status_code == 200
+    assert {assignment["role_code"] for assignment in response.json()} == {
+        "instructor",
+        "teaching_assistant",
+    }
+    assert {assignment["account_id"] for assignment in response.json()} == {
+        str(viewer.id),
+        str(instructor.id),
+        str(assistant.id),
+    }
+    assert str(student.id) not in {assignment["account_id"] for assignment in response.json()}
+
+    response = api_client.get(
+        "/api/auth/rbac/role-assignments/",
+        {
+            "scope_type": "course",
+            "scope_id": str(other_course_id),
+            "role_code": "instructor,teaching_assistant",
+        },
+        HTTP_AUTHORIZATION=f"Bearer {access}",
+    )
+    assert response.status_code == 403

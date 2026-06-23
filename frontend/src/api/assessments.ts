@@ -5,8 +5,13 @@ export type Assessment = Entity & {
   course_id?: string;
   institution_id?: string;
   assessment_type?: string;
+  title?: string;
+  status?: string;
+  instructions?: string | null;
   available_from?: string | null;
   available_until?: string | null;
+  quiz?: Record<string, unknown>;
+  assignment?: Record<string, unknown>;
 };
 
 export type Question = Entity & {

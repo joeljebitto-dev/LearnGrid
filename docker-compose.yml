@@ -584,7 +584,6 @@ services:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "wget -q --no-check-certificate -O- https://127.0.0.1:8443/gateway/health >/dev/null"]
-      test: ["CMD-SHELL", "wget -q --no-check-certificate -O- https://127.0.0.1:8443/gateway/health >/dev/null"]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -19,6 +19,7 @@ from .serializers import (
     PasswordResetRequestSerializer,
     PermissionSerializer,
     RoleAssignmentCreateSerializer,
+    RoleAssignmentSearchSerializer,
     RoleAssignmentSerializer,
     RoleSerializer,
     TokenIssueSerializer,
@@ -212,9 +213,41 @@ class PermissionListView(APIView):
 
 
 class RoleAssignmentCreateView(APIView):
-    permission_classes = [CanManageRbac]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        serializer = RoleAssignmentSearchSerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        scope_type = serializer.validated_data.get("scope_type") or AssignmentScopeType.PLATFORM
+        scope_id = serializer.validated_data.get("scope_id")
+
+        can_manage_rbac = has_permission(request.user, "rbac.manage")
+        can_view_course_scope = (
+            scope_type == AssignmentScopeType.COURSE
+            and scope_id is not None
+            and has_permission(
+                request.user,
+                "course.view",
+                scope_type=AssignmentScopeType.COURSE,
+                scope_id=scope_id,
+            )
+        )
+        if not (can_manage_rbac or can_view_course_scope):
+            raise PermissionDenied("You do not have permission to view role assignments.")
+
+        assignments = RoleAssignment.objects.select_related("account", "role", "assigned_by_account")
+        if not serializer.validated_data.get("include_revoked"):
+            assignments = assignments.filter(revoked_at__isnull=True)
+        if serializer.validated_data.get("scope_type"):
+            assignments = assignments.filter(scope_type=scope_type, scope_id=scope_id)
+        role_codes = serializer.role_codes
+        if role_codes:
+            assignments = assignments.filter(role__code__in=role_codes)
+        assignments = assignments.order_by("role__code", "assigned_at", "id")
+        return Response(RoleAssignmentSerializer(assignments, many=True).data)
 
     def post(self, request):
+        require_permission(request.user, "rbac.manage")
         serializer = RoleAssignmentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 

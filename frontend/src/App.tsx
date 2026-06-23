@@ -3,7 +3,9 @@ import type { ReactElement } from 'react';
 
 import { clearStoredTokens } from './api/client';
 import { portalForRole, type SessionContext } from './api/auth';
-import { AdminCreateUserPage } from './features/admin/AdminCreateUserPage';
+import { AdminCoursesPage } from './features/admin/AdminCoursesPage';
+import { AdminInstitutionsPage } from './features/admin/AdminInstitutionsPage';
+import { AdminUsersPage } from './features/admin/AdminUsersPage';
 import { AnalyticsReportsPage } from './features/analytics/AnalyticsPages';
 import {
   AssignmentSubmissionPage,
@@ -24,7 +26,11 @@ import {
   CourseBuilderPage,
   CourseCatalogPage,
   CourseDetailPage,
+  InstructorCourseAssessmentsPage,
+  InstructorCourseWorkspacePage,
   InstructorCourseManagementPage,
+  InstructorCourseParticipantsPage,
+  InstructorCourseQuestionBanksPage,
   StudentLearningPlayerPage
 } from './features/courses/CoursePages';
 import {
@@ -130,8 +136,24 @@ export function App() {
         element={<ProtectedRoute><PortalRoute portal="instructor">{(context) => <InstructorCourseManagementPage context={context} />}</PortalRoute></ProtectedRoute>}
       />
       <Route
+        path="/dashboard/instructor/courses/:courseId"
+        element={<ProtectedRoute><PortalRoute portal="instructor">{(context) => <InstructorCourseWorkspacePage context={context} />}</PortalRoute></ProtectedRoute>}
+      />
+      <Route
         path="/dashboard/instructor/courses/:courseId/builder"
         element={<ProtectedRoute><PortalRoute portal="instructor">{(context) => <CourseBuilderPage context={context} />}</PortalRoute></ProtectedRoute>}
+      />
+      <Route
+        path="/dashboard/instructor/courses/:courseId/question-banks"
+        element={<ProtectedRoute><PortalRoute portal="instructor">{(context) => <InstructorCourseQuestionBanksPage context={context} />}</PortalRoute></ProtectedRoute>}
+      />
+      <Route
+        path="/dashboard/instructor/courses/:courseId/participants"
+        element={<ProtectedRoute><PortalRoute portal="instructor">{(context) => <InstructorCourseParticipantsPage context={context} />}</PortalRoute></ProtectedRoute>}
+      />
+      <Route
+        path="/dashboard/instructor/courses/:courseId/assessments"
+        element={<ProtectedRoute><PortalRoute portal="instructor">{(context) => <InstructorCourseAssessmentsPage context={context} />}</PortalRoute></ProtectedRoute>}
       />
       <Route
         path="/dashboard/instructor/content"
@@ -159,8 +181,20 @@ export function App() {
         element={<ProtectedRoute><PortalRoute portal="admin">{(context) => <AdminDashboardPage context={context} />}</PortalRoute></ProtectedRoute>}
       />
       <Route
+        path="/dashboard/admin/institutions"
+        element={<ProtectedRoute><PortalRoute portal="admin">{(context) => <AdminInstitutionsPage context={context} />}</PortalRoute></ProtectedRoute>}
+      />
+      <Route
+        path="/dashboard/admin/users"
+        element={<ProtectedRoute><PortalRoute portal="admin">{(context) => <AdminUsersPage context={context} />}</PortalRoute></ProtectedRoute>}
+      />
+      <Route
         path="/dashboard/admin/users/new"
-        element={<ProtectedRoute><PortalRoute portal="admin">{(context) => <AdminCreateUserPage context={context} />}</PortalRoute></ProtectedRoute>}
+        element={<Navigate to="/dashboard/admin/users" replace />}
+      />
+      <Route
+        path="/dashboard/admin/courses"
+        element={<ProtectedRoute><PortalRoute portal="admin">{(context) => <AdminCoursesPage context={context} />}</PortalRoute></ProtectedRoute>}
       />
       <Route
         path="/dashboard/admin/enrollments"

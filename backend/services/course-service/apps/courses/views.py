@@ -8,7 +8,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import CourseStatus
-from .permissions import has_course_permission, require_course_permission
+from .permissions import (
+    has_assigned_course_permission,
+    has_course_permission,
+    require_course_permission,
+)
 from .selectors import (
     category_queryset,
     course_queryset,
@@ -107,13 +111,39 @@ def _correlation_id(request) -> str | None:
 
 
 def _require_structure_read(request, course) -> bool:
-    management = has_course_permission(request, "course.manage", course.institution_id)
+    management = _has_course_manage(request, course)
     if management:
         return True
     if course.status != CourseStatus.PUBLISHED or course.deleted_at is not None:
-        require_course_permission(request, "course.manage", course.institution_id)
-    require_course_permission(request, "course.view", course.institution_id)
+        _require_course_manage(request, course)
+    _require_course_view(request, course)
     return False
+
+
+def _has_course_view(request, course) -> bool:
+    return has_course_permission(
+        request,
+        "course.view",
+        course.institution_id,
+    ) or has_assigned_course_permission(request, "course.view", course.id)
+
+
+def _has_course_manage(request, course) -> bool:
+    return has_course_permission(
+        request,
+        "course.manage",
+        course.institution_id,
+    ) or has_assigned_course_permission(request, "course.manage", course.id)
+
+
+def _require_course_view(request, course) -> None:
+    if not _has_course_view(request, course):
+        require_course_permission(request, "course.view", course.institution_id)
+
+
+def _require_course_manage(request, course) -> None:
+    if not _has_course_manage(request, course):
+        require_course_permission(request, "course.manage", course.institution_id)
 
 
 class CourseListCreateView(APIView):
@@ -160,10 +190,10 @@ class CourseDetailView(APIView):
 
     def get(self, request, course_id):
         course = get_object_or_404(course_queryset(include_deleted=True), id=course_id)
-        management = has_course_permission(request, "course.manage", course.institution_id)
+        management = _has_course_manage(request, course)
         if course.status == CourseStatus.PUBLISHED and course.deleted_at is None:
             if not management:
-                require_course_permission(request, "course.view", course.institution_id)
+                _require_course_view(request, course)
                 cache_key = catalog_cache_key("course-detail", {"course_id": str(course.id)})
                 cached = get_catalog_cache(cache_key)
                 if cached is not None:
@@ -172,7 +202,7 @@ class CourseDetailView(APIView):
                 set_catalog_cache(cache_key, data)
                 return Response(data)
         elif not management:
-            require_course_permission(request, "course.manage", course.institution_id)
+            _require_course_manage(request, course)
         return Response(CourseSerializer(course).data)
 
     def patch(self, request, course_id):
@@ -253,7 +283,7 @@ class ModuleListCreateView(APIView):
 
     def post(self, request, course_id):
         course = get_object_or_404(course_queryset(), id=course_id)
-        require_course_permission(request, "course.manage", course.institution_id)
+        _require_course_manage(request, course)
         serializer = ModuleCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         module = create_module(course=course, validated_data=serializer.validated_data)
@@ -272,7 +302,7 @@ class ModuleDetailView(APIView):
 
     def patch(self, request, module_id):
         module = get_object_or_404(module_queryset(), id=module_id)
-        require_course_permission(request, "course.manage", module.course.institution_id)
+        _require_course_manage(request, module.course)
         serializer = ModuleUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         module = update_module(module=module, validated_data=serializer.validated_data)
@@ -280,7 +310,7 @@ class ModuleDetailView(APIView):
 
     def delete(self, request, module_id):
         module = get_object_or_404(module_queryset(), id=module_id)
-        require_course_permission(request, "course.manage", module.course.institution_id)
+        _require_course_manage(request, module.course)
         module = archive_module(module=module)
         return Response(CourseModuleSerializer(module).data)
 
@@ -290,7 +320,7 @@ class ModuleReorderView(APIView):
 
     def post(self, request, course_id):
         course = get_object_or_404(course_queryset(), id=course_id)
-        require_course_permission(request, "course.manage", course.institution_id)
+        _require_course_manage(request, course)
         serializer = ModuleReorderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         modules = reorder_modules(course=course, module_ids=serializer.validated_data["module_ids"])
@@ -312,7 +342,7 @@ class LessonListCreateView(APIView):
 
     def post(self, request, module_id):
         module = get_object_or_404(module_queryset(), id=module_id)
-        require_course_permission(request, "course.manage", module.course.institution_id)
+        _require_course_manage(request, module.course)
         serializer = LessonCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         lesson = create_lesson(module=module, validated_data=serializer.validated_data)
@@ -331,7 +361,7 @@ class LessonDetailView(APIView):
 
     def patch(self, request, lesson_id):
         lesson = get_object_or_404(lesson_queryset(), id=lesson_id)
-        require_course_permission(request, "course.manage", lesson.course.institution_id)
+        _require_course_manage(request, lesson.course)
         serializer = LessonUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         lesson = update_lesson(lesson=lesson, validated_data=serializer.validated_data)
@@ -339,7 +369,7 @@ class LessonDetailView(APIView):
 
     def delete(self, request, lesson_id):
         lesson = get_object_or_404(lesson_queryset(), id=lesson_id)
-        require_course_permission(request, "course.manage", lesson.course.institution_id)
+        _require_course_manage(request, lesson.course)
         lesson = archive_lesson(lesson=lesson)
         return Response(LessonSerializer(lesson).data)
 
@@ -349,7 +379,7 @@ class LessonPublishView(APIView):
 
     def post(self, request, lesson_id):
         lesson = get_object_or_404(lesson_queryset(), id=lesson_id)
-        require_course_permission(request, "course.manage", lesson.course.institution_id)
+        _require_course_manage(request, lesson.course)
         lesson = publish_lesson(lesson=lesson, correlation_id=_correlation_id(request))
         return Response(LessonSerializer(lesson).data)
 
@@ -359,7 +389,7 @@ class LessonReorderView(APIView):
 
     def post(self, request, module_id):
         module = get_object_or_404(module_queryset(), id=module_id)
-        require_course_permission(request, "course.manage", module.course.institution_id)
+        _require_course_manage(request, module.course)
         serializer = LessonReorderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         lessons = reorder_lessons(module=module, lesson_ids=serializer.validated_data["lesson_ids"])
@@ -379,7 +409,7 @@ class TopicListCreateView(APIView):
 
     def post(self, request, lesson_id):
         lesson = get_object_or_404(lesson_queryset(), id=lesson_id)
-        require_course_permission(request, "course.manage", lesson.course.institution_id)
+        _require_course_manage(request, lesson.course)
         serializer = TopicCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         topic = create_topic(lesson=lesson, validated_data=serializer.validated_data)
@@ -400,7 +430,7 @@ class TopicDetailView(APIView):
 
     def patch(self, request, topic_id):
         topic = get_object_or_404(topic_queryset(), id=topic_id)
-        require_course_permission(request, "course.manage", topic.lesson.course.institution_id)
+        _require_course_manage(request, topic.lesson.course)
         serializer = TopicUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         topic = update_topic(topic=topic, validated_data=serializer.validated_data)
@@ -408,7 +438,7 @@ class TopicDetailView(APIView):
 
     def delete(self, request, topic_id):
         topic = get_object_or_404(topic_queryset(), id=topic_id)
-        require_course_permission(request, "course.manage", topic.lesson.course.institution_id)
+        _require_course_manage(request, topic.lesson.course)
         delete_topic(topic=topic)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -418,7 +448,7 @@ class TopicReorderView(APIView):
 
     def post(self, request, lesson_id):
         lesson = get_object_or_404(lesson_queryset(), id=lesson_id)
-        require_course_permission(request, "course.manage", lesson.course.institution_id)
+        _require_course_manage(request, lesson.course)
         serializer = TopicReorderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         topics = reorder_topics(lesson=lesson, topic_ids=serializer.validated_data["topic_ids"])

@@ -13,15 +13,18 @@ import { ErrorState, ListBand, LoadingState, PageHeader, SummaryGrid } from '../
 
 function DashboardHeader({
   title,
-  aggregate
+  aggregate,
+  breadcrumbs
 }: {
   title: string;
   aggregate: StudentDashboard['aggregate'];
+  breadcrumbs?: Array<{ label: string; href?: string }>;
 }) {
   return (
     <PageHeader
       title={title}
       description={aggregate ? `Updated ${aggregate.computed_at}` : 'No aggregate computed yet'}
+      breadcrumbs={breadcrumbs}
     />
   );
 }
@@ -35,7 +38,11 @@ export function StudentDashboardPage({ context }: { context: SessionContext }) {
       {query.isError ? <ErrorState title="Unable to load dashboard" error={query.error} onRetry={() => void query.refetch()} /> : null}
       {query.data ? (
         <>
-          <DashboardHeader title="Student Dashboard" aggregate={query.data.aggregate} />
+          <DashboardHeader
+            title="Student Dashboard"
+            aggregate={query.data.aggregate}
+            breadcrumbs={[{ label: 'Student' }]}
+          />
           <SummaryGrid summary={query.data.summary} />
           <div className="mt-5 grid gap-4 xl:grid-cols-2">
             <ListBand title="Active courses" items={query.data.active_courses} />
@@ -62,7 +69,11 @@ export function InstructorDashboardPage({ context }: { context: SessionContext }
       {query.isError ? <ErrorState title="Unable to load dashboard" error={query.error} onRetry={() => void query.refetch()} /> : null}
       {query.data ? (
         <>
-          <DashboardHeader title="Instructor Dashboard" aggregate={query.data.aggregate} />
+          <DashboardHeader
+            title="Instructor Dashboard"
+            aggregate={query.data.aggregate}
+            breadcrumbs={[{ label: 'Instructor' }]}
+          />
           <SummaryGrid summary={query.data.summary} />
           <div className="mt-5 grid gap-4 xl:grid-cols-2">
             <ListBand title="Learner engagement" items={query.data.learner_engagement} />

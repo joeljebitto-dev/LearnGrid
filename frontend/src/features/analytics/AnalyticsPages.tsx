@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
-import type { SessionContext } from '../../api/auth';
+import { portalForRole, type SessionContext } from '../../api/auth';
 import {
   generateReport,
   listDashboardAggregates,
@@ -80,10 +80,21 @@ export function AnalyticsReportsPage({
       await queryClient.invalidateQueries({ queryKey: ['analytics-snapshots'] });
     }
   });
+  const breadcrumbs =
+    portalForRole(context.session.primary_role) === 'instructor'
+      ? [
+          { label: 'Instructor', href: '/dashboard/instructor' },
+          { label: 'Reports' }
+        ]
+      : undefined;
 
   return (
     <PortalLayout context={context} activeNav={activeNav}>
-      <PageHeader title="Analytics And Reporting" description="Search indexed resources, generate reports, and inspect dashboard aggregates and usage metrics." />
+      <PageHeader
+        title="Analytics And Reporting"
+        description="Search indexed resources, generate reports, and inspect dashboard aggregates and usage metrics."
+        breadcrumbs={breadcrumbs}
+      />
       <div className="grid gap-5 xl:grid-cols-[1fr_360px]">
         <div className="space-y-5">
           <ReportingFilters

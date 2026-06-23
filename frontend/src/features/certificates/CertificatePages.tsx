@@ -18,6 +18,10 @@ export function StudentCertificatesPage({ context }: { context: SessionContext }
       <PageHeader
         title="Certificates"
         description="View valid certificates and certificate asset references issued for completed courses."
+        breadcrumbs={[
+          { label: 'Student', href: '/dashboard/student' },
+          { label: 'Certificates' }
+        ]}
       />
       {query.isLoading ? <LoadingState label="Loading certificates" /> : null}
       {query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : null}

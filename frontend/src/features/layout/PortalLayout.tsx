@@ -2,12 +2,12 @@ import {
   BarChart3,
   Bell,
   BookOpen,
+  Building2,
   ClipboardList,
   FileUp,
   GraduationCap,
   LayoutDashboard,
   Medal,
-  UserPlus,
   Users
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -58,7 +58,9 @@ function navItemsFor(portal: Portal): NavItem[] {
   }
   return [
     { key: 'admin-dashboard', label: 'Admin', to: '/dashboard/admin', icon: LayoutDashboard },
-    { key: 'admin-create-user', label: 'Create User', to: '/dashboard/admin/users/new', icon: UserPlus },
+    { key: 'admin-institutions', label: 'Institutions', to: '/dashboard/admin/institutions', icon: Building2 },
+    { key: 'admin-users', label: 'Users', to: '/dashboard/admin/users', icon: Users },
+    { key: 'admin-courses', label: 'Courses', to: '/dashboard/admin/courses', icon: BookOpen },
     { key: 'admin-enrollments', label: 'Enrollments', to: '/dashboard/admin/enrollments', icon: Users },
     { key: 'reports', label: 'Reports', to: '/dashboard/admin/reports', icon: BarChart3 },
     { key: 'notifications', label: 'Notifications', to: '/dashboard/admin/notifications', icon: Bell }
@@ -68,10 +70,12 @@ function navItemsFor(portal: Portal): NavItem[] {
 export function PortalLayout({
   context,
   activeNav,
+  hidePortalNav = false,
   children
 }: {
   context: SessionContext;
   activeNav: string;
+  hidePortalNav?: boolean;
   children: ReactNode;
 }) {
   const navigate = useNavigate();
@@ -114,30 +118,36 @@ export function PortalLayout({
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[220px_1fr]">
-        <nav className="h-fit rounded-panel border border-slate-200 bg-white p-3 shadow-panel" aria-label="Portal">
-          <div className="mb-3 flex items-center justify-between px-2">
-            <span className="text-xs font-semibold uppercase text-slate-500">Portal</span>
-            <Badge tone="info">{portal === 'none' ? 'No access' : portal}</Badge>
-          </div>
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-            <Link
-              key={item.key}
-              className={`flex items-center gap-2 rounded-control px-3 py-2 text-sm font-medium ${
-                activeNav === item.key
-                  ? 'bg-emerald-50 text-emerald-800'
-                  : 'text-slate-700 hover:bg-slate-100'
-              }`}
-              to={item.to}
-            >
-              <Icon className="h-4 w-4" aria-hidden />
-              {item.label}
-            </Link>
-          );
-          })}
-        </nav>
+      <div
+        className={`mx-auto grid max-w-7xl gap-6 px-6 py-6 ${
+          hidePortalNav ? '' : 'lg:grid-cols-[220px_1fr]'
+        }`}
+      >
+        {hidePortalNav ? null : (
+          <nav className="h-fit rounded-panel border border-slate-200 bg-white p-3 shadow-panel" aria-label="Portal">
+            <div className="mb-3 flex items-center justify-between px-2">
+              <span className="text-xs font-semibold uppercase text-slate-500">Portal</span>
+              <Badge tone="info">{portal === 'none' ? 'No access' : portal}</Badge>
+            </div>
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.key}
+                  className={`flex items-center gap-2 rounded-control px-3 py-2 text-sm font-medium ${
+                    activeNav === item.key
+                      ? 'bg-emerald-50 text-emerald-800'
+                      : 'text-slate-700 hover:bg-slate-100'
+                  }`}
+                  to={item.to}
+                >
+                  <Icon className="h-4 w-4" aria-hidden />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
         <section id="main-content" tabIndex={-1}>{children}</section>
       </div>
     </main>

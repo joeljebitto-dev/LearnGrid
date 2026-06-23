@@ -92,6 +92,29 @@ class RoleAssignmentCreateSerializer(serializers.Serializer):
         return attrs
 
 
+class RoleAssignmentSearchSerializer(serializers.Serializer):
+    scope_type = serializers.ChoiceField(choices=AssignmentScopeType.choices, required=False)
+    scope_id = serializers.UUIDField(required=False, allow_null=True)
+    role_code = serializers.CharField(required=False, allow_blank=True, max_length=256)
+    include_revoked = serializers.BooleanField(default=False, required=False)
+
+    def validate(self, attrs):
+        scope_type = attrs.get("scope_type")
+        scope_id = attrs.get("scope_id")
+        if scope_type and scope_type != AssignmentScopeType.PLATFORM and scope_id is None:
+            raise serializers.ValidationError(
+                {"scope_id": "scope_id is required for scoped role assignment searches."}
+            )
+        if scope_type == AssignmentScopeType.PLATFORM:
+            attrs["scope_id"] = None
+        return attrs
+
+    @property
+    def role_codes(self) -> list[str]:
+        value = self.validated_data.get("role_code") or ""
+        return [item.strip() for item in value.split(",") if item.strip()]
+
+
 class AuthorizationCheckSerializer(serializers.Serializer):
     permission = serializers.CharField(max_length=128)
     scope_type = serializers.ChoiceField(

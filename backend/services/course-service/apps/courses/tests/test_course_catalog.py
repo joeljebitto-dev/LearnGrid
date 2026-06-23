@@ -105,6 +105,18 @@ def allow_platform_course_manage_and_view(monkeypatch):
     )
 
 
+def allow_assigned_course_manage_and_view(monkeypatch, course_id):
+    monkeypatch.setattr(
+        permissions,
+        "remote_authorization_check",
+        lambda **kwargs: (
+            kwargs["permission"] in {"course.manage", "course.view"}
+            and kwargs["scope_type"] == "course"
+            and kwargs["scope_id"] == str(course_id)
+        ),
+    )
+
+
 def create_course(institution_id, **overrides) -> Course:
     defaults = {
         "institution_id": institution_id,
@@ -243,6 +255,68 @@ def test_unauthorized_user_cannot_manage_courses(api_client, access_token, monke
     institution_id = uuid4()
     course = create_course(institution_id)
     monkeypatch.setattr(permissions, "remote_authorization_check", lambda **_kwargs: False)
+
+    response = api_client.post(
+        "/api/courses/",
+        {
+            "institution_id": str(institution_id),
+            "owner_profile_id": str(uuid4()),
+            "title": "Blocked Course",
+        },
+        **auth_headers(access_token),
+        format="json",
+    )
+    assert response.status_code == 403
+
+    for method, path in [
+        ("patch", f"/api/courses/{course.id}/"),
+        ("post", f"/api/courses/{course.id}/publish/"),
+        ("post", f"/api/courses/{course.id}/archive/"),
+        ("delete", f"/api/courses/{course.id}/"),
+    ]:
+        response = getattr(api_client, method)(
+            path,
+            {"title": "Blocked Update"} if method == "patch" else {},
+            **auth_headers(access_token),
+            format="json",
+        )
+        assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_course_scoped_instructor_can_read_assigned_draft_course_only(
+    api_client,
+    access_token,
+    monkeypatch,
+):
+    institution_id = uuid4()
+    assigned_course = create_course(institution_id, title="Assigned", slug="assigned")
+    other_course = create_course(institution_id, title="Other", slug="other")
+    allow_assigned_course_manage_and_view(monkeypatch, assigned_course.id)
+
+    response = api_client.get(
+        f"/api/courses/{assigned_course.id}/",
+        **auth_headers(access_token),
+    )
+    assert response.status_code == 200
+    assert response.json()["id"] == str(assigned_course.id)
+
+    response = api_client.get(
+        f"/api/courses/{other_course.id}/",
+        **auth_headers(access_token),
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_course_scoped_instructor_cannot_create_or_lifecycle_courses(
+    api_client,
+    access_token,
+    monkeypatch,
+):
+    institution_id = uuid4()
+    course = create_course(institution_id)
+    allow_assigned_course_manage_and_view(monkeypatch, course.id)
 
     response = api_client.post(
         "/api/courses/",

@@ -55,6 +55,7 @@ class EnrollmentListCreateView(APIView):
             request,
             "enrollment.view",
             serializer.validated_data.get("institution_id"),
+            course_id=serializer.validated_data.get("course_id"),
         )
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(

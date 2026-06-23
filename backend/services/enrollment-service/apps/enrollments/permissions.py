@@ -18,9 +18,16 @@ def enrollment_scope_from_institution(institution_id) -> tuple[str, str | None]:
     return "platform", None
 
 
-def has_enrollment_permission(request, permission: str, institution_id=None) -> bool:
+def has_enrollment_permission(request, permission: str, institution_id=None, course_id=None) -> bool:
     if not request.user or not request.user.is_authenticated or not isinstance(request.auth, str):
         return False
+    if course_id and remote_authorization_check(
+        token=request.auth,
+        permission=permission,
+        scope_type="course",
+        scope_id=str(course_id),
+    ):
+        return True
     scope_type, scope_id = enrollment_scope_from_institution(institution_id)
     return remote_authorization_check(
         token=request.auth,
@@ -30,6 +37,6 @@ def has_enrollment_permission(request, permission: str, institution_id=None) -> 
     )
 
 
-def require_enrollment_permission(request, permission: str, institution_id=None) -> None:
-    if not has_enrollment_permission(request, permission, institution_id):
+def require_enrollment_permission(request, permission: str, institution_id=None, course_id=None) -> None:
+    if not has_enrollment_permission(request, permission, institution_id, course_id):
         raise PermissionDenied("You do not have permission to access this enrollment scope.")

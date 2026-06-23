@@ -56,6 +56,18 @@ def allow_enrollment(monkeypatch, institution_id):
     )
 
 
+def allow_course_enrollment_view(monkeypatch, course_id):
+    monkeypatch.setattr(
+        permissions,
+        "remote_authorization_check",
+        lambda **kwargs: (
+            kwargs["permission"] == "enrollment.view"
+            and kwargs["scope_type"] == "course"
+            and kwargs["scope_id"] == str(course_id)
+        ),
+    )
+
+
 @pytest.mark.django_db
 def test_individual_enrollment_access_history_and_events(api_client, access_token, monkeypatch):
     institution_id = uuid4()
@@ -123,6 +135,36 @@ def test_individual_enrollment_access_history_and_events(api_client, access_toke
     )
     assert response.status_code == 200
     assert response.json()["allowed"] is False
+
+
+@pytest.mark.django_db
+def test_course_scoped_viewer_can_list_course_enrollments(api_client, access_token, monkeypatch):
+    institution_id = uuid4()
+    course_id = uuid4()
+    other_course_id = uuid4()
+    Enrollment.objects.create(
+        student_profile_id=uuid4(),
+        course_id=course_id,
+        institution_id=institution_id,
+    )
+    allow_course_enrollment_view(monkeypatch, course_id)
+
+    response = api_client.get(
+        "/api/enrollments/",
+        {"course_id": str(course_id)},
+        **auth_headers(access_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["count"] == 1
+    assert response.json()["results"][0]["course_id"] == str(course_id)
+
+    response = api_client.get(
+        "/api/enrollments/",
+        {"course_id": str(other_course_id)},
+        **auth_headers(access_token),
+    )
+    assert response.status_code == 403
 
 
 @pytest.mark.django_db

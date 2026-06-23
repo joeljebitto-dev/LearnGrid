@@ -90,6 +90,10 @@ export function ContentUploadPage({ context }: { context: SessionContext }) {
       <PageHeader
         title="Content Upload"
         description="Create presigned uploads, complete MinIO uploads, and upload proxy files through content-service."
+        breadcrumbs={[
+          { label: 'Instructor', href: '/dashboard/instructor' },
+          { label: 'Content' }
+        ]}
       />
       <div className="grid gap-5 xl:grid-cols-3">
         <Panel title="Presigned upload">

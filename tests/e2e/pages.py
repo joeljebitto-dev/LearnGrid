@@ -61,14 +61,14 @@ class DashboardPage(BasePage):
 
 class AdminCreateUserPage(BasePage):
     def open(self):
-        return self.visit("/dashboard/admin/users/new")
+        return self.visit("/dashboard/admin/users")
 
     def fill_required_student_fields(self, *, email: str, password: str, student_number: str):
-        self.driver.find_element("id", "new-email").send_keys(email)
-        self.driver.find_element("id", "new-password").send_keys(password)
-        self.driver.find_element("id", "first-name").send_keys("Quality")
-        self.driver.find_element("id", "last-name").send_keys("Student")
-        self.driver.find_element("id", "student-number").send_keys(student_number)
+        self.driver.find_element("id", "user-email").send_keys(email)
+        self.driver.find_element("id", "user-password").send_keys(password)
+        self.driver.find_element("id", "user-first-name").send_keys("Quality")
+        self.driver.find_element("id", "user-last-name").send_keys("Student")
+        self.driver.find_element("id", "user-student-number").send_keys(student_number)
         return self
 
     def submit(self):

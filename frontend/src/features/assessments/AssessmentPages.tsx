@@ -138,7 +138,14 @@ export function AssessmentAuthoringPage({ context }: { context: SessionContext }
 
   return (
     <PortalLayout context={context} activeNav="assessment-authoring">
-      <PageHeader title="Assessment Authoring" description="Build question banks, questions, quizzes, exams, and assignments." />
+      <PageHeader
+        title="Assessment Authoring"
+        description="Build question banks, questions, quizzes, exams, and assignments."
+        breadcrumbs={[
+          { label: 'Instructor', href: '/dashboard/instructor' },
+          { label: 'Assessments' }
+        ]}
+      />
       <div className="mb-5">
         <AssessmentAuthoringSummary
           banks={toList(banksQuery.data)}
@@ -263,7 +270,15 @@ export function StudentAssessmentAttemptPage({ context }: { context: SessionCont
 
   return (
     <PortalLayout context={context} activeNav="student-courses">
-      <PageHeader title="Assessment Attempt" description="Start, save draft answers, submit, or auto-submit a quiz/exam attempt." />
+      <PageHeader
+        title="Assessment Attempt"
+        description="Start, save draft answers, submit, or auto-submit a quiz/exam attempt."
+        breadcrumbs={[
+          { label: 'Student', href: '/dashboard/student' },
+          { label: 'Assessments' },
+          { label: 'Attempt' }
+        ]}
+      />
       <AttemptStatusPanel
         status={attempt?.status}
         timeRemaining={attempt ? 'Timer is enforced by the assessment service.' : 'Start an attempt to begin timing.'}
@@ -316,7 +331,15 @@ export function AssignmentSubmissionPage({ context }: { context: SessionContext 
 
   return (
     <PortalLayout context={context} activeNav="student-courses">
-      <PageHeader title="Assignment Submission" description="Save draft work, attach content assets, and submit final assignment responses." />
+      <PageHeader
+        title="Assignment Submission"
+        description="Save draft work, attach content assets, and submit final assignment responses."
+        breadcrumbs={[
+          { label: 'Student', href: '/dashboard/student' },
+          { label: 'Assignments' },
+          { label: 'Submit' }
+        ]}
+      />
       <Panel title="Submission editor">
         <form className="space-y-4" onChange={() => setHasUnsavedChanges(true)} onSubmit={(event) => { event.preventDefault(); draftMutation.mutate(event.currentTarget); }}>
           <Field htmlFor="assignment-text" label="Text response">

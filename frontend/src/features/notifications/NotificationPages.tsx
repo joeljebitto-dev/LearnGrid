@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { SessionContext } from '../../api/auth';
+import { portalForRole, type SessionContext } from '../../api/auth';
 import {
   listNotificationPreferences,
   listNotifications,
@@ -60,10 +60,27 @@ export function NotificationCenterPage({
     },
     onSuccess: invalidate
   });
+  const portal = portalForRole(context.session.primary_role);
+  const breadcrumbs =
+    portal === 'instructor'
+      ? [
+          { label: 'Instructor', href: '/dashboard/instructor' },
+          { label: 'Notifications' }
+        ]
+      : portal === 'student'
+        ? [
+            { label: 'Student', href: '/dashboard/student' },
+            { label: 'Notifications' }
+          ]
+        : undefined;
 
   return (
     <PortalLayout context={context} activeNav={activeNav}>
-      <PageHeader title="Notification Center" description="Review in-app notifications and manage notification preferences.">
+      <PageHeader
+        title="Notification Center"
+        description="Review in-app notifications and manage notification preferences."
+        breadcrumbs={breadcrumbs}
+      >
         <button className={secondaryButtonClass} type="button" onClick={() => readAllMutation.mutate()}>
           Mark all read
         </button>
