@@ -41,6 +41,55 @@ If Poetry is not installed as `poetry`, pass its path explicitly:
 POETRY_BIN=/path/to/poetry pnpm dev
 ```
 
+## Run The Full Stack With Docker Compose
+Start the complete hot-reload development stack in containers:
+
+```bash
+docker compose up --build
+```
+
+This starts PostgreSQL, Redis, MinIO, Kafka, all ten Django backend services, the Vite frontend,
+and the local Nginx API Gateway. Backend services run migrations before starting `runserver`.
+
+Main URLs:
+
+| Item | URL |
+| --- | --- |
+| Frontend direct | `http://127.0.0.1:5173` |
+| API Gateway HTTP | `http://127.0.0.1:8080` |
+| API Gateway HTTPS | `https://127.0.0.1:8443` |
+
+Stop the stack:
+
+```bash
+docker compose down
+```
+
+If a host port is already in use, override only the conflicting binding:
+
+```bash
+FRONTEND_HOST_PORT=15173 KAFKA_HOST_PORT=19092 REDIS_HOST_PORT=16379 docker compose up --build
+```
+
+Seed demo data through the running Compose containers:
+
+```bash
+scripts/seed-sample-data-compose.sh
+```
+
+Run the Selenium GUI seeded-credential smoke in visible Chromium mode:
+
+```bash
+scripts/seed-sample-data-compose.sh --reset-sample-data
+docker compose --profile e2e up --abort-on-container-exit --exit-code-from selenium-e2e selenium-e2e
+```
+
+Open `http://127.0.0.1:7900` while the tests run to view the browser through noVNC. The default
+viewer password is `secret`, and WebDriver is also exposed at `http://127.0.0.1:4444`.
+
+To use the same visible browser for the full e2e directory, set
+`SELENIUM_PYTEST_ARGS=tests/e2e`.
+
 ## Local Infrastructure
 Start PostgreSQL, Redis, and MinIO:
 
@@ -266,7 +315,9 @@ Optional test environment variables:
 | `INTEGRATION_KAFKA_BOOTSTRAP_SERVERS` | Kafka bootstrap servers for produce/consume checks |
 | `INTEGRATION_MINIO_ENDPOINT` | MinIO endpoint for object storage checks |
 | `E2E_BASE_URL` | Browser E2E target URL; tests skip when unset |
-| `E2E_*_EMAIL` / `E2E_*_PASSWORD` | Optional student, instructor, and admin credentials |
+| `E2E_*_EMAIL` / `E2E_*_PASSWORD` | Optional student, instructor, admin, and super-admin credentials |
+| `SELENIUM_REMOTE_URL` | Optional remote WebDriver URL, such as `http://127.0.0.1:4444/wd/hub` |
+| `SELENIUM_HEADLESS` | Set to `false` for visible Selenium sessions |
 | `LOAD_BASE_URL` | k6 target URL; smoke script runs offline when unset |
 | `LOAD_*_EMAIL` / `LOAD_*_PASSWORD` | Optional k6 role credentials |
 | `LOAD_VUS` / `LOAD_DURATION` | k6 virtual users and duration |

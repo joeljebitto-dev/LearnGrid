@@ -247,6 +247,53 @@ def test_instructor_dashboard_requires_instructor_profile(api_client, access_tok
 
 
 @pytest.mark.django_db
+def test_instructor_dashboard_allows_course_scoped_analytics(
+    api_client,
+    access_token,
+    monkeypatch,
+):
+    course_id = uuid4()
+    profile = profile_payload(profile_type="instructor")
+    checks = []
+
+    monkeypatch.setattr(views, "current_profile", lambda **_kwargs: profile)
+    monkeypatch.setattr(
+        services,
+        "current_session",
+        lambda **_kwargs: {
+            "role_assignments": [
+                {
+                    "role_code": "instructor",
+                    "scope_type": "course",
+                    "scope_id": str(course_id),
+                }
+            ]
+        },
+    )
+
+    def remote_authorization_check(**kwargs):
+        checks.append(kwargs)
+        return kwargs["scope_type"] == "course" and kwargs["scope_id"] == str(course_id)
+
+    monkeypatch.setattr(services, "remote_authorization_check", remote_authorization_check)
+
+    response = api_client.get(
+        "/api/analytics/dashboards/instructor/",
+        **auth_headers(access_token),
+    )
+
+    assert response.status_code == 200
+    assert checks == [
+        {
+            "token": access_token,
+            "permission": "analytics.view",
+            "scope_type": "course",
+            "scope_id": str(course_id),
+        }
+    ]
+
+
+@pytest.mark.django_db
 def test_admin_dashboard_enforces_institution_scope(api_client, access_token, monkeypatch):
     institution_id = uuid4()
     checks = []

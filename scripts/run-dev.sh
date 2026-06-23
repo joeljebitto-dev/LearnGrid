@@ -132,7 +132,7 @@ cleanup() {
 
   if [[ "$GATEWAY_STARTED" == true ]]; then
     log "Stopping API gateway..."
-    compose stop api-gateway >/dev/null 2>&1 || true
+    compose stop api-gateway-host >/dev/null 2>&1 || true
   fi
 }
 
@@ -415,8 +415,8 @@ start_gateway() {
   log "Preparing local API gateway TLS certificate..."
   "$ROOT_DIR/scripts/generate-local-gateway-cert.sh"
 
-  log "Starting api-gateway on http://127.0.0.1:8080 and https://127.0.0.1:8443..."
-  compose up -d api-gateway >/dev/null
+  log "Starting api-gateway-host on http://127.0.0.1:8080 and https://127.0.0.1:8443..."
+  compose up -d api-gateway-host >/dev/null
   GATEWAY_STARTED=true
 
   log "Waiting for api-gateway..."

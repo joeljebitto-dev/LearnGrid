@@ -25,24 +25,48 @@ LearnGrid LMS is a web-based learning management platform scaffolded as a monore
 pnpm dev
 ```
 
-3. For repeat starts after dependencies and migrations are already prepared:
+3. Or run the full hot-reload stack inside Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+If another local app is using a default port, set the matching `*_HOST_PORT` variable before
+starting Compose, for example `FRONTEND_HOST_PORT=15173 KAFKA_HOST_PORT=19092 docker compose up --build`.
+
+4. For repeat starts after dependencies and migrations are already prepared:
 
 ```bash
 pnpm dev:fast
 ```
 
-4. Check service health:
+5. Check service health:
 
 ```bash
 curl http://127.0.0.1:8001/health/
 curl -k https://127.0.0.1:8443/gateway/health
 ```
 
-5. Add deterministic local demo data:
+6. Add deterministic local demo data:
 
 ```bash
 scripts/seed-sample-data.sh
 ```
+
+When using the Docker Compose app stack, seed through the running service containers:
+
+```bash
+scripts/seed-sample-data-compose.sh
+```
+
+Run the visible Selenium GUI credential smoke through Compose:
+
+```bash
+docker compose --profile e2e up --abort-on-container-exit --exit-code-from selenium-e2e selenium-e2e
+```
+
+Open `http://127.0.0.1:7900` while tests run to watch the browser through noVNC. The default
+viewer password is `secret`, and WebDriver is exposed on `http://127.0.0.1:4444`.
 
 Demo bot credentials are listed in [LOCAL_BOT_USERS.txt](LOCAL_BOT_USERS.txt). The seed is
 idempotent and safe to rerun; use `scripts/seed-sample-data.sh --reset-sample-data` to remove only

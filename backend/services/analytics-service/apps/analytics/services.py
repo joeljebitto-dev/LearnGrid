@@ -50,8 +50,34 @@ class UserServiceError(APIException):
     default_detail = "User-service request failed."
 
 
+class AuthServiceError(APIException):
+    status_code = 502
+    default_code = "auth_service_error"
+    default_detail = "Auth-service request failed."
+
+
 def auth_token(request) -> str:
     return str(request.auth)
+
+
+def current_session(*, token: str) -> dict[str, Any]:
+    request = urlrequest.Request(
+        f"{settings.AUTH_SERVICE_BASE_URL.rstrip('/')}/api/auth/session/",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        },
+        method="GET",
+    )
+    try:
+        with urlrequest.urlopen(request, timeout=3) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except error.HTTPError as exc:
+        if exc.code in {401, 403}:
+            raise PermissionDenied("Session lookup was denied.") from exc
+        raise AuthServiceError(f"Auth-service returned HTTP {exc.code}.") from exc
+    except (error.URLError, TimeoutError, OSError, ValueError) as exc:
+        raise AuthServiceError("Auth-service is unavailable.") from exc
 
 
 def current_profile(*, token: str) -> dict[str, Any]:
@@ -91,6 +117,28 @@ def require_analytics_view(
         scope_id=scope_id,
     ):
         raise PermissionDenied("You do not have permission to view analytics.")
+
+
+def require_instructor_analytics_view(
+    *,
+    token: str,
+    institution_id: str | None = None,
+) -> None:
+    session = current_session(token=token)
+    for assignment in session.get("role_assignments", []):
+        if assignment.get("role_code") != "instructor":
+            continue
+        if assignment.get("scope_type") != "course" or not assignment.get("scope_id"):
+            continue
+        if remote_authorization_check(
+            token=token,
+            permission="analytics.view",
+            scope_type="course",
+            scope_id=assignment["scope_id"],
+        ):
+            return
+
+    require_analytics_view(token=token, institution_id=institution_id)
 
 
 def require_resource_search_view(

@@ -43,6 +43,7 @@ from .services import (
     generate_report_snapshot,
     ingest_event,
     require_analytics_view,
+    require_instructor_analytics_view,
     require_instructor_profile,
     require_profile_view,
     require_resource_search_view,
@@ -85,7 +86,10 @@ class InstructorDashboardView(APIView):
         token = auth_token(request)
         profile = current_profile(token=token)
         require_instructor_profile(profile)
-        require_analytics_view(token=token, institution_id=profile.get("institution_id"))
+        require_instructor_analytics_view(
+            token=token,
+            institution_id=profile.get("institution_id"),
+        )
         scope_type, scope_id = dashboard_scope_for_profile(profile)
         return Response(
             cached_dashboard_payload(

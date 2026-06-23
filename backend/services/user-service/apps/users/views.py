@@ -266,7 +266,6 @@ class CurrentProfileView(APIView):
             profile_queryset().filter(deleted_at__isnull=True),
             auth_account_id=request.user.id,
         )
-        require_profile_permission(request, "profile.view", profile.institution_id)
         return Response(UserProfileSerializer(profile).data)
 
 

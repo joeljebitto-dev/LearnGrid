@@ -436,6 +436,30 @@ def test_current_profile_returns_authenticated_profile(api_client):
 
 
 @pytest.mark.django_db
+def test_current_profile_allows_own_course_scoped_instructor_profile(api_client, monkeypatch):
+    monkeypatch.setattr(permissions, "remote_authorization_check", lambda **_kwargs: False)
+    institution = create_institution()
+    account_id = uuid4()
+    profile = UserProfile.objects.create(
+        auth_account_id=account_id,
+        institution=institution,
+        first_name="Current",
+        last_name="Instructor",
+    )
+    InstructorProfile.objects.create(user_profile=profile, employee_number="INS-ME")
+
+    response = api_client.get(
+        "/api/users/profiles/me/",
+        **auth_headers(token_for_account(account_id)),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["id"] == str(profile.id)
+    assert body["profile_type"] == "instructor"
+
+
+@pytest.mark.django_db
 def test_current_profile_rejects_missing_profile(api_client):
     response = api_client.get(
         "/api/users/profiles/me/",

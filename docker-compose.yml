@@ -1,3 +1,66 @@
+x-backend-env: &backend-env
+  DJANGO_SETTINGS_MODULE: config.settings.local
+  DJANGO_DEBUG: "true"
+  DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,auth-service,user-service,course-service,content-service,enrollment-service,progress-service,assessment-service,grading-service,notification-service,analytics-service,api-gateway,frontend-service
+  CORS_ALLOWED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080,https://localhost:8443,https://127.0.0.1:8443
+  CSRF_TRUSTED_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080,https://localhost:8443,https://127.0.0.1:8443
+  REDIS_URL: redis://redis:6379/0
+  REDIS_ENV: local
+  CONTENT_STORAGE_PROVIDER: minio
+  CONTENT_STORAGE_BUCKET: ${CONTENT_STORAGE_BUCKET:-learngrid-content}
+  CONTENT_MINIO_ENDPOINT_URL: http://minio:9000
+  CONTENT_MINIO_ACCESS_KEY: ${CONTENT_MINIO_ACCESS_KEY:-learngrid}
+  CONTENT_MINIO_SECRET_KEY: ${CONTENT_MINIO_SECRET_KEY:-learngrid-minio-secret}
+  CONTENT_MINIO_SECURE: "false"
+  AUTH_SERVICE_BASE_URL: http://auth-service:8000
+  USER_SERVICE_BASE_URL: http://user-service:8000
+  COURSE_SERVICE_BASE_URL: http://course-service:8000
+  CONTENT_SERVICE_BASE_URL: http://content-service:8000
+  ENROLLMENT_SERVICE_BASE_URL: http://enrollment-service:8000
+  PROGRESS_SERVICE_BASE_URL: http://progress-service:8000
+  ASSESSMENT_SERVICE_BASE_URL: http://assessment-service:8000
+  GRADING_SERVICE_BASE_URL: http://grading-service:8000
+  NOTIFICATION_SERVICE_BASE_URL: http://notification-service:8000
+  ANALYTICS_SERVICE_BASE_URL: http://analytics-service:8000
+  AUTH_JWT_SIGNING_KEY: ${AUTH_JWT_SIGNING_KEY:-insecure-local-auth-service-change-me-32bytes}
+  AUTH_TOKEN_HASH_KEY: ${AUTH_TOKEN_HASH_KEY:-insecure-local-auth-service-change-me-32bytes}
+  AUTH_JWT_ISSUER: ${AUTH_JWT_ISSUER:-learngrid-auth-service}
+  AUTH_JWT_ALGORITHM: HS256
+  KAFKA_ENABLED: "true"
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  KAFKA_DEFAULT_PARTITIONS: ${KAFKA_DEFAULT_PARTITIONS:-3}
+  KAFKA_REPLICATION_FACTOR: ${KAFKA_REPLICATION_FACTOR:-1}
+  KAFKA_MAX_RETRY_ATTEMPTS: ${KAFKA_MAX_RETRY_ATTEMPTS:-3}
+  AUTH_LOGIN_RATE_LIMIT_COUNT: ${AUTH_LOGIN_RATE_LIMIT_COUNT:-50}
+  AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS: ${AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS:-900}
+
+x-backend-common: &backend-common
+  restart: unless-stopped
+  command: >
+    sh -c "python manage.py migrate --noinput &&
+    python manage.py runserver 0.0.0.0:8000"
+  environment:
+    <<: *backend-env
+  volumes:
+    - ./backend/shared:/app/backend/shared
+    - ./scripts/sample-data:/app/scripts/sample-data:ro
+    - ./scripts/sample_data:/app/scripts/sample_data:ro
+  depends_on: &backend-depends
+    postgres-init:
+      condition: service_completed_successfully
+    redis:
+      condition: service_healthy
+    minio-init:
+      condition: service_completed_successfully
+    kafka-init:
+      condition: service_completed_successfully
+  healthcheck:
+    test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health/ >/dev/null"]
+    interval: 10s
+    timeout: 5s
+    retries: 12
+    start_period: 30s
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -7,7 +70,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-learngrid}
       POSTGRES_DB: learngrid
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - learngrid_postgres_data:/var/lib/postgresql/data
       - ./infrastructure/docker/postgres/init:/docker-entrypoint-initdb.d:ro
@@ -17,11 +80,30 @@ services:
       timeout: 5s
       retries: 5
 
+  postgres-init:
+    image: postgres:16-alpine
+    container_name: learngrid-postgres-init
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-learngrid}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-learngrid}
+    command: >
+      sh -c '
+      set -eu;
+      for db in auth_db user_db course_db content_db enrollment_db progress_db assessment_db grading_db notification_db analytics_db; do
+        if ! psql -h postgres -U "$$POSTGRES_USER" -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '\''$$db'\''" | grep -q 1; then
+          createdb -h postgres -U "$$POSTGRES_USER" "$$db";
+        fi;
+      done
+      '
+
   redis:
     image: redis:7-alpine
     container_name: learngrid-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_HOST_PORT:-6379}:6379"
     volumes:
       - learngrid_redis_data:/data
     healthcheck:
@@ -38,8 +120,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-learngrid}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-learngrid-minio-secret}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_API_HOST_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
     volumes:
       - learngrid_minio_data:/data
     healthcheck:
@@ -65,13 +147,13 @@ services:
     image: apache/kafka:3.8.1
     container_name: learngrid-kafka
     ports:
-      - "9092:29092"
+      - "${KAFKA_HOST_PORT:-9092}:29092"
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,PLAINTEXT_HOST://:29092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://127.0.0.1:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://127.0.0.1:${KAFKA_HOST_PORT:-9092}
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
@@ -118,24 +200,390 @@ services:
       kafka:
         condition: service_healthy
     ports:
-      - "8090:8080"
+      - "${KAFKA_UI_HOST_PORT:-8090}:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: learngrid-local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
 
+  frontend-service:
+    image: node:22-alpine
+    container_name: learngrid-frontend-service
+    working_dir: /workspace
+    environment:
+      VITE_API_BASE_URL: /api
+      LEARNGRID_AUTH_PROXY_TARGET: http://auth-service:8000
+      LEARNGRID_USER_PROXY_TARGET: http://user-service:8000
+      LEARNGRID_COURSE_PROXY_TARGET: http://course-service:8000
+      LEARNGRID_CONTENT_PROXY_TARGET: http://content-service:8000
+      LEARNGRID_ENROLLMENT_PROXY_TARGET: http://enrollment-service:8000
+      LEARNGRID_PROGRESS_PROXY_TARGET: http://progress-service:8000
+      LEARNGRID_ASSESSMENT_PROXY_TARGET: http://assessment-service:8000
+      LEARNGRID_GRADING_PROXY_TARGET: http://grading-service:8000
+      LEARNGRID_NOTIFICATION_PROXY_TARGET: http://notification-service:8000
+      LEARNGRID_ANALYTICS_PROXY_TARGET: http://analytics-service:8000
+      CHOKIDAR_USEPOLLING: "true"
+    ports:
+      - "${FRONTEND_HOST_PORT:-5173}:5173"
+    volumes:
+      - .:/workspace
+      - learngrid_root_node_modules:/workspace/node_modules
+      - learngrid_frontend_node_modules:/workspace/frontend/node_modules
+      - learngrid_pnpm_store:/pnpm-store
+    command: >
+      sh -c "corepack enable &&
+      pnpm config set store-dir /pnpm-store &&
+      pnpm install --frozen-lockfile &&
+      pnpm -C frontend dev --host 0.0.0.0 --port 5173"
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      user-service:
+        condition: service_healthy
+      course-service:
+        condition: service_healthy
+      content-service:
+        condition: service_healthy
+      enrollment-service:
+        condition: service_healthy
+      progress-service:
+        condition: service_healthy
+      assessment-service:
+        condition: service_healthy
+      grading-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      analytics-service:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:5173').then((r)=>process.exit(r.status < 500 ? 0 : 1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  auth-service:
+    <<: *backend-common
+    build:
+      context: .
+      dockerfile: backend/services/auth-service/Dockerfile
+      args:
+        SERVICE_NAME: auth-service
+    container_name: learngrid-auth-service
+    working_dir: /app/backend/services/auth-service
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-learngrid}:${POSTGRES_PASSWORD:-learngrid}@postgres:5432/auth_db
+    ports:
+      - "${AUTH_SERVICE_HOST_PORT:-8001}:8000"
+    volumes:
+      - ./backend/services/auth-service:/app/backend/services/auth-service
+      - ./backend/shared:/app/backend/shared
+      - ./scripts/sample-data:/app/scripts/sample-data:ro
+      - ./scripts/sample_data:/app/scripts/sample_data:ro
+
+  user-service:
+    <<: *backend-common
+    build:
+      context: .
+      dockerfile: backend/services/user-service/Dockerfile
+      args:
+        SERVICE_NAME: user-service
+    container_name: learngrid-user-service
+    working_dir: /app/backend/services/user-service
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-learngrid}:${POSTGRES_PASSWORD:-learngrid}@postgres:5432/user_db
+    ports:
+      - "${USER_SERVICE_HOST_PORT:-8002}:8000"
+    volumes:
+      - ./backend/services/user-service:/app/backend/services/user-service
+      - ./backend/shared:/app/backend/shared
+      - ./scripts/sample-data:/app/scripts/sample-data:ro
+      - ./scripts/sample_data:/app/scripts/sample_data:ro
+
+  course-service:
+    <<: *backend-common
+    build:
+      context: .
+      dockerfile: backend/services/course-service/Dockerfile
+      args:
+        SERVICE_NAME: course-service
+    container_name: learngrid-course-service
+    working_dir: /app/backend/services/course-service
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-learngrid}:${POSTGRES_PASSWORD:-learngrid}@postgres:5432/course_db
+    ports:
+      - "${COURSE_SERVICE_HOST_PORT:-8003}:8000"
+    volumes:
+      - ./backend/services/course-service:/app/backend/services/course-service
+      - ./backend/shared:/app/backend/shared
+      - ./scripts/sample-data:/app/scripts/sample-data:ro
+      - ./scripts/sample_data:/app/scripts/sample_data:ro
+
+  content-service:
+    <<: *backend-common
+    build:
+      context: .
+      dockerfile: backend/services/content-service/Dockerfile
+      args:
+        SERVICE_NAME: content-service
+    container_name: learngrid-content-service
+    working_dir: /app/backend/services/content-service
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-learngrid}:${POSTGRES_PASSWORD:-learngrid}@postgres:5432/content_db
+    ports:
+      - "${CONTENT_SERVICE_HOST_PORT:-8004}:8000"
+    volumes:
+      - ./backend/services/content-service:/app/backend/services/content-service
+      - ./backend/shared:/app/backend/shared
+      - ./scripts/sample-data:/app/scripts/sample-data:ro
+      - ./scripts/sample_data:/app/scripts/sample_data:ro
+
+  enrollment-service:
+    <<: *backend-common
+    build:
+      context: .
+      dockerfile: backend/services/enrollment-service/Dockerfile
+      args:
+        SERVICE_NAME: enrollment-service
+    container_name: learngrid-enrollment-service
+    working_dir: /app/backend/services/enrollment-service
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-learngrid}:${POSTGRES_PASSWORD:-learngrid}@postgres:5432/enrollment_db
+    ports:
+      - "${ENROLLMENT_SERVICE_HOST_PORT:-8005}:8000"
+    volumes:
+      - ./backend/services/enrollment-service:/app/backend/services/enrollment-service
+      - ./backend/shared:/app/backend/shared
+      - ./scripts/sample-data:/app/scripts/sample-data:ro
+      - ./scripts/sample_data:/app/scripts/sample_data:ro
+
+  progress-service:
+    <<: *backend-common
+    build:
+      context: .
+      dockerfile: backend/services/progress-service/Dockerfile
+      args:
+        SERVICE_NAME: progress-service
+    container_name: learngrid-progress-service
+    working_dir: /app/backend/services/progress-service
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-learngrid}:${POSTGRES_PASSWORD:-learngrid}@postgres:5432/progress_db
+    ports:
+      - "${PROGRESS_SERVICE_HOST_PORT:-8006}:8000"
+    volumes:
+      - ./backend/services/progress-service:/app/backend/services/progress-service
+      - ./backend/shared:/app/backend/shared
+      - ./scripts/sample-data:/app/scripts/sample-data:ro
+      - ./scripts/sample_data:/app/scripts/sample_data:ro
+
+  assessment-service:
+    <<: *backend-common
+    build:
+      context: .
+      dockerfile: backend/services/assessment-service/Dockerfile
+      args:
+        SERVICE_NAME: assessment-service
+    container_name: learngrid-assessment-service
+    working_dir: /app/backend/services/assessment-service
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-learngrid}:${POSTGRES_PASSWORD:-learngrid}@postgres:5432/assessment_db
+    ports:
+      - "${ASSESSMENT_SERVICE_HOST_PORT:-8007}:8000"
+    volumes:
+      - ./backend/services/assessment-service:/app/backend/services/assessment-service
+      - ./backend/shared:/app/backend/shared
+      - ./scripts/sample-data:/app/scripts/sample-data:ro
+      - ./scripts/sample_data:/app/scripts/sample_data:ro
+
+  grading-service:
+    <<: *backend-common
+    build:
+      context: .
+      dockerfile: backend/services/grading-service/Dockerfile
+      args:
+        SERVICE_NAME: grading-service
+    container_name: learngrid-grading-service
+    working_dir: /app/backend/services/grading-service
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-learngrid}:${POSTGRES_PASSWORD:-learngrid}@postgres:5432/grading_db
+    ports:
+      - "${GRADING_SERVICE_HOST_PORT:-8008}:8000"
+    volumes:
+      - ./backend/services/grading-service:/app/backend/services/grading-service
+      - ./backend/shared:/app/backend/shared
+      - ./scripts/sample-data:/app/scripts/sample-data:ro
+      - ./scripts/sample_data:/app/scripts/sample_data:ro
+
+  notification-service:
+    <<: *backend-common
+    build:
+      context: .
+      dockerfile: backend/services/notification-service/Dockerfile
+      args:
+        SERVICE_NAME: notification-service
+    container_name: learngrid-notification-service
+    working_dir: /app/backend/services/notification-service
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-learngrid}:${POSTGRES_PASSWORD:-learngrid}@postgres:5432/notification_db
+    ports:
+      - "${NOTIFICATION_SERVICE_HOST_PORT:-8009}:8000"
+    volumes:
+      - ./backend/services/notification-service:/app/backend/services/notification-service
+      - ./backend/shared:/app/backend/shared
+      - ./scripts/sample-data:/app/scripts/sample-data:ro
+      - ./scripts/sample_data:/app/scripts/sample_data:ro
+
+  analytics-service:
+    <<: *backend-common
+    build:
+      context: .
+      dockerfile: backend/services/analytics-service/Dockerfile
+      args:
+        SERVICE_NAME: analytics-service
+    container_name: learngrid-analytics-service
+    working_dir: /app/backend/services/analytics-service
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-learngrid}:${POSTGRES_PASSWORD:-learngrid}@postgres:5432/analytics_db
+    ports:
+      - "${ANALYTICS_SERVICE_HOST_PORT:-8010}:8000"
+    volumes:
+      - ./backend/services/analytics-service:/app/backend/services/analytics-service
+      - ./backend/shared:/app/backend/shared
+      - ./scripts/sample-data:/app/scripts/sample-data:ro
+      - ./scripts/sample_data:/app/scripts/sample_data:ro
+
+  gateway-cert:
+    image: python:3.12-slim
+    container_name: learngrid-gateway-cert
+    command: >
+      sh -c '
+      set -eu;
+      mkdir -p /certs;
+      if [ ! -f /certs/learngrid-local.crt ] || [ ! -f /certs/learngrid-local.key ]; then
+        openssl req -x509 -newkey rsa:2048 -sha256 -days 365 -nodes -keyout /certs/learngrid-local.key -out /certs/learngrid-local.crt -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1";
+        chmod 600 /certs/learngrid-local.key;
+      fi
+      '
+    volumes:
+      - ./infrastructure/docker/nginx/certs:/certs
+
   api-gateway:
     image: nginx:1.27-alpine
     container_name: learngrid-api-gateway
+    ports:
+      - "${API_GATEWAY_HTTP_HOST_PORT:-8080}:8080"
+      - "${API_GATEWAY_HTTPS_HOST_PORT:-8443}:8443"
+    volumes:
+      - ./infrastructure/docker/nginx/compose.conf:/etc/nginx/nginx.conf:ro
+      - ./infrastructure/docker/nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      gateway-cert:
+        condition: service_completed_successfully
+      frontend-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --no-check-certificate -O- https://127.0.0.1:8443/gateway/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  selenium-chrome:
+    image: selenium/standalone-chromium:latest
+    container_name: learngrid-selenium-chrome
+    profiles:
+      - e2e
+    shm_size: 2gb
+    environment:
+      SE_START_XVFB: "true"
+      SE_SCREEN_WIDTH: ${SELENIUM_SCREEN_WIDTH:-1440}
+      SE_SCREEN_HEIGHT: ${SELENIUM_SCREEN_HEIGHT:-1000}
+      SE_NODE_SESSION_TIMEOUT: ${SELENIUM_SESSION_TIMEOUT:-300}
+      SE_VNC_PASSWORD: ${SELENIUM_VNC_PASSWORD:-secret}
+    ports:
+      - "${SELENIUM_WEBDRIVER_HOST_PORT:-4444}:4444"
+      - "${SELENIUM_NOVNC_HOST_PORT:-7900}:7900"
+    depends_on:
+      frontend-service:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:4444/status | grep -q '\"ready\"[[:space:]]*:[[:space:]]*true'",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  selenium-e2e:
+    image: python:3.13-slim
+    container_name: learngrid-selenium-e2e
+    profiles:
+      - e2e
+    working_dir: /workspace
+    environment:
+      E2E_BASE_URL: http://frontend-service:5173
+      E2E_STUDENT_EMAIL: ${E2E_STUDENT_EMAIL:-bot.student@learngrid.local}
+      E2E_STUDENT_PASSWORD: ${E2E_STUDENT_PASSWORD:-BotStudent123!}
+      E2E_INSTRUCTOR_EMAIL: ${E2E_INSTRUCTOR_EMAIL:-bot.instructor@learngrid.local}
+      E2E_INSTRUCTOR_PASSWORD: ${E2E_INSTRUCTOR_PASSWORD:-BotInstructor123!}
+      E2E_ADMIN_EMAIL: ${E2E_ADMIN_EMAIL:-bot.admin@learngrid.local}
+      E2E_ADMIN_PASSWORD: ${E2E_ADMIN_PASSWORD:-BotAdmin123!}
+      E2E_SUPER_ADMIN_EMAIL: ${E2E_SUPER_ADMIN_EMAIL:-bot.superadmin@learngrid.local}
+      E2E_SUPER_ADMIN_PASSWORD: ${E2E_SUPER_ADMIN_PASSWORD:-BotSuperAdmin123!}
+      SELENIUM_BROWSER: chrome
+      SELENIUM_HEADLESS: "false"
+      SELENIUM_REMOTE_URL: http://selenium-chrome:4444/wd/hub
+      SELENIUM_WINDOW_WIDTH: ${SELENIUM_SCREEN_WIDTH:-1440}
+      SELENIUM_WINDOW_HEIGHT: ${SELENIUM_SCREEN_HEIGHT:-1000}
+      SELENIUM_PYTEST_ARGS: ${SELENIUM_PYTEST_ARGS:-tests/e2e/test_compose_selenium_config.py tests/e2e/test_demo_credentials.py}
+    volumes:
+      - .:/workspace
+    command: >
+      sh -c "pip install --no-cache-dir -r requirements-test.txt &&
+      python -c 'import redis; r=redis.Redis.from_url(\"redis://redis:6379/0\"); keys=list(r.scan_iter(\"lg:local:auth-service:rate-limit:login:*\")); print(\"Clearing\", len(keys), \"login rate-limit keys\"); keys and r.delete(*keys)' &&
+      python -m pytest $${SELENIUM_PYTEST_ARGS}"
+    depends_on:
+      redis:
+        condition: service_healthy
+      frontend-service:
+        condition: service_healthy
+      selenium-chrome:
+        condition: service_healthy
+
+  api-gateway-host:
+    image: nginx:1.27-alpine
+    container_name: learngrid-api-gateway-host
+    profiles:
+      - host-dev
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "8080:8080"
-      - "8443:8443"
+      - "${API_GATEWAY_HTTP_HOST_PORT:-8080}:8080"
+      - "${API_GATEWAY_HTTPS_HOST_PORT:-8443}:8443"
     volumes:
       - ./infrastructure/docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./infrastructure/docker/nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      gateway-cert:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --no-check-certificate -O- https://localhost:8443/gateway/health >/dev/null"]
+      test: ["CMD-SHELL", "wget -q --no-check-certificate -O- https://127.0.0.1:8443/gateway/health >/dev/null"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -145,3 +593,6 @@ volumes:
   learngrid_redis_data:
   learngrid_minio_data:
   learngrid_kafka_data:
+  learngrid_root_node_modules:
+  learngrid_frontend_node_modules:
+  learngrid_pnpm_store:
